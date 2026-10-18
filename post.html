@@ -1,0 +1,1766 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>try{var t=localStorage.getItem("reelstudio-theme");document.documentElement.dataset.theme=t==="light"||t==="dark"?t:"system";}catch(e){document.documentElement.dataset.theme="system";}</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Studio Post Editor</title>
+<meta name="description" content="Girika Homes studio for posts, stories, reels and shorts across Instagram, Facebook, X and YouTube.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Manrope:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Serif+Devanagari:wght@500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --slate:#2C3A47;--deodar:#556348;--sage:#A9B896;--clay:#9A5B40;--clay-lt:#C98B6E;
+  --lime:#F4F1EC;--mist:#E4E8DC;--ink:#1C2128;--fog:#5E6773;--line:#DAD5CC;--white:#FFFFFF;
+  --serif:"Fraunces",Georgia,serif;--sans:"Manrope",Arial,sans-serif;
+  --bar:56px;
+  --bg:var(--lime);--surface:var(--white);--soft:var(--mist);--heading:var(--slate);--text:var(--ink);--muted:var(--fog);color-scheme:light;--stage:#E9E5DE;--warn-bg:#F6E7DF;--warn-fg:#7A3F27;
+}
+:root[data-theme="dark"]{--bg:#14181D;--surface:#1C2229;--soft:#262D36;--heading:#EEF1F4;--text:#D7DCE2;--muted:#9AA3AE;--line:#343C46;--mist:#2A323B;color-scheme:dark;--stage:#0F1216;--warn-bg:#3A2A22;--warn-fg:#F0C2A8;}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--bg:#14181D;--surface:#1C2229;--soft:#262D36;--heading:#EEF1F4;--text:#D7DCE2;--muted:#9AA3AE;--line:#343C46;--mist:#2A323B;color-scheme:dark;--stage:#0F1216;--warn-bg:#3A2A22;--warn-fg:#F0C2A8;}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button,input,select,textarea{font:inherit;color:inherit}
+h2{font:700 11px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0 0 12px}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+
+/* top bar */
+.bar{height:var(--bar);display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 20px;background:var(--slate);color:var(--lime)}
+.brand{display:flex;align-items:center;gap:12px;font:500 19px var(--serif)}
+.brand .mark{width:28px;height:34px}
+.bar .status{font-size:12px;color:var(--sage);white-space:nowrap}
+.bar{justify-content:flex-start;gap:24px}
+.nav{display:flex;gap:4px;margin-right:auto}
+.nav a{color:var(--sage);text-decoration:none;font-weight:600;font-size:13px;padding:7px 12px;border-radius:8px}
+.nav a:hover{color:var(--lime);background:rgba(255,255,255,.06)}
+.nav a[aria-current="page"]{color:var(--heading);background:var(--bg)}
+@media (max-width:760px){.bar .status{display:none}}
+
+/* app grid */
+.app{display:grid;grid-template-columns:250px minmax(0,1fr) 340px;height:calc(100vh - var(--bar))}
+.panel{overflow-y:auto;padding:20px;background:var(--surface)}
+.panel.left{border-right:1px solid var(--line)}
+.panel.right{border-left:1px solid var(--line)}
+.group{padding-bottom:20px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+.group:last-child{border-bottom:0;margin-bottom:0}
+
+/* format list */
+.plat{font:600 12px var(--sans);color:var(--heading);margin:14px 0 6px}
+.plat:first-of-type{margin-top:0}
+.fmt{display:flex;align-items:center;gap:10px;width:100%;text-align:left;background:none;border:1px solid transparent;border-radius:10px;padding:7px 8px;cursor:pointer}
+.fmt:hover{background:var(--bg)}
+.fmt[aria-pressed="true"]{background:var(--soft);border-color:var(--deodar)}
+.fmt .ar{flex:0 0 22px;height:22px;display:grid;place-items:center}
+.fmt .ar i{display:block;border:1.5px solid var(--slate);border-radius:2px}
+.fmt b{font-weight:600;display:block;line-height:1.2}
+.fmt small{color:var(--muted);font-size:11px}
+
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:7px 12px;font-weight:600;font-size:13px;cursor:pointer;color:var(--heading)}
+.chip:hover{background:var(--bg)}
+.chip[aria-pressed="true"]{background:var(--slate);border-color:var(--heading);color:var(--lime)}
+.preset{display:block;width:100%;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:10px;padding:9px 12px;margin-bottom:6px;cursor:pointer}
+.preset:hover{background:var(--bg)}
+.preset b{display:block;font-weight:600;color:var(--heading)}
+.preset small{color:var(--muted)}
+
+/* stage */
+.stage{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--stage)}
+.stage-top{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 20px;flex-wrap:wrap}
+.stage-top .title b{font:500 18px var(--serif);color:var(--heading)}
+.stage-top .title span{color:var(--muted);margin-left:8px;font-size:12px}
+.toggle{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:13px;color:var(--heading);cursor:pointer;user-select:none}
+.toggle input{accent-color:var(--deodar);width:16px;height:16px}
+.canvas-area{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;padding:8px 20px 20px}
+.holder{position:relative;box-shadow:0 12px 40px rgba(28,33,40,.18);border-radius:4px;overflow:hidden;background:var(--slate)}
+#cv{display:block;width:100%;height:100%;touch-action:none}
+#cv.pannable{cursor:grab}
+#cv.panning{cursor:grabbing}
+#guides{position:absolute;inset:0;pointer-events:none}
+.g-block{position:absolute;background:repeating-linear-gradient(45deg,rgba(201,91,70,.22) 0 8px,rgba(201,91,70,.12) 8px 16px);outline:1px dashed rgba(255,255,255,.7);outline-offset:-1px}
+.g-frame{position:absolute;outline:2px dashed rgba(255,255,255,.9);box-shadow:0 0 0 1px rgba(0,0,0,.25)}
+.g-label{position:absolute;left:6px;top:4px;font:700 10px/1.2 var(--sans);letter-spacing:.06em;text-transform:uppercase;color:#fff;background:rgba(28,33,40,.7);padding:3px 6px;border-radius:4px;white-space:nowrap}
+.g-frame .g-label{top:auto;bottom:4px}
+
+/* template gallery */
+.tpl-modal{position:fixed;inset:0;z-index:60;background:rgba(28,33,40,.7);display:grid;place-items:center;padding:20px}
+.tpl-box{background:var(--bg);border-radius:18px;width:min(1180px,100%);height:min(86vh,900px);display:flex;flex-direction:column;overflow:hidden}
+.tpl-head{display:flex;align-items:center;gap:14px;padding:16px 20px;border-bottom:1px solid var(--line);background:var(--surface)}
+.tpl-head h1{font:500 24px var(--serif);color:var(--heading);margin:0}
+.tpl-head .btn{margin-left:auto}
+.tpl-body{flex:1;min-height:0;display:grid;grid-template-columns:200px 1fr}
+.tpl-cats{padding:14px;border-right:1px solid var(--line);background:var(--surface);overflow-y:auto;display:flex;flex-direction:column;gap:4px}
+.tpl-cats button{text-align:left;border:0;background:none;padding:9px 12px;border-radius:9px;font-weight:600;color:var(--heading);cursor:pointer}
+.tpl-cats button[aria-pressed="true"]{background:var(--slate);color:var(--lime)}
+.tpl-cats button:hover:not([aria-pressed="true"]){background:var(--bg)}
+.tpl-grid{overflow-y:auto;padding:18px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px;align-content:start}
+.tpl-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column}
+.tpl-thumb{background:var(--soft);display:grid;place-items:center;padding:10px}
+.tpl-thumb canvas{display:block;max-width:100%;max-height:240px;border-radius:6px;box-shadow:0 4px 14px rgba(28,33,40,.15)}
+.tpl-info{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
+.tpl-info b{font-weight:700;color:var(--heading);font-size:14px}
+.tpl-info small{color:var(--muted);font-size:12px;line-height:1.35}
+.tpl-info .tag{align-self:flex-start;font:700 10px var(--sans);letter-spacing:.06em;text-transform:uppercase;background:var(--soft);color:var(--deodar);padding:3px 7px;border-radius:999px}
+.tpl-info .row{margin-top:auto}
+@media (max-width:760px){.tpl-body{grid-template-columns:1fr}.tpl-cats{flex-direction:row;overflow-x:auto;border-right:0;border-bottom:1px solid var(--line)}}
+/* pages strip */
+.pages{padding:0 20px 12px}
+.pages-row{display:flex;align-items:center;gap:8px}
+.pages-row.actions{margin-top:8px;flex-wrap:wrap}
+.page-lbl{font-weight:700;font-size:12px;color:var(--heading);margin-right:4px}
+.pages-row.actions .btn{padding:6px 10px;font-size:12px}
+.thumbs{flex:1;min-width:0;display:flex;gap:8px;overflow-x:auto;padding:4px 2px;scrollbar-width:thin}
+.thumb{position:relative;flex:0 0 auto;border:0;padding:0;background:none;cursor:pointer;border-radius:6px}
+.thumb canvas{display:block;height:64px;width:auto;border-radius:6px;box-shadow:0 0 0 1px var(--line)}
+.thumb[aria-selected="true"] canvas{box-shadow:0 0 0 3px var(--deodar)}
+.thumb b{position:absolute;left:4px;bottom:4px;font:700 10px/1 var(--sans);background:rgba(28,33,40,.75);color:#fff;padding:3px 5px;border-radius:4px}
+.thumb:focus-visible{outline:2px solid var(--deodar);outline-offset:2px}
+/* video bar */
+.vbar{display:none;align-items:center;gap:10px;padding:0 20px 16px;flex-wrap:wrap}
+.vbar.on{display:flex}
+.vbar input[type=range]{flex:1;min-width:140px;accent-color:var(--clay)}
+.time{font:600 12px var(--sans);font-variant-numeric:tabular-nums;color:var(--heading);min-width:92px}
+
+/* controls */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--heading);border-radius:10px;padding:9px 14px;font-weight:600;font-size:13px;cursor:pointer;text-decoration:none;white-space:nowrap}
+.btn:hover:not(:disabled){background:var(--bg)}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.btn svg{width:16px;height:16px;flex:0 0 16px}
+.btn.primary{background:var(--clay);border-color:var(--clay);color:#fff}
+.btn.primary:hover:not(:disabled){background:#86492F}
+.btn.dark{background:var(--slate);border-color:var(--heading);color:var(--lime)}
+.btn.dark:hover:not(:disabled){background:var(--ink)}
+.btn.block{width:100%}
+.btn.icon{padding:9px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.field{margin-bottom:12px}
+.field:last-child{margin-bottom:0}
+.field label,.lbl{display:block;font-weight:600;font-size:12px;color:var(--heading);margin-bottom:5px}
+.field input[type=text],.field input[type=number],.field textarea,.field select{width:100%;border:1px solid var(--line);border-radius:9px;padding:9px 11px;background:var(--surface);font-size:14px}
+.field textarea{resize:vertical;min-height:62px;line-height:1.45}
+.field input:focus,.field textarea:focus,.field select:focus,.btn:focus-visible,.chip:focus-visible,.fmt:focus-visible,.preset:focus-visible{outline:2px solid var(--deodar);outline-offset:1px}
+.hint{font-size:12px;color:var(--muted);margin-top:4px}
+.slider{display:grid;grid-template-columns:78px 1fr 42px;align-items:center;gap:8px;margin-bottom:8px}
+.slider span{font-size:12px;font-weight:600;color:var(--heading)}
+.slider output{font-size:12px;color:var(--muted);text-align:right;font-variant-numeric:tabular-nums}
+.slider input{accent-color:var(--deodar);width:100%}
+.upload{position:relative;overflow:hidden}
+.upload input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.swatch{width:30px;height:30px;border-radius:50%;border:2px solid var(--white);box-shadow:0 0 0 1px var(--line);cursor:pointer;padding:0}
+.swatch[aria-pressed="true"]{box-shadow:0 0 0 2px var(--deodar)}
+.swatch.sm{width:22px;height:22px;flex:0 0 22px}
+.auto-chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:3px 10px;font-weight:600;font-size:12px;cursor:pointer;color:var(--heading)}
+.auto-chip[aria-pressed="true"]{background:var(--slate);border-color:var(--heading);color:var(--lime)}
+.crow{margin-bottom:12px}
+.ltiles{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ltiles.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.ltile{display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:0;border:0;background:none;cursor:pointer;text-align:left}
+.ltile .pv{height:64px;border-radius:10px;border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;transition:box-shadow .15s}
+.ltile canvas{display:block;width:84%;height:44px;object-fit:contain}
+.ltile span{font-size:11px;font-weight:600;color:var(--heading);line-height:1.25}
+.ltile:hover .pv{box-shadow:0 0 0 2px var(--line)}
+.ltile[aria-checked="true"] .pv{box-shadow:0 0 0 2px var(--deodar)}
+.ltile[aria-checked="true"] span{color:var(--deodar)}
+.ltile:focus-visible{outline:none}
+.ltile:focus-visible .pv{outline:2px solid var(--deodar);outline-offset:2px}
+.crow .row{gap:4px;flex-wrap:nowrap}
+.trim{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.warn{background:var(--warn-bg);color:var(--warn-fg);border-radius:8px;padding:8px 10px;font-size:12px;margin-top:8px;display:none}
+.warn.on{display:block}
+.progress{height:6px;background:var(--soft);border-radius:6px;overflow:hidden;margin-top:10px;display:none}
+.progress.on{display:block}
+.progress i{display:block;height:100%;width:0;background:var(--clay);transition:width .2s}
+[hidden]{display:none!important}
+
+/* recording lock */
+body.recording .panel,body.recording .pages{pointer-events:none;opacity:.55}
+body.recording #exportGroup{pointer-events:auto;opacity:1}
+.recnote{display:none;background:var(--clay);color:#fff;font-weight:600;font-size:13px;padding:8px 20px;text-align:center}
+body.recording .recnote{display:block}
+
+/* responsive */
+@media (max-width:1180px){
+  .app{grid-template-columns:minmax(0,1fr) 340px;grid-template-areas:"stage right" "left right";height:auto}
+  .stage{grid-area:stage;min-height:70vh}
+  .panel.left{grid-area:left;border-right:0;border-top:1px solid var(--line)}
+  .panel.right{grid-area:right}
+}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr;grid-template-areas:"stage" "right" "left"}
+  .panel.right{border-left:0;border-top:1px solid var(--line)}
+  .panel{padding:16px}
+  .stage-top,.canvas-area,.vbar{padding-left:16px;padding-right:16px}
+  .stage{min-height:0}
+}
+body.simple .pro-only{display:none!important}
+.mode-sw{display:flex;background:rgba(255,255,255,.08);border-radius:9px;padding:3px;gap:2px;margin-left:auto}
+.mode-sw button{border:0;background:none;color:var(--sage);font:700 12px var(--sans);padding:6px 12px;border-radius:7px;cursor:pointer}
+.mode-sw button[aria-pressed="true"]{background:var(--bg);color:var(--heading)}
+html.embedded .bar{display:none}
+html.embedded .app{height:100vh}
+/* reel-skin: neutral editing-desk chrome; brand colours live only in the preview */
+:root{--slate:#1B1D21;--deodar:#1B1D21;--sage:#A3A8AF;--clay:#F2C230;--clay-lt:#F2C230;--lime:#F4F4F2;--mist:#EAEBE8;--ink:#1B1D21;--fog:#666B72;--line:#DEDFDC;--accent:#F2C230;--on-accent:#1B1D21;
+  --serif:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+:root[data-theme="dark"]{--deodar:#F2C230}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--deodar:#F2C230}}
+.g-label,
+.tpl-info .tag,
+h2{text-transform:none;letter-spacing:0;font-size:13px;font-weight:650}
+
+body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
+.btn,.chip,.tbtn,.st-btn,input,select,textarea{border-radius:6px}
+.chip{border-radius:6px;font-weight:600}
+.chip[aria-pressed=true]{background:var(--slate);color:#fff;border-color:var(--slate)}
+:root[data-theme="dark"] .chip[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+@media (prefers-color-scheme:dark){:root[data-theme="system"] .chip[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}}
+.btn.primary,.btn.primary:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(.96)}
+.group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
+:focus-visible{outline-color:var(--accent)!important}
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><span class="mark" id="brandMark" aria-hidden="true"></span>Reel Studio</div>
+  <nav class="nav" aria-label="Tools">
+    <a href="index.html">Home</a>
+    <a href="post.html" aria-current="page">Post studio</a>
+    <a href="video.html">Video editor</a>
+  </nav>
+  <span class="theme-slot"></span>
+  <div class="mode-sw" role="group" aria-label="Editing mode"><button type="button" data-m="simple">Simple</button><button type="button" data-m="pro">Pro</button></div>
+  <span class="status" id="saveStatus" aria-live="polite">Draft saved on this browser</span>
+</header>
+<div class="recnote" role="status">Recording your video. Keep this tab open and visible until it finishes.</div>
+
+<div class="tpl-modal" id="tplModal" hidden role="dialog" aria-modal="true" aria-labelledby="tplTitle">
+  <div class="tpl-box">
+    <div class="tpl-head">
+      <h1 id="tplTitle">Templates</h1>
+      <span class="hint" id="tplFmt"></span>
+      <button class="btn" id="tplClose">Close</button>
+    </div>
+    <div class="tpl-body">
+      <nav class="tpl-cats" id="tplCats" aria-label="Template categories"></nav>
+      <div class="tpl-grid" id="tplGrid"></div>
+    </div>
+  </div>
+</div>
+<div class="app">
+
+  <!-- LEFT: format, layout, presets -->
+  <aside class="panel left" aria-label="Format and layout">
+    <div class="group">
+      <h2>Format</h2>
+      <div id="formatList"></div>
+    </div>
+    <div class="group">
+      <h2>Layout</h2>
+      <div class="chips" id="layoutList"></div>
+    </div>
+    <div class="group">
+      <h2>Templates</h2>
+      <button class="btn primary block" id="tplOpen">Browse templates</button>
+      <p class="hint">Listings, site visits, buyer guides, location, contact and festive posts. Text in [brackets] is for you to fill in.</p>
+    </div>
+  </aside>
+
+  <!-- CENTER: canvas -->
+  <main class="stage">
+    <div class="stage-top">
+      <div class="title"><b id="fmtTitle">Instagram Post</b><span id="fmtDims">1080 x 1350</span></div>
+      <label class="toggle"><input type="checkbox" id="guidesToggle" checked> Safe zone guides</label>
+    </div>
+    <div class="canvas-area" id="canvasArea">
+      <div class="holder" id="holder">
+        <canvas id="cv" role="img" aria-label="Post preview"></canvas>
+        <div id="guides" aria-hidden="true"></div>
+      </div>
+    </div>
+    <div class="pages" id="pagesBar">
+      <div class="pages-row">
+        <button class="btn icon" id="prevPage" aria-label="Previous page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></button>
+        <div class="thumbs" id="thumbs" role="tablist" aria-label="Pages"></div>
+        <button class="btn icon" id="nextPage" aria-label="Next page"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
+        <button class="btn dark" id="addPage"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add page</button>
+      </div>
+      <div class="pages-row actions">
+        <span class="page-lbl" id="pageLbl">Page 1 of 1</span>
+        <button class="btn" id="dupPage">Duplicate</button>
+        <button class="btn" id="moveLeft" aria-label="Move page left">Move left</button>
+        <button class="btn" id="moveRight" aria-label="Move page right">Move right</button>
+        <button class="btn" id="delPage">Delete</button>
+      </div>
+    </div>
+    <div class="vbar" id="vbar">
+      <button class="btn icon" id="playBtn" aria-label="Play"></button>
+      <input type="range" id="scrub" min="0" max="1" step="0.01" value="0" aria-label="Video position">
+      <span class="time" id="timeLbl">0:00 / 0:00</span>
+      <button class="btn" id="soundBtn" aria-pressed="false"></button>
+    </div>
+  </main>
+
+  <!-- RIGHT: media, text, style, export -->
+  <aside class="panel right" aria-label="Edit">
+    <div class="group">
+      <h2>Photo or video</h2>
+      <div class="row">
+        <label class="btn dark upload" style="flex:1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>Upload<input type="file" id="fileIn" accept="image/*,video/*"></label>
+        <button class="btn" id="clearMedia" disabled>Remove</button>
+      </div>
+      <p class="hint" id="mediaHint">No file yet. A brand hill scene is used as a placeholder.</p>
+      <div id="posCtl" hidden style="margin-top:12px">
+        <div class="slider"><span>Zoom</span><input type="range" id="zoom" min="1" max="3" step="0.01" value="1"><output id="zoomOut">100%</output></div>
+        <div class="slider"><span>Left/right</span><input type="range" id="posX" min="0" max="1" step="0.005" value="0.5"><output id="posXOut">50%</output></div>
+        <div class="slider"><span>Up/down</span><input type="range" id="posY" min="0" max="1" step="0.005" value="0.5"><output id="posYOut">50%</output></div>
+        <p class="hint">Tip: drag the photo on the canvas to reposition it.</p>
+      </div>
+      <div id="trimCtl" hidden style="margin-top:12px">
+        <span class="lbl">Trim (seconds)</span>
+        <div class="trim">
+          <div class="field"><input type="number" id="trimStart" min="0" step="0.1" aria-label="Start time"><button class="btn block" id="setStart" style="margin-top:6px">Start here</button></div>
+          <div class="field"><input type="number" id="trimEnd" min="0" step="0.1" aria-label="End time"><button class="btn block" id="setEnd" style="margin-top:6px">End here</button></div>
+        </div>
+        <p class="hint" id="trimLen"></p>
+        <div class="warn" id="durWarn"></div>
+      </div>
+    </div>
+
+    <div class="group">
+      <h2>Text</h2>
+      <div id="fieldList"></div>
+      <p class="hint">Wrap words in *stars* to highlight them. Clear a field to hide it.</p>
+    </div>
+
+    <div class="group">
+      <h2>Style</h2>
+      <div class="field" data-for="split text listing banner">
+        <span class="lbl">Panel colour</span>
+        <div class="row" id="themeList"></div>
+      </div>
+      <div class="field" data-for="feature split listing banner">
+        <label for="overlay">Photo shade</label>
+        <select id="overlay">
+          <option value="auto">Auto (best for layout)</option>
+          <option value="bottom">Bottom fade</option>
+          <option value="top">Top fade</option>
+          <option value="edges">Top and bottom</option>
+          <option value="band">Bottom block (strong)</option>
+          <option value="left">Left fade</option>
+          <option value="right">Right fade</option>
+          <option value="vignette">Vignette (dark corners)</option>
+          <option value="full">Full tint</option>
+          <option value="none">None</option>
+        </select>
+        <div class="pro-only">
+        <span class="lbl" style="margin-top:10px">Shade colour</span>
+        <div class="row" id="shadeList"></div>
+        <p class="hint" id="shadeHint" hidden>Light wash: text set to Auto switches to dark colours.</p>
+        <div class="slider" style="margin-top:8px"><span>Strength</span><input type="range" id="overlayK" min="0" max="1" step="0.05" value="0.85"><output id="overlayKOut">85%</output></div>
+        </div>
+      </div>
+      <div class="field" data-for="feature">
+        <span class="lbl">Text position</span>
+        <div class="chips" id="alignList"></div>
+      </div>
+      <div class="field" id="indField">
+        <span class="lbl">Carousel indicator</span>
+        <div class="chips" id="indList"></div>
+        <p class="hint">Shows on carousel formats when there are 2 or more pages. Swipe hides itself on the last page.</p>
+      </div>
+      <div class="field pro-only" data-for="feature listing">
+        <span class="lbl">Button colour</span>
+        <div class="chips" id="ctaList"></div>
+      </div>
+    </div>
+
+    <div class="group pro-only">
+      <h2>Text size</h2>
+      <div class="slider"><span>All text</span><input type="range" id="textScale" min="0.7" max="1.4" step="0.01" value="1"><output id="textScaleOut">100%</output></div>
+      <div id="sizeList"></div>
+      <button class="btn block" id="sizeReset" style="margin-top:6px">Reset sizes</button>
+      <p class="hint">Headlines still shrink automatically if they would run out of space or into the app UI.</p>
+    </div>
+
+    <div class="group">
+      <h2>Logo</h2>
+      <label class="toggle"><input type="checkbox" id="showLogo" checked> Show logo</label>
+      <div id="logoCtl" class="pro-only" style="margin-top:12px">
+        <div class="field"><span class="lbl" id="logoKindLbl">Logo type</span><div class="ltiles three" id="logoKindList" role="radiogroup" aria-labelledby="logoKindLbl"></div></div>
+        <div class="field"><span class="lbl" id="logoToneLbl">Logo version</span><div class="ltiles" id="logoToneList" role="radiogroup" aria-labelledby="logoToneLbl"></div></div>
+      </div>
+    </div>
+
+    <div class="group pro-only">
+      <h2>Text colours</h2>
+      <div id="colorList"></div>
+      <p class="hint">Auto picks the brand colour that reads best on the current background.</p>
+    </div>
+
+    <div class="group" id="exportGroup">
+      <h2>Export</h2>
+      <button class="btn primary block" id="pngBtn">Save PNG</button>
+      <button class="btn dark block" id="zipBtn" style="margin-top:8px" hidden>Download all pages (ZIP)</button>
+      <button class="btn dark block" id="vidBtn" style="margin-top:8px" hidden>Save MP4</button>
+      <button class="btn block" id="cancelBtn" style="margin-top:8px" hidden>Cancel recording</button>
+      <div class="progress" id="prog"><i></i></div>
+      <p class="hint" id="exportHint"></p>
+      <button class="btn block" id="resetBtn" style="margin-top:16px">Reset this page's text and colours</button>
+    </div>
+  </aside>
+</div>
+
+<script src="rs-store.js"></script>
+<script>RS.theme.mount(document.querySelector(".theme-slot"));</script>
+<script src="brand.js"></script>
+<script src="packs.js"></script>
+<script>
+if (!window.GIRIKA) document.body.insertAdjacentHTML("afterbegin", '<p style="background:#9A5B40;color:#fff;padding:12px 20px;margin:0;font-weight:600">brand.js is missing. Keep brand.js in the same folder as this file.</p>');
+const LOGO = GIRIKA.LOGO;
+
+/* =========================================================
+   Brand constants
+   ========================================================= */
+const C = { ...GIRIKA.C };
+const SERIF = GIRIKA.FONTS.SERIF, SANS = GIRIKA.FONTS.SANS;
+const KIT = GIRIKA.KIT, PACK = (window.REEL_PACKS || {})[GIRIKA.industry] || null;
+const FILE_PREFIX = (KIT.name || "reel-studio").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "reel-studio";
+const LOGO_TONES = GIRIKA.TONES;
+/* value, label, preview background */
+const LOGO_STYLES = [["auto","Auto","split"],["light","Full colour","lime"],["dark","Reversed","slate"],["green","On green","deodar"],["mono-slate","Mono slate","mist"],["mono-white","Mono white","slate"]];
+const TEXT_PALETTE = [...GIRIKA.PALETTE.filter(p => p.key !== "fog").map(p => [p.hex, p.name]), [C.white, "White"]];
+const TEXT_ROLES = [["head","Headline"],["hl","Highlighted words"],["body","Supporting line"],["eyebrow","Small line / location"]];
+const THEMES = {
+  lime:   { label:"Limestone", bg:C.lime, head:C.slate, body:"#3B434D", muted:C.fog, eyebrow:C.deodar, accent:C.clay, hl:C.clay, num:C.sage, rule:C.deodar, chip:C.mist, chipText:C.slate, line:"#DAD5CC", logo:"light", ridge:["#ECE8E0","#E6E9DF"] },
+  slate:  { label:"Slate", bg:C.slate, head:C.lime, body:C.mist, muted:C.sage, eyebrow:C.sage, accent:C.clayLt, hl:C.clayLt, num:"#4A5B4A", rule:C.clayLt, chip:"#3A4A58", chipText:C.lime, line:"#44556A", logo:"dark", ridge:["#334351","#3A4A58"] },
+  deodar: { label:"Deodar", bg:C.deodar, head:C.lime, body:C.mist, muted:"#D5DCCB", eyebrow:C.mist, accent:C.lime, hl:C.mist, num:C.sage, rule:C.clayLt, chip:"#4B583F", chipText:C.lime, line:"#6B7A5D", logo:"green", ridge:["#4E5B42","#5B6A4E"] }
+};
+/* Ridge silhouette from the brand cover, normalised to 1440 x 140 */
+const RIDGE_A = [[0,90],[160,52],[300,84],[470,38],[640,80],[820,46],[990,86],[1160,50],[1320,78],[1440,60]];
+const RIDGE_B = [[0,118],[200,92],[380,112],[560,86],[760,114],[960,90],[1150,116],[1320,96],[1440,108]];
+const RIDGE_SPLIT = [[0,50],[70,26],[150,46],[240,12],[330,44],[420,22],[540,40]]; /* 540 x 90 */
+
+/* =========================================================
+   Formats. safe = minimum insets (px) that the app UI covers.
+   Values are approximate; apps change their UI over time.
+   ========================================================= */
+const ALL = ["feature","split","listing","text"];
+const FORMATS = {
+  "ig-post":   { platform:"Instagram", name:"Post 4:5", short:"Post", w:1080, h:1350, carousel:true, layouts:ALL, video:true,
+                 guides:[{kind:"frame", x:33.75, y:0, w:1012.5, h:1350, label:"Profile grid crop (3:4)"}] },
+  "ig-square": { platform:"Instagram", name:"Square 1:1", short:"Square post", w:1080, h:1080, carousel:true, layouts:ALL, video:true, guides:[] },
+  "ig-story":  { platform:"Instagram", name:"Story", short:"Story", w:1080, h:1920, layouts:ALL, video:true, max:60, maxNote:"Stories longer than 60 seconds are split into parts.",
+                 safe:{t:250,r:72,b:280,l:72} },
+  "ig-reel":   { platform:"Instagram", name:"Reel", short:"Reel", w:1080, h:1920, layouts:ALL, video:true, max:180, maxNote:"Reels can be up to 3 minutes.",
+                 safe:{t:220,r:150,b:440,l:72}, extra:[{kind:"frame", x:0, y:240, w:1080, h:1440, label:"Profile grid crop (3:4)"}] },
+  "fb-post":   { platform:"Facebook", name:"Post 4:5", short:"Post", w:1080, h:1350, carousel:true, layouts:ALL, video:true, guides:[] },
+  "fb-land":   { platform:"Facebook", name:"Landscape", short:"Landscape post", w:1200, h:630, carousel:true, layouts:ALL, video:true, guides:[] },
+  "fb-story":  { platform:"Facebook", name:"Story / Reel", short:"Story / Reel", w:1080, h:1920, layouts:ALL, video:true, max:90, maxNote:"Facebook reels work best under 90 seconds.",
+                 safe:{t:260,r:150,b:440,l:72} },
+  "fb-cover":  { platform:"Facebook", name:"Page cover", short:"Page cover", w:1640, h:624, layouts:["banner"], video:false,
+                 guides:[{kind:"frame", x:270, y:0, w:1100, h:624, label:"Visible on mobile"}] },
+  "x-post":    { platform:"X", name:"Post 16:9", short:"Post", w:1600, h:900, carousel:true, layouts:ALL, video:true, max:140, maxNote:"X allows 2 min 20 s on free accounts.", guides:[] },
+  "x-square":  { platform:"X", name:"Post 1:1", short:"Square post", w:1080, h:1080, carousel:true, layouts:ALL, video:true, max:140, maxNote:"X allows 2 min 20 s on free accounts.", guides:[] },
+  "x-header":  { platform:"X", name:"Header", short:"Header", w:1500, h:500, layouts:["banner"], video:false,
+                 guides:[{kind:"frame", x:0, y:60, w:1500, h:380, label:"Safe on all screens"},{kind:"block", x:40, y:330, w:300, h:170, label:"Profile photo"}] },
+  "yt-short":  { platform:"YouTube", name:"Short", short:"Short", w:1080, h:1920, layouts:ALL, video:true, max:180, maxNote:"Shorts can be up to 3 minutes.",
+                 safe:{t:240,r:190,b:500,l:72} }
+};
+const LAYOUTS = {
+  feature: { name:"Photo + text", fields:["badge","eyebrow","headline","body","cta"] },
+  split:   { name:"Split panel", fields:["badge","eyebrow","headline","body","cta"] },
+  listing: { name:"Listing card", fields:["badge","eyebrow","headline","specs","price","cta"] },
+  text:    { name:"Text slide", fields:["number","headline","body","handle","swipe"] },
+  banner:  { name:"Banner", fields:["tagline","contact"] }
+};
+const FIELDS = {
+  badge:   { label:"Tag", type:"text" },
+  eyebrow: { label:"Location / small line", type:"text" },
+  headline:{ label:"Headline", type:"area" },
+  body:    { label:"Supporting line", type:"area" },
+  cta:     { label:"Button text", type:"text" },
+  price:   { label:"Price", type:"text" },
+  specs:   { label:"Details (comma separated)", type:"text" },
+  number:  { label:"Slide number", type:"text" },
+  handle:  { label:"Footer left", type:"text" },
+  swipe:   { label:"Footer right", type:"text" },
+  tagline: { label:"Tagline", type:"text" },
+  contact: { label:"Contact line", type:"text" }
+};
+const DEFAULT_FIELDS = {
+  badge:"Papers checked",
+  eyebrow:"Sahastradhara Road, Dehradun",
+  headline:"Forest-view plots, *10 minutes* from the city",
+  body:"Clear titles, approved layouts and an honest site visit. No pressure, just answers.",
+  cta:"Book a site visit",
+  price:"From ₹32 Lakh",
+  specs:"200 sq yd, East facing, 30 ft road",
+  number:"01",
+  handle:"@girikahomes",
+  swipe:"Swipe",
+  tagline:"Plots, homes and property in Dehradun and nearby areas",
+  contact:"girikahomes.com  |  90585 37664"
+};
+const PRESETS = [
+  { name:"Plot launch", sub:"New plots, photo-led", layout:"feature", f:{ badge:"New plots", eyebrow:"Sahastradhara Road, Dehradun", headline:"Forest-view plots, *10 minutes* from the city", body:"Clear titles and approved layouts. Visit before you decide.", cta:"Book a site visit" } },
+  { name:"Site visit weekend", sub:"Invite people to visit", layout:"split", f:{ badge:"This weekend", eyebrow:"Free guided site visits", headline:"Come see the land *before* you decide", body:"Saturday and Sunday. Call or DM us to fix a time.", cta:"Reply VISIT to book" } },
+  { name:"Property listing", sub:"Price, details, CTA", layout:"listing", f:{ badge:"New listing", eyebrow:"Rajpur Road, Dehradun", headline:"3BHK independent home with *mountain views*", specs:"3 BHK, 2,100 sq ft, Covered parking", price:"₹1.45 Cr", cta:"Book a visit" } },
+  { name:"Buyer tip slide", sub:"Carousel text slide", layout:"text", f:{ number:"01", headline:"Check the *title documents* first", body:"Never pay a token amount before you see the original papers. The name on the registry should match the seller.", handle:"@girikahomes", swipe:"Swipe" } }
+];
+
+/* =========================================================
+   State and persistence
+   ========================================================= */
+if (PACK){ Object.keys(DEFAULT_FIELDS).forEach(k => delete DEFAULT_FIELDS[k]); Object.assign(DEFAULT_FIELDS, PACK.post.defaults); }
+GIRIKA.fill(DEFAULT_FIELDS); GIRIKA.fill(PRESETS);
+const STORE_KEY = GIRIKA.storeKey("girika-studio-v2");
+const DEFAULT_STATE = { format:"ig-post", layout:"feature", fields:{...DEFAULT_FIELDS}, theme:"lime", overlay:"auto", overlayK:0.85, align:"left", cta:"clay", textScale:1, sizes:{ head:1, body:1, eyebrow:1, ui:1 }, overlayColor:"ink", showLogo:true, indicator:"count", logoTone:"auto", logoKind:"lockup", colors:{ head:"auto", hl:"auto", body:"auto", eyebrow:"auto" }, guides:true, zoom:1, px:0.5, py:0.5 };
+let st = structuredClone(DEFAULT_STATE);
+const MAX_PAGES = 20; /* Instagram carousel limit */
+const newPage = (id, layout, fields) => ({ id, layout: layout || "feature", fields: { ...DEFAULT_FIELDS, ...(fields || {}) }, zoom:1, px:.5, py:.5 });
+try {
+  const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+  if (saved && typeof saved === "object") st = { ...st, ...saved, colors:{ ...DEFAULT_STATE.colors, ...(saved.colors||{}) }, sizes:{ ...DEFAULT_STATE.sizes, ...(saved.sizes||{}) } };
+  if (!FORMATS[st.format]) st.format = DEFAULT_STATE.format;
+} catch(e) {}
+/* pages: per-page layout, text and photo position. Style stays shared across pages. */
+if (!Array.isArray(st.pages) || !st.pages.length) st.pages = [newPage(1, st.layout, st.fields)];
+st.pages = st.pages.slice(0, MAX_PAGES).map((p, i) => newPage(p.id || i + 1, p.layout, p.fields));
+st.page = Math.min(Math.max(0, st.page | 0), st.pages.length - 1);
+delete st.layout; delete st.fields; delete st.zoom; delete st.px; delete st.py;
+let nextPageId = Math.max(...st.pages.map(p => p.id)) + 1;
+const pg = () => st.pages[st.page];
+["layout","fields","zoom","px","py"].forEach(k => Object.defineProperty(st, k, { get: () => pg()[k], set: v => { pg()[k] = v; }, enumerable:false, configurable:true }));
+let saveTimer = 0;
+function persist(){
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    try {
+      const keep = { ...st, pages: st.pages.map(({ id, layout, fields }) => ({ id, layout, fields })) };
+      localStorage.setItem(STORE_KEY, JSON.stringify(keep));
+      $("saveStatus").textContent = "Draft saved on this browser";
+    } catch(e) { $("saveStatus").textContent = "Draft not saved (storage blocked)"; }
+  }, 400);
+}
+
+const $ = id => document.getElementById(id);
+const fmt = () => FORMATS[st.format];
+const layoutKey = () => { const f = fmt(); return f.layouts.includes(st.layout) ? st.layout : f.layouts[0]; };
+
+/* =========================================================
+   Media (one persistent video element so the audio graph can be reused)
+   ========================================================= */
+const newMedia = () => ({ type:null, el:null, url:null, name:"", trim:{ start:0, end:0 }, poster:null });
+const mediaStore = new Map();
+const mediaFor = id => { if (!mediaStore.has(id)) mediaStore.set(id, newMedia()); return mediaStore.get(id); };
+let media = mediaFor(pg().id);
+let videoOwner = null; /* which page's media is loaded in the shared video element */
+function capturePoster(m){
+  if (!m || m.type !== "video" || videoOwner !== m || videoEl.readyState < 2 || !videoEl.videoWidth) return;
+  const c = m.poster && m.poster.width === videoEl.videoWidth ? m.poster : document.createElement("canvas");
+  c.width = videoEl.videoWidth; c.height = videoEl.videoHeight; c.getContext("2d").drawImage(videoEl, 0, 0);
+  m.poster = c;
+}
+const videoEl = document.createElement("video");
+videoEl.playsInline = true; videoEl.preload = "auto"; videoEl.loop = false;
+let audio = null; /* { ctx, src, monitor, dest } */
+let sound = false;
+
+function ensureAudio(){
+  if (audio) return audio;
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const src = ctx.createMediaElementSource(videoEl);
+    const monitor = ctx.createGain(); monitor.gain.value = sound ? 1 : 0;
+    const dest = ctx.createMediaStreamDestination();
+    src.connect(monitor).connect(ctx.destination);
+    src.connect(dest);
+    audio = { ctx, src, monitor, dest };
+    videoEl.muted = false;
+  } catch(e) { audio = null; videoEl.muted = !sound; }
+  return audio;
+}
+
+/* =========================================================
+   Canvas renderer
+   ========================================================= */
+const cv = $("cv"), ctx = cv.getContext("2d");
+const fg = document.createElement("canvas"), fctx = fg.getContext("2d");
+let fgDirty = true, mediaGeom = null;
+const LOGO_PATHS = {}; ["arch","sun","girika","homes"].forEach(k => LOGO_PATHS[k] = new Path2D(LOGO[k]));
+
+/* Stacked lockup, same construction as the brand book: wordmark = 1.75 x mark width, gap = 12% of mark height */
+const STK = (() => { const M = [47,59,1063,1290], Wb = [1306,284,2115,913], k = M[2] * 1.75 / Wb[2], ww = Wb[2] * k, wh = Wb[3] * k, T = Math.max(M[2], ww), gap = M[3] * .12; return { M, Wb, k, ww, T, gap, H: M[3] + gap + wh }; })();
+const logoAspect = kind => GIRIKA.IMG ? GIRIKA.imgAspect(kind) : GIRIKA.TEXTLOGO ? GIRIKA.textAspect(kind) : kind === "mark" ? 1290 / 1063 : kind === "stacked" ? STK.H / STK.T : 1290 / 3374;
+function drawLogo(c, kind, tone, x, y, width){
+  if (GIRIKA.IMG) return GIRIKA.drawImageLogo(c, kind, tone, x, y, width);
+  if (GIRIKA.TEXTLOGO) return GIRIKA.drawTextLogo(c, kind, tone, x, y, width);
+  if (kind === "stacked"){
+    const cols = LOGO_TONES[tone] || LOGO_TONES.light, s = width / STK.T;
+    c.save(); c.translate(x, y); c.scale(s, s);
+    c.save(); c.translate((STK.T - STK.M[2]) / 2 - STK.M[0], -STK.M[1]); ["arch","sun"].forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); }); c.restore();
+    c.translate((STK.T - STK.ww) / 2, STK.M[3] + STK.gap); c.scale(STK.k, STK.k); c.translate(-STK.Wb[0], -STK.Wb[1]);
+    ["girika","homes"].forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); });
+    c.restore();
+    return width * logoAspect("stacked");
+  }
+  const vb = kind === "mark" ? [47,59,1063,1290] : [47,59,3374,1290];
+  const cols = LOGO_TONES[tone] || LOGO_TONES.light, s = width / vb[2];
+  c.save(); c.translate(x - vb[0]*s, y - vb[1]*s); c.scale(s, s);
+  (kind === "mark" ? ["arch","sun"] : ["arch","sun","girika","homes"]).forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); });
+  c.restore();
+  return vb[3] * s;
+}
+
+function logoDims(w){
+  if (st.logoKind === "mark") return { kind:"mark", w:w * 1063 / 3374 * 1.35 };
+  if (st.logoKind === "stacked") return { kind:"stacked", w:w * .56 };
+  return { kind:"lockup", w };
+}
+const logoTone = def => st.logoTone === "auto" ? def : st.logoTone;
+const col = (role, def) => (st.colors[role] && st.colors[role] !== "auto") ? st.colors[role] : def;
+function ridgePath(c, pts, vw, vh, x, y, w, h, closeTo){
+  c.beginPath();
+  pts.forEach(([px,py], i) => { const X = x + px / vw * w, Y = y + py / vh * h; i ? c.lineTo(X, Y) : c.moveTo(X, Y); });
+  c.lineTo(x + w, closeTo); c.lineTo(x, closeTo); c.closePath();
+}
+
+function drawScene(c, b){
+  const g = c.createLinearGradient(0, b.y, 0, b.y + b.h);
+  g.addColorStop(0, "#DCE2D2"); g.addColorStop(.6, C.lime); g.addColorStop(1, C.lime);
+  c.fillStyle = g; c.fillRect(b.x, b.y, b.w, b.h);
+  const r = Math.min(b.w, b.h) * .075;
+  c.fillStyle = C.clayLt; c.beginPath(); c.arc(b.x + b.w*.68, b.y + b.h*.36, r, 0, Math.PI*2); c.fill();
+  const layers = [[C.sage, .42, RIDGE_A.map(([x,y]) => [1440-x,y])], [C.deodar, .56, RIDGE_A], [C.slate, .72, RIDGE_B]];
+  layers.forEach(([col, top, pts]) => { c.fillStyle = col; ridgePath(c, pts, 1440, 140, b.x, b.y + b.h*top, b.w, b.h*.22, b.y + b.h); c.fill(); });
+}
+
+function drawMedia(c, b, placeholder){
+  mediaGeom = null;
+  if (!b) return;
+  let src = null, mw = 0, mh = 0;
+  if (media.type === "image" && media.el && media.el.complete){ src = media.el; mw = src.naturalWidth; mh = src.naturalHeight; }
+  else if (media.type === "video"){
+    if (videoOwner === media && videoEl.readyState >= 2){ src = videoEl; mw = videoEl.videoWidth; mh = videoEl.videoHeight; }
+    else if (media.poster){ src = media.poster; mw = src.width; mh = src.height; }
+  }
+  if (!src || !mw || !mh){
+    if (placeholder === "scene") drawScene(c, b);
+    else { c.fillStyle = THEMES[st.theme].bg; c.fillRect(b.x, b.y, b.w, b.h); }
+    return;
+  }
+  const s = Math.max(b.w / mw, b.h / mh) * st.zoom, dw = mw * s, dh = mh * s;
+  const ox = dw - b.w, oy = dh - b.h;
+  c.save(); c.beginPath(); c.rect(b.x, b.y, b.w, b.h); c.clip();
+  c.drawImage(src, b.x - ox * st.px, b.y - oy * st.py, dw, dh);
+  c.restore();
+  mediaGeom = { ox, oy };
+}
+
+const SHADES = [["ink","Ink"],["slate","Mountain slate"],["deodar","Deodar green"],["clay","Earth clay"],["lime","Limestone (light wash)"]];
+function drawOverlay(c, b, type, k){
+  if (!b || type === "none" || k <= 0) return;
+  if (type === "slate") type = "full"; /* older drafts */
+  const hex = C[st.overlayColor] || C.ink, D = [1,3,5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(",");
+  const a = v => `rgba(${D},${Math.min(1, v * k).toFixed(3)})`;
+  let fill;
+  const lin = (x0, y0, x1, y1, stops) => { const g = c.createLinearGradient(x0, y0, x1, y1); stops.forEach(([p, v]) => g.addColorStop(p, a(v))); return g; };
+  if (type === "bottom") fill = lin(0, b.y, 0, b.y + b.h, [[0,0],[.35,0],[.7,.78],[1,.95]]);
+  else if (type === "top") fill = lin(0, b.y, 0, b.y + b.h, [[0,.95],[.3,.78],[.65,0],[1,0]]);
+  else if (type === "edges") fill = lin(0, b.y, 0, b.y + b.h, [[0,.72],[.26,0],[.42,0],[.72,.8],[1,.95]]);
+  else if (type === "left") fill = lin(b.x, 0, b.x + b.w, 0, [[0,.9],[.72,0]]);
+  else if (type === "right") fill = lin(b.x, 0, b.x + b.w, 0, [[.28,0],[1,.9]]);
+  else if (type === "vignette"){
+    const cx = b.x + b.w / 2, cy = b.y + b.h / 2, r = Math.hypot(b.w, b.h) / 2;
+    fill = c.createRadialGradient(cx, cy, r * .25, cx, cy, r); fill.addColorStop(0, a(0)); fill.addColorStop(.6, a(.35)); fill.addColorStop(1, a(.95));
+  }
+  else if (type === "band"){ /* solid block behind the text area at the bottom */
+    fill = lin(0, b.y, 0, b.y + b.h, [[0,0],[.42,0],[.5,.88],[1,.92]]);
+  }
+  else if (type === "full") fill = a(.6);
+  if (!fill) return;
+  c.fillStyle = fill; c.fillRect(b.x, b.y, b.w, b.h);
+}
+
+/* ---------- rich text: *word* = highlight ---------- */
+function parseRich(text){
+  const paras = []; let hl = false;
+  for (const line of String(text).split("\n")){
+    const words = []; let cur = "", curHl = null;
+    const push = () => { if (cur) words.push({ t:cur, hl:curHl }); cur = ""; curHl = null; };
+    for (const ch of line){
+      if (ch === "*"){ hl = !hl; continue; }
+      if (/\s/.test(ch)){ push(); continue; }
+      if (curHl === null) curHl = hl;
+      cur += ch;
+    }
+    push(); paras.push(words);
+  }
+  return paras;
+}
+function layoutRich(c, paras, maxW, f, hf, ls){
+  c.font = f; c.letterSpacing = ls + "px";
+  const sp = c.measureText(" ").width, lines = [];
+  let widest = 0;
+  for (const words of paras){
+    let line = [], lw = 0;
+    for (const wd of words){
+      c.font = wd.hl ? hf : f;
+      const ww = c.measureText(wd.t).width;
+      if (line.length && lw + sp + ww > maxW){ lines.push({ words:line, w:lw }); widest = Math.max(widest, lw); line = []; lw = 0; }
+      lw += line.length ? sp + ww : ww; line.push({ t:wd.t, hl:wd.hl, ww });
+    }
+    lines.push({ words:line, w:lw }); widest = Math.max(widest, lw);
+  }
+  c.letterSpacing = "0px";
+  return { lines, sp, f, hf, ls, widest };
+}
+/* Fit text into maxW / maxLines / maxH by shrinking the size step by step. */
+function textBlock(c, text, o){
+  if (!text || !String(text).trim()) return null;
+  const paras = parseRich(o.upper ? String(text).toUpperCase() : text);
+  let s = o.size, res;
+  for (let i = 0; i < 60; i++){
+    res = layoutRich(c, paras, o.maxW, o.font(s), (o.hlFont || o.font)(s), o.ls ? o.ls * s : 0);
+    const h = res.lines.length * s * o.lh;
+    const ok = res.lines.length <= (o.maxLines || 99) && h <= (o.maxH || Infinity) && res.widest <= o.maxW + 1;
+    if (ok || s <= o.min) break;
+    s = Math.max(o.min, s * .95);
+  }
+  const blk = { ...res, size:s, lh:o.lh };
+  blk.h = res.lines.length * s * o.lh;
+  return blk;
+}
+function textEl(c, blk, color, hlColor, gap){
+  if (!blk) return null;
+  return { h:blk.h, gap:gap || 0, w:blk.widest, draw(x, y, w, align){
+    c.textBaseline = "middle";
+    blk.lines.forEach((ln, i) => {
+      let lx = align === "center" ? x + (w - ln.w) / 2 : align === "right" ? x + w - ln.w : x;
+      const cy = y + (i + .5) * blk.size * blk.lh;
+      ln.words.forEach((wd, j) => {
+        c.font = wd.hl ? blk.hf : blk.f; c.letterSpacing = blk.ls + "px";
+        c.fillStyle = wd.hl ? hlColor : color; c.fillText(wd.t, lx, cy);
+        lx += wd.ww + (j < ln.words.length - 1 ? blk.sp : 0);
+      });
+    });
+    c.letterSpacing = "0px";
+  }};
+}
+const fSerif = s => `500 ${s}px ${SERIF}`, fSerifI = s => `italic 500 ${s}px ${SERIF}`;
+const fSans = w => s => `${w} ${s}px ${SANS}`;
+
+function pill(c, text, u, opts){
+  if (!text || !text.trim()) return null;
+  const k = SZ("ui"), size = opts.size * u * k, padX = opts.padX * u * k, padY = opts.padY * u * k, ls = (opts.ls || 0) * size;
+  const t = opts.upper ? text.toUpperCase() : text;
+  c.font = `${opts.weight || 700} ${size}px ${SANS}`; c.letterSpacing = ls + "px";
+  const tw = c.measureText(t).width - ls; c.letterSpacing = "0px";
+  const w = Math.min(tw + padX*2, opts.maxW || Infinity), h = size + padY*2;
+  return { w, h, gap:opts.gap || 0, draw(x, y, W, align){
+    const bx = align === "center" && W ? x + (W - w)/2 : align === "right" && W ? x + W - w : x;
+    if (opts.shadow){ c.save(); c.shadowColor = "rgba(0,0,0,.28)"; c.shadowBlur = 24*u; c.shadowOffsetY = 8*u; }
+    c.fillStyle = opts.bg; c.beginPath(); c.roundRect(bx, y, w, h, (opts.radius || 10) * u); c.fill();
+    if (opts.shadow) c.restore();
+    c.font = `${opts.weight || 700} ${size}px ${SANS}`; c.letterSpacing = ls + "px";
+    c.fillStyle = opts.fg; c.textBaseline = "middle"; c.textAlign = "center";
+    c.fillText(t, bx + w/2 + ls/2, y + h/2 + size*.04, w - padX*1.2);
+    c.textAlign = "left"; c.letterSpacing = "0px";
+  }};
+}
+const badgeEl = (c, t, u, bg, fg, gap) => pill(c, t, u, { size:24, padX:24, padY:14, ls:.1, upper:true, bg, fg, radius:10, gap });
+function buttonEl(c, t, u, style, maxW, gap){
+  const s = { clay:[C.clay,"#FFFFFF"], light:[C.lime,C.slate], deodar:[C.deodar,C.lime] }[style] || [C.clay,"#FFFFFF"];
+  return pill(c, t, u, { size:30, padX:46, padY:27, weight:600, bg:s[0], fg:s[1], radius:14, maxW, gap, shadow:true });
+}
+function arrowLinkEl(c, t, u, color, gap){
+  if (!t || !t.trim()) return null;
+  const size = 26*u*SZ("ui"), ls = .12*size, txt = t.toUpperCase();
+  c.font = `700 ${size}px ${SANS}`; c.letterSpacing = ls + "px"; const tw = c.measureText(txt).width; c.letterSpacing = "0px";
+  const aw = 34*u, w = tw + 16*u + aw, h = size * 1.3;
+  return { w, h, gap:gap||0, draw(x, y, W, align){
+    const bx = align === "center" ? x + (W - w)/2 : x, cy = y + h/2;
+    c.font = `700 ${size}px ${SANS}`; c.letterSpacing = ls + "px"; c.fillStyle = color; c.textBaseline = "middle";
+    c.fillText(txt, bx, cy); c.letterSpacing = "0px";
+    const ax = bx + tw + 16*u;
+    c.strokeStyle = color; c.lineWidth = 3.2*u; c.lineCap = "round"; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(ax, cy); c.lineTo(ax + aw, cy); c.moveTo(ax + aw - 12*u, cy - 12*u); c.lineTo(ax + aw, cy); c.lineTo(ax + aw - 12*u, cy + 12*u); c.stroke();
+  }};
+}
+function chipsEl(c, list, u, maxW, T, gap){
+  const items = String(list || "").split(",").map(s => s.trim()).filter(Boolean);
+  if (!items.length) return null;
+  const size = 24*u*SZ("ui"), padX = 18*u*SZ("ui"), h = size + 24*u*SZ("ui"), g = 12*u;
+  c.font = `600 ${size}px ${SANS}`;
+  const rows = [[]]; let rw = 0;
+  items.forEach(t => {
+    const w = Math.min(c.measureText(t).width + padX*2, maxW);
+    if (rows[rows.length-1].length && rw + g + w > maxW){ rows.push([]); rw = 0; }
+    rw += (rows[rows.length-1].length ? g : 0) + w; rows[rows.length-1].push({ t, w });
+  });
+  return { h: rows.length*h + (rows.length-1)*g, gap:gap||0, draw(x, y){
+    rows.forEach((row, ri) => { let cx = x; const cy = y + ri*(h+g);
+      row.forEach(ch => {
+        c.fillStyle = T.chip; c.beginPath(); c.roundRect(cx, cy, ch.w, h, 10*u); c.fill();
+        c.font = `600 ${size}px ${SANS}`; c.fillStyle = T.chipText; c.textBaseline = "middle";
+        c.fillText(ch.t, cx + padX, cy + h/2, ch.w - padX*2); cx += ch.w + g;
+      });
+    });
+  }};
+}
+function ruleEl(w, h, color, gap){ return { h, gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - w)/2 : x; fctx.fillStyle = color; fctx.fillRect(bx, y, w, h); } }; }
+function logoEl(c, tone, width, gap){
+  const d = logoDims(width);
+  return { h: d.w * logoAspect(d.kind), gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - d.w)/2 : align === "right" ? x + W - d.w : x; drawLogo(c, d.kind, logoTone(tone), bx, y, d.w); } };
+}
+
+function stackH(items){ const a = items.filter(Boolean); return a.reduce((s, it, i) => s + it.h + (i < a.length - 1 ? it.gap : 0), 0); }
+function drawStack(items, x, y, w, align){ const a = items.filter(Boolean); a.forEach((it, i) => { it.draw(x, y, w, align); y += it.h + (i < a.length - 1 ? it.gap : 0); }); }
+
+/* ---------- layout context ---------- */
+function makeCtx(){
+  const f = fmt(), W = f.w, H = f.h, u = Math.min(W, H) / 1080, m = Math.round(72 * u);
+  const s = f.safe || { t:0, r:0, b:0, l:0 };
+  const l = Math.max(m, s.l), t = Math.max(m, s.t), r = Math.max(m, s.r), b = Math.max(m, s.b);
+  const ratio = W / H;
+  return { f, W, H, u, m, box:{ x:l, y:t, w:W - l - r, h:H - t - b }, landscape: ratio >= 1.3, tall: ratio <= .6, ratio, F:st.fields, T:THEMES[st.theme] || THEMES.lime };
+}
+const SZ = role => st.textScale * ((st.sizes && st.sizes[role]) || 1);
+function headSize(L, base){ return base * L.u * SZ("head"); }
+function resolveOverlay(L, layout){
+  if (st.overlay !== "auto") return st.overlay;
+  if (layout === "feature") return L.landscape ? "left" : "edges";
+  if (layout === "listing") return "edges";
+  if (layout === "banner") return "full";
+  return "none";
+}
+
+const LAYOUT_DRAW = {
+  feature: {
+    media: L => ({ x:0, y:0, w:L.W, h:L.H }), placeholder:"scene",
+    fg(L){
+      const { u, box, F, W } = L, c = fctx;
+      const ovType = resolveOverlay(L, "feature");
+      const wash = st.overlayColor === "lime" && ["bottom","edges","band","full","left","vignette"].includes(ovType);
+      const P = wash ? { head:C.slate, body:C.ink, eyebrow:C.deodar, hl:C.clay, logo:"light" } : { head:C.lime, body:C.mist, eyebrow:C.sage, hl:C.clayLt, logo:"dark" };
+      if (ovType !== "band") drawOverlay(c, { x:0, y:0, w:L.W, h:L.H }, ovType, st.overlayK);
+      const center = st.align === "center" && !L.landscape;
+      const maxW = L.landscape ? Math.min(box.w * .62, 980 * u) : box.w;
+      const x = center ? box.x + (box.w - maxW) / 2 : box.x;
+      let topH = 0;
+      const flip = L.landscape;
+      if (st.showLogo){ const d = logoDims(230 * u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(P.logo), center ? (W - lw)/2 : flip ? box.x : box.x + box.w - lw, box.y, lw); }
+      const badge = badgeEl(c, F.badge, u, C.deodar, C.lime, 30*u);
+      if (badge && !center){ badge.draw(flip ? box.x + box.w - badge.w : box.x, box.y); topH = Math.max(topH, badge.h); }
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:24*u*SZ("eyebrow"), min:16*u, lh:1.3, maxW, maxLines:2, ls:.2, upper:true }), col("eyebrow", P.eyebrow), col("hl", P.head), 22*u);
+      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:(L.tall ? 34 : 31)*u*SZ("body"), min:20*u, lh:1.45, maxW, maxLines:4 }), col("body", P.body), col("hl", P.head), 44*u);
+      const cta = buttonEl(c, F.cta, u, st.cta, maxW);
+      const before = [center && badge, eyebrow].filter(Boolean), after = [body, cta].filter(Boolean);
+      const avail = box.h - topH - 60*u - stackH([...before, ...after]) - (before.length ? before[before.length-1].gap : 0) - (after.length ? 40*u : 0);
+      const base = L.tall ? 96 : L.landscape ? 92 : L.ratio > .95 ? 80 : 86;
+      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:34*u, lh:1.08, maxW, maxLines:5, maxH:avail }), col("head", P.head), col("hl", P.hl), body ? 26*u : 40*u);
+      const items = [center && badge, eyebrow, head, body, cta];
+      const textTop = box.y + box.h - stackH(items);
+      if (ovType === "band"){
+        const hex = C[st.overlayColor] || C.ink, D = [1,3,5].map(i => parseInt(hex.slice(i, i + 2), 16)).join(",");
+        const y0 = Math.max(0, textTop - 140*u), y1 = Math.max(0, textTop - 40*u);
+        const g = c.createLinearGradient(0, y0, 0, y1); g.addColorStop(0, `rgba(${D},0)`); g.addColorStop(1, `rgba(${D},${(.9*st.overlayK).toFixed(3)})`);
+        c.fillStyle = g; c.fillRect(0, y0, L.W, y1 - y0);
+        c.fillStyle = `rgba(${D},${(.9*st.overlayK).toFixed(3)})`; c.fillRect(0, y1, L.W, L.H - y1);
+      }
+      c.save(); if (!wash){ c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 14*u; c.shadowOffsetY = 2*u; }
+      drawStack(items, x, textTop, maxW, center ? "center" : "left");
+      c.restore();
+    }
+  },
+
+  split: {
+    media(L){ return L.landscape ? { x:Math.round(L.W * .44), y:0, w:L.W - Math.round(L.W * .44), h:L.H } : { x:0, y:0, w:L.W, h:Math.round(L.H * (L.tall ? .42 : .54)) }; },
+    placeholder:"scene",
+    fg(L){
+      const { u, box, F, T, W, H } = L, c = fctx, mb = this.media(L);
+      if (st.overlay !== "auto") drawOverlay(c, mb, st.overlay, st.overlayK);
+      let px, py, pw, ph;
+      if (!L.landscape){
+        const R = 170 * u; c.fillStyle = T.bg;
+        ridgePath(c, RIDGE_SPLIT, 540, 90, 0, mb.h - R * .98, W, R, H); c.fill();
+        c.fillRect(0, mb.h, W, H - mb.h);
+        px = box.x; pw = box.w; py = mb.h + 34*u; ph = box.y + box.h - py;
+      } else {
+        c.fillStyle = T.bg; c.fillRect(0, 0, mb.x, H);
+        px = box.x; pw = mb.x - box.x - 64*u; py = box.y; ph = box.h;
+      }
+      const badge = pill(c, F.badge, u, { size:22, padX:22, padY:12, ls:.1, upper:true, bg:"rgba(28,33,40,.82)", fg:C.lime, radius:10 });
+      if (badge) badge.draw(L.landscape ? mb.x + mb.w - Math.max(L.m, 64*u) - badge.w : box.x + box.w - badge.w, box.y);
+      const logo = st.showLogo ? logoEl(c, T.logo, 200*u, 34*u) : null;
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:pw, maxLines:2, ls:.2, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 18*u);
+      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:30*u*SZ("body"), min:19*u, lh:1.45, maxW:pw, maxLines:3 }), col("body", T.body), col("hl", T.accent), 34*u);
+      const cta = arrowLinkEl(c, F.cta, u, T.accent);
+      const others = [logo, eyebrow, body, cta].filter(Boolean);
+      const avail = ph - stackH(others) - others.reduce((s, it) => s + it.gap, 0) - 10*u;
+      const base = L.tall ? 84 : L.landscape ? 76 : L.ratio > .95 ? 68 : 74;
+      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW:pw, maxLines:4, maxH:Math.max(60*u, avail) }), col("head", T.head), col("hl", T.hl), body ? 22*u : 34*u);
+      const items = [logo, eyebrow, head, body, cta];
+      const total = stackH(items);
+      drawStack(items, px, L.landscape ? py + (ph - total)/2 : py, pw, "left");
+    }
+  },
+
+  listing: {
+    media: L => ({ x:0, y:0, w:L.W, h:L.H }), placeholder:"scene",
+    fg(L){
+      const { u, box, F, T } = L, c = fctx;
+      drawOverlay(c, { x:0, y:0, w:L.W, h:L.H }, resolveOverlay(L, "listing"), st.overlayK * .75);
+      let topH = 0;
+      if (st.showLogo){ const d = logoDims(220*u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(st.overlayColor === "lime" && resolveOverlay(L, "listing") !== "none" ? "light" : "dark"), box.x + box.w - lw, box.y, lw); }
+      const badge = badgeEl(c, F.badge, u, C.deodar, C.lime);
+      if (badge){ badge.draw(box.x, box.y); topH = Math.max(topH, badge.h); }
+      const cardW = L.landscape ? Math.min(box.w * .55, 860*u) : box.w, pad = 46*u, inner = cardW - pad*2;
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:inner, maxLines:2, ls:.18, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 14*u);
+      const chips = chipsEl(c, F.specs, u, inner, T, 30*u);
+      const price = textEl(c, textBlock(c, F.price, { font:fSerif, hlFont:fSerifI, size:54*u*SZ("head"), min:30*u, lh:1.1, maxW:inner, maxLines:1 }), T.accent, T.accent);
+      const btn = buttonEl(c, F.cta, u, st.cta, inner);
+      let bottom = null;
+      if (price || btn){
+        const side = price && btn && (price.w + 24*u + btn.w <= inner);
+        const h = side ? Math.max(price.h, btn.h) : stackH([price && { ...price, gap:20*u }, btn]);
+        bottom = { h, gap:0, draw(x, y){
+          if (side){ price.draw(x, y + (h - price.h)/2, inner, "left"); btn.draw(x + inner - btn.w, y + (h - btn.h)/2); }
+          else drawStack([price && { ...price, gap:20*u }, btn], x, y, inner, "left");
+        }};
+      }
+      const divider = (chips || eyebrow) && bottom ? ruleEl(inner, Math.max(1, 2*u), T.line, 28*u) : null;
+      const others = [eyebrow, chips, divider, bottom].filter(Boolean);
+      const avail = box.h - topH - 50*u - pad*2 - stackH(others) - others.reduce((s, it) => s + it.gap, 0);
+      const base = L.tall ? 64 : L.landscape ? 58 : 58;
+      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:28*u, lh:1.1, maxW:inner, maxLines:3, maxH:Math.max(50*u, avail) }), col("head", T.head), col("hl", T.hl), chips ? 24*u : 30*u);
+      const items = [eyebrow, head, chips, divider, bottom];
+      const cardH = stackH(items) + pad*2, cy = box.y + box.h - cardH;
+      c.save(); c.shadowColor = "rgba(0,0,0,.25)"; c.shadowBlur = 40*u; c.shadowOffsetY = 12*u;
+      c.fillStyle = T.bg; c.beginPath(); c.roundRect(box.x, cy, cardW, cardH, 28*u); c.fill(); c.restore();
+      drawStack(items, box.x + pad, cy + pad, inner, "left");
+    }
+  },
+
+  text: {
+    media: () => null, placeholder:null,
+    fg(L){
+      const { u, box, F, T, W, H } = L, c = fctx;
+      c.fillStyle = T.bg; c.fillRect(0, 0, W, H);
+      c.fillStyle = T.ridge[0]; ridgePath(c, RIDGE_A, 1440, 140, 0, H - 230*u, W, 150*u, H); c.fill();
+      c.fillStyle = T.ridge[1]; ridgePath(c, RIDGE_B, 1440, 140, 0, H - 200*u, W, 200*u, H); c.fill();
+      let topH = 0;
+      if (st.showLogo){ const d = logoDims(180*u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(T.logo), box.x + box.w - lw, box.y + 8*u, lw) + 8*u; }
+      const num = textEl(c, textBlock(c, F.number, { font:fSerif, size:150*u*SZ("head"), min:60*u, lh:1, maxW:box.w * .6, maxLines:1 }), T.num, T.num);
+      if (num){ num.draw(box.x, box.y, box.w, "left"); topH = Math.max(topH, num.h); }
+      const fsz = 22*u, footY = box.y + box.h - fsz;
+      const foot = (t, align) => { const b = textBlock(c, t, { font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); if (b) textEl(c, b, T.muted, T.muted).draw(box.x, footY - fsz/2, box.w, align); };
+      foot(F.handle, "left");
+      if (!showIndicator() && F.swipe && F.swipe.trim()){ const b = textBlock(c, F.swipe + "  >", { font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); textEl(c, b, T.accent, T.accent).draw(box.x, footY - fsz/2, box.w, "right"); }
+      const top = box.y + topH + (num ? 64 : 80)*u, bottomLimit = footY - 70*u, maxW = L.landscape ? box.w * .8 : box.w;
+      const rule = ruleEl(84*u, 5*u, T.rule, 36*u);
+      const bodyMax = (bottomLimit - top) * .55;
+      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:(L.tall ? 44 : 38)*u*SZ("body"), min:20*u, lh:1.55, maxW, maxLines:10, maxH:bodyMax }), col("body", T.body), col("hl", T.hl));
+      const base = L.tall ? 100 : L.landscape ? 74 : L.ratio > .95 ? 76 : 84;
+      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW, maxLines:5, maxH:(bottomLimit - top) - (body ? body.h + 36*u + 5*u + 30*u : 0) }), col("head", T.head), col("hl", T.hl), 30*u);
+      const parts = [head, (head && body) ? rule : null, body], ph = stackH(parts);
+      drawStack(parts, box.x, top + Math.max(0, (bottomLimit - top - ph) * .42), maxW, "left");
+    }
+  },
+
+  banner: {
+    media: L => ({ x:0, y:0, w:L.W, h:L.H }), placeholder:"theme",
+    fg(L){
+      const { F, T, W, H } = L, c = fctx;
+      if (media.type){
+        if (st.overlay === "auto"){ c.globalAlpha = .6 + .35 * st.overlayK; c.fillStyle = T.bg; c.fillRect(0, 0, W, H); c.globalAlpha = 1; }
+        else drawOverlay(c, { x:0, y:0, w:W, h:H }, st.overlay, Math.max(st.overlayK, .6));
+      }
+      c.fillStyle = T.ridge[0]; ridgePath(c, RIDGE_A, 1440, 140, 0, H * .62, W, H * .3, H); c.fill();
+      c.fillStyle = T.ridge[1]; ridgePath(c, RIDGE_B, 1440, 140, 0, H * .66, W, H * .34, H); c.fill();
+      const u = H / 624, inner = Math.min(W * .62, 1000 * u);
+      const logo = st.showLogo ? logoEl(c, T.logo, Math.min(W * .32, 520 * u), 30*u) : null;
+      const tag = textEl(c, textBlock(c, F.tagline, { font:fSans(500), size:28*u*SZ("body"), min:16*u, lh:1.35, maxW:inner, maxLines:2 }), col("body", T.body), col("hl", T.hl), 16*u);
+      const contact = textEl(c, textBlock(c, F.contact, { font:fSans(700), size:19*u*SZ("eyebrow"), min:13*u, lh:1.3, maxW:inner, maxLines:1, ls:.08 }), col("eyebrow", T.muted), col("eyebrow", T.muted));
+      const items = [logo, tag, contact], total = stackH(items);
+      drawStack(items, (W - inner)/2, (H - total)/2 - H*.04, inner, "center");
+    }
+  }
+};
+
+const showIndicator = () => fmt().carousel && st.pages.length > 1 && st.indicator !== "none";
+function drawIndicator(L, lk){
+  if (!showIndicator() || lk === "banner") return;
+  const c = fctx, { u, box, H, T } = L, n = st.pages.length, i = st.page, last = i === n - 1;
+  const wash = st.overlayColor === "lime" && ["bottom","edges","band","full","left","vignette"].includes(resolveOverlay(L, lk));
+  let color = wash ? C.slate : C.lime, cy = H - (H - (box.y + box.h)) / 2, right = box.x + box.w;
+  if (lk === "text"){ color = T.accent; cy = box.y + box.h - 22*u; }
+  else if (lk === "split" && !L.landscape) color = T.muted;
+  const shadow = color === C.lime;
+  c.save();
+  if (shadow){ c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 8*u; }
+  c.fillStyle = color; c.strokeStyle = color; c.textBaseline = "middle"; c.textAlign = "right";
+  if (st.indicator === "count"){
+    c.font = `700 ${22*u}px ${SANS}`; c.letterSpacing = (.1*22*u) + "px";
+    c.fillText(`${i + 1} / ${n}`, right, cy);
+  } else if (st.indicator === "dots"){
+    const r = 5.5*u, gap = 18*u, w = (n - 1) * gap;
+    for (let k = 0; k < n; k++){ c.globalAlpha = k === i ? 1 : .4; c.beginPath(); c.arc(right - w + k * gap, cy, k === i ? r * 1.25 : r, 0, Math.PI * 2); c.fill(); }
+  } else if (st.indicator === "swipe" && !last){
+    const size = 21*u, aw = 30*u;
+    c.font = `700 ${size}px ${SANS}`; c.letterSpacing = (.14*size) + "px";
+    c.lineWidth = 3*u; c.lineCap = "round"; c.lineJoin = "round";
+    c.beginPath(); c.moveTo(right - aw, cy); c.lineTo(right, cy); c.moveTo(right - 11*u, cy - 11*u); c.lineTo(right, cy); c.lineTo(right - 11*u, cy + 11*u); c.stroke();
+    c.fillText("SWIPE", right - aw - 14*u, cy);
+  }
+  c.restore(); c.letterSpacing = "0px"; c.textAlign = "left";
+}
+function rebuildFG(){
+  const L = makeCtx(), lay = LAYOUT_DRAW[layoutKey()];
+  if (fg.width !== L.W || fg.height !== L.H){ fg.width = L.W; fg.height = L.H; } else fctx.clearRect(0, 0, L.W, L.H);
+  fctx.textAlign = "left";
+  lay.fg.call(lay, L);
+  drawIndicator(L, layoutKey());
+  fgDirty = false;
+}
+function draw(){
+  const L = makeCtx(), lay = LAYOUT_DRAW[layoutKey()];
+  if (cv.width !== L.W || cv.height !== L.H){ cv.width = L.W; cv.height = L.H; fgDirty = true; }
+  if (fgDirty) rebuildFG();
+  ctx.fillStyle = C.slate; ctx.fillRect(0, 0, L.W, L.H);
+  drawMedia(ctx, lay.media.call(lay, L), lay.placeholder);
+  ctx.drawImage(fg, 0, 0);
+}
+let rafId = 0;
+function requestRender(full){
+  if (full !== false){ fgDirty = true; scheduleThumbs(); }
+  if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; draw(); });
+}
+/* Render any page into the main canvas synchronously, run fn, then restore the current page. */
+function withPage(i, fn){
+  const keepPage = st.page, keepMedia = media;
+  st.page = i; media = mediaFor(st.pages[i].id); fgDirty = true; draw();
+  let out; try { out = fn(); } finally { st.page = keepPage; media = keepMedia; fgDirty = true; draw(); }
+  return out;
+}
+const thumbCanvases = new Map();
+let thumbTimer = 0;
+function scheduleThumbs(){ clearTimeout(thumbTimer); thumbTimer = setTimeout(refreshThumbs, 350); }
+function refreshThumbs(){
+  if (recording) return;
+  const f = fmt(), th = 128, tw = Math.round(th * f.w / f.h);
+  st.pages.forEach((p, i) => {
+    let t = thumbCanvases.get(p.id);
+    if (!t){ t = document.createElement("canvas"); thumbCanvases.set(p.id, t); }
+    if (t.width !== tw || t.height !== th){ t.width = tw; t.height = th; }
+    withPage(i, () => t.getContext("2d").drawImage(cv, 0, 0, tw, th));
+  });
+  if ($("thumbs").children.length !== st.pages.length) renderStrip();
+}
+
+/* =========================================================
+   UI: formats, layouts, fields, style
+   ========================================================= */
+function buildFormatList(){
+  const host = $("formatList"); host.innerHTML = "";
+  let last = "";
+  Object.entries(FORMATS).forEach(([key, f]) => {
+    if (f.platform !== last){ const p = document.createElement("div"); p.className = "plat"; p.textContent = f.platform; host.appendChild(p); last = f.platform; }
+    const r = f.w / f.h, bw = r >= 1 ? 20 : Math.round(20 * r), bh = r >= 1 ? Math.round(20 / r) : 20;
+    const b = document.createElement("button");
+    b.className = "fmt"; b.type = "button"; b.dataset.key = key;
+    b.innerHTML = `<span class="ar"><i style="width:${bw}px;height:${bh}px"></i></span><span><b>${f.name}</b><small>${f.w} x ${f.h}${f.video ? " · photo or video" : " · image"}</small></span>`;
+    b.addEventListener("click", () => setFormat(key));
+    host.appendChild(b);
+  });
+}
+function buildLayoutList(){
+  const host = $("layoutList"); host.innerHTML = "";
+  fmt().layouts.forEach(k => {
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = LAYOUTS[k].name;
+    b.setAttribute("aria-pressed", String(k === layoutKey()));
+    b.addEventListener("click", () => { st.layout = k; syncUI(); requestRender(); persist(); });
+    host.appendChild(b);
+  });
+}
+function buildFields(){
+  const host = $("fieldList"); host.innerHTML = "";
+  LAYOUTS[layoutKey()].fields.forEach(k => {
+    const d = FIELDS[k], wrap = document.createElement("div"); wrap.className = "field";
+    const id = "f-" + k;
+    wrap.innerHTML = `<label for="${id}">${d.label}</label>` + (d.type === "area" ? `<textarea id="${id}" rows="${k === "headline" ? 2 : 3}"></textarea>` : `<input type="text" id="${id}">`);
+    const inp = wrap.querySelector("input,textarea"); inp.value = st.fields[k] || "";
+    inp.addEventListener("input", () => { st.fields[k] = inp.value; requestRender(); persist(); updateAria(); });
+    host.appendChild(wrap);
+  });
+}
+/* =========================================================
+   Templates (Girika Homes). Text in [brackets] is for you to fill in.
+   ========================================================= */
+const BLANK = { badge:"", eyebrow:"", headline:"", body:"", cta:"", price:"", specs:"", number:"", handle:"@girikahomes", swipe:"Swipe", tagline:DEFAULT_FIELDS.tagline, contact:DEFAULT_FIELDS.contact };
+const TEMPLATES = [
+  /* Listings */
+  { cat:"Listings", name:"New plot launch", sub:"Photo-led launch post", style:{ overlay:"auto", align:"left" },
+    pages:[{ layout:"feature", f:{ badge:"New plots", eyebrow:"[Area], Dehradun", headline:"Plots near *[landmark]*", body:"Clear titles. Approved layout. Visit before you decide.", cta:"Book a site visit" } }] },
+  { cat:"Listings", name:"Property listing card", sub:"Price, size and details", style:{ overlay:"auto", theme:"lime" },
+    pages:[{ layout:"listing", f:{ badge:"New listing", eyebrow:"[Area], Dehradun", headline:"[3BHK] home with *mountain views*", specs:"[Size] sq ft, [Facing] facing, [Road] ft road", price:"₹[XX] Lakh", cta:"Book a visit" } }] },
+  { cat:"Listings", name:"Price update", sub:"Centred price announcement", style:{ overlay:"full", align:"center" },
+    pages:[{ layout:"feature", f:{ badge:"Price update", eyebrow:"[Project name], [Area]", headline:"Now from *₹[XX] Lakh*", body:"Ask us for the latest availability.", cta:"Call 90585 37664" } }] },
+  { cat:"Listings", name:"Sold / handed over", sub:"Celebrate a closed deal", style:{ overlay:"auto", align:"center" },
+    pages:[{ layout:"feature", f:{ badge:"Sold", eyebrow:"[Area], Dehradun", headline:"Congratulations to the *[Name]* family", body:"Thank you for trusting Girika Homes with your new beginning." } }] },
+  /* Site visits */
+  { cat:"Site visits", name:"Weekend site visit", sub:"Invite people to visit", style:{ theme:"lime" },
+    pages:[{ layout:"split", f:{ badge:"This weekend", eyebrow:"Free guided site visits", headline:"See the land *before* you decide", body:"Saturday and Sunday, [time]. Call or DM to book a slot.", cta:"Reply VISIT to book" } }] },
+  { cat:"Site visits", name:"Open house", sub:"Date, time and place", style:{ overlay:"auto", align:"left" },
+    pages:[{ layout:"feature", f:{ badge:"Open house", eyebrow:"[Date], [time]", headline:"Walk through *[project]* this Sunday", body:"[Area], Dehradun. Bring your questions.", cta:"Save your spot" } }] },
+  /* Buyer guides */
+  { cat:"Buyer guides", name:"5 checks before buying a plot", sub:"7-page carousel", style:{ theme:"lime", indicator:"count" },
+    pages:[
+      { layout:"split", f:{ badge:"Buyer guide", eyebrow:"Save this for later", headline:"5 checks before you buy a plot in *Dehradun*", cta:"Swipe to learn" } },
+      { layout:"text", f:{ number:"01", headline:"Check the *title documents*", body:"See the original sale deed and confirm the seller's name matches the land records." } },
+      { layout:"text", f:{ number:"02", headline:"Confirm the *land use*", body:"Make sure the land is meant for residential use before you pay anything." } },
+      { layout:"text", f:{ number:"03", headline:"Verify the *approved layout*", body:"Ask for the approved map and check your plot number on it." } },
+      { layout:"text", f:{ number:"04", headline:"Visit the site *in person*", body:"Walk the boundaries, meet the neighbours and see it at different times of day." } },
+      { layout:"text", f:{ number:"05", headline:"Check *road and water*", body:"Confirm road width, access in the monsoon and the water and power connections." } },
+      { layout:"feature", f:{ eyebrow:"Girika Homes", headline:"Questions before you buy?", body:"We check the papers with you. No pressure.", cta:"Call 90585 37664" } } ] },
+  { cat:"Buyer guides", name:"Documents checklist", sub:"6-page carousel", style:{ theme:"slate", indicator:"count" },
+    pages:[
+      { layout:"text", f:{ number:"", headline:"The *documents* to ask for before buying land", body:"A simple checklist. Swipe through and save it." } },
+      { layout:"text", f:{ number:"01", headline:"Sale deed", body:"The registered deed that shows who owns the land today." } },
+      { layout:"text", f:{ number:"02", headline:"Land records", body:"Mutation and ownership entries in the revenue records should match the seller." } },
+      { layout:"text", f:{ number:"03", headline:"Encumbrance certificate", body:"Shows whether the land has any loan or legal claim on it." } },
+      { layout:"text", f:{ number:"04", headline:"Approved map", body:"The sanctioned layout or building plan from the authority, where it applies." } },
+      { layout:"text", f:{ number:"05", headline:"Tax and dues", body:"Latest receipts so no old payments are left for you." } } ] },
+  { cat:"Buyer guides", name:"Myth vs fact", sub:"Single text post", style:{ theme:"deodar" },
+    pages:[{ layout:"text", f:{ number:"Myth", headline:"\"Registry means the land is *clear*.\"", body:"Fact: also check the encumbrance certificate and the land records before you pay.", swipe:"" } }] },
+  /* Location */
+  { cat:"Location", name:"Area spotlight", sub:"Why this area", style:{ overlay:"auto", align:"left" },
+    pages:[{ layout:"feature", f:{ badge:"Area spotlight", eyebrow:"Dehradun", headline:"Why families choose *[Area]*", body:"[Distance] to [school or hospital]. Quiet, green and well connected.", cta:"Explore plots" } }] },
+  { cat:"Location", name:"What's nearby", sub:"Distances as chips", style:{ overlay:"auto", theme:"lime" },
+    pages:[{ layout:"listing", f:{ badge:"Location", eyebrow:"Dehradun", headline:"*[Area]*: what's nearby", specs:"[X] min to ISBT, [X] min to [school], [X] min to [hospital]", cta:"Ask for directions" } }] },
+  /* Trust and contact */
+  { cat:"Trust and contact", name:"Meet the team", sub:"Introduce Girika Homes", style:{ theme:"lime" },
+    pages:[{ layout:"text", f:{ number:"Hi", headline:"We are *Girika Homes*", body:"Viraj, Shubham and Amit. We help you buy land in Dehradun the honest way.", swipe:"" } }] },
+  { cat:"Trust and contact", name:"Contact us", sub:"Phone and website", style:{ theme:"slate" },
+    pages:[{ layout:"split", f:{ badge:"Talk to us", eyebrow:"Call or WhatsApp", headline:"*90585 37664*", body:"Plots, homes and property in Dehradun and nearby areas.", cta:"girikahomes.com" } }] },
+  { cat:"Trust and contact", name:"Client words", sub:"Use only real feedback", style:{ theme:"lime" },
+    pages:[{ layout:"text", f:{ number:"\u201C", headline:"[What your client said, in their words]", body:"[Client name], bought a plot at [Area]", swipe:"" } }] },
+  /* Festive */
+  { cat:"Festive", name:"Diwali greeting", sub:"Warm wishes", style:{ overlay:"full", align:"center" },
+    pages:[{ layout:"feature", f:{ eyebrow:"From all of us at Girika Homes", headline:"Happy *Diwali*", body:"May your new beginnings be bright and full of light." } }] },
+  { cat:"Festive", name:"Holi greeting", sub:"Colourful wishes", style:{ overlay:"full", align:"center" },
+    pages:[{ layout:"feature", f:{ eyebrow:"From all of us at Girika Homes", headline:"Happy *Holi*", body:"Wishing you a season full of colour and joy." } }] },
+  { cat:"Festive", name:"Any festival", sub:"Edit the festival name", style:{ theme:"deodar" },
+    pages:[{ layout:"text", f:{ number:"", headline:"Happy *[Festival]*", body:"Warm wishes to you and your family from Girika Homes.", swipe:"" } }] }
+];
+if (PACK) TEMPLATES.splice(0, TEMPLATES.length, ...JSON.parse(JSON.stringify(PACK.post.templates)));
+GIRIKA.fill(TEMPLATES); GIRIKA.fill(BLANK);
+const TPL_STYLE_KEYS = ["theme","overlay","overlayColor","align","indicator"];
+let tplCat = TEMPLATES[0].cat;
+function tplPages(t){ return t.pages.map(pp => newPage(nextPageId++, pp.layout, { ...BLANK, ...pp.f })); }
+/* draw the first page of a template into a small canvas using the live renderer */
+function renderTplThumb(t){
+  const keep = { pages:st.pages, page:st.page, media }, keepStyle = {};
+  TPL_STYLE_KEYS.forEach(k => keepStyle[k] = st[k]);
+  st.pages = [newPage(-1, t.pages[0].layout, { ...BLANK, ...t.pages[0].f })]; st.page = 0;
+  media = { type:null, el:null, url:null, name:"", trim:{ start:0, end:0 }, poster:null };
+  Object.assign(st, { overlay:"auto", align:"left" }, t.style || {});
+  fgDirty = true; draw();
+  const th = 240, tw = Math.round(th * cv.width / cv.height), c = document.createElement("canvas");
+  c.width = tw; c.height = th; c.getContext("2d").drawImage(cv, 0, 0, tw, th);
+  st.pages = keep.pages; st.page = keep.page; media = keep.media; Object.assign(st, keepStyle);
+  fgDirty = true; draw();
+  return c;
+}
+function syncStyleUI(){
+  buildThemes();
+  chipGroup("alignList", [["left","Left"],["center","Centred"]], "align");
+  chipGroup("indList", [["count","1 / 5"],["swipe","Swipe arrow"],["dots","Dots"],["none","None"]], "indicator");
+  if (typeof buildShades === "function") buildShades();
+  $("overlay").value = st.overlay;
+}
+function applyTemplate(t, mode){
+  const pages = tplPages(t);
+  if (pages.length > 1 && !fmt().carousel) st.format = "ig-post";
+  Object.assign(st, { overlay:"auto", align:"left" }, t.style || {});
+  if (mode === "replace"){ st.pages = pages.slice(0, MAX_PAGES); st.page = 0; }
+  else { st.pages.splice(st.page + 1, 0, ...pages); st.pages = st.pages.slice(0, MAX_PAGES); st.page = Math.min(st.page + 1, st.pages.length - 1); }
+  closeTemplates(); syncStyleUI(); switchPage(st.page); renderStrip(); requestRender(); persist();
+}
+function renderTplCats(){
+  const host = $("tplCats"); host.innerHTML = "";
+  [...new Set(TEMPLATES.map(t => t.cat))].forEach(c => {
+    const b = document.createElement("button"); b.type = "button"; b.textContent = c; b.setAttribute("aria-pressed", String(c === tplCat));
+    b.addEventListener("click", () => { tplCat = c; renderTplCats(); renderTplGrid(); }); host.appendChild(b);
+  });
+}
+function renderTplGrid(){
+  const host = $("tplGrid"); host.innerHTML = "";
+  TEMPLATES.filter(t => t.cat === tplCat).forEach(t => {
+    const card = document.createElement("article"); card.className = "tpl-card";
+    const th = document.createElement("div"); th.className = "tpl-thumb"; th.appendChild(renderTplThumb(t));
+    const info = document.createElement("div"); info.className = "tpl-info";
+    info.innerHTML = `<b></b><small></small>${t.pages.length > 1 ? `<span class="tag">${t.pages.length} pages</span>` : ""}<div class="row"><button class="btn primary" data-m="replace">Use</button><button class="btn" data-m="add">Add as new page${t.pages.length > 1 ? "s" : ""}</button></div>`;
+    info.querySelector("b").textContent = t.name; info.querySelector("small").textContent = t.sub;
+    info.querySelectorAll("button").forEach(b => b.addEventListener("click", () => applyTemplate(t, b.dataset.m)));
+    card.append(th, info); host.appendChild(card);
+  });
+}
+function openTemplates(){ $("tplModal").hidden = false; $("tplFmt").textContent = `Previews in ${fmt().platform} ${fmt().short}. "Use" replaces your current pages.`; renderTplCats(); renderTplGrid(); $("tplClose").focus(); }
+function closeTemplates(){ $("tplModal").hidden = true; }
+$("tplOpen").addEventListener("click", openTemplates);
+$("tplClose").addEventListener("click", closeTemplates);
+$("tplModal").addEventListener("click", e => { if (e.target.id === "tplModal") closeTemplates(); });
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("tplModal").hidden) closeTemplates(); });
+
+function chipGroup(hostId, options, key){
+  const host = $(hostId); host.innerHTML = "";
+  options.forEach(([val, label]) => {
+    const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = label;
+    b.setAttribute("aria-pressed", String(st[key] === val));
+    b.addEventListener("click", () => { st[key] = val; host.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === b))); requestRender(); persist(); });
+    host.appendChild(b);
+  });
+}
+function buildThemes(){
+  const host = $("themeList"); host.innerHTML = "";
+  Object.entries(THEMES).forEach(([k, t]) => {
+    const b = document.createElement("button"); b.className = "swatch"; b.type = "button"; b.style.background = t.bg;
+    b.title = t.label; b.setAttribute("aria-label", t.label + " panel"); b.setAttribute("aria-pressed", String(st.theme === k));
+    b.addEventListener("click", () => { st.theme = k; buildThemes(); requestRender(); persist(); });
+    host.appendChild(b);
+  });
+}
+function buildColors(){
+  const host = $("colorList"); host.innerHTML = "";
+  const used = new Set(LAYOUTS[layoutKey()].fields);
+  TEXT_ROLES.forEach(([role, label]) => {
+    if (role === "body" && !used.has("body") && !used.has("tagline")) return;
+    if (role === "eyebrow" && !used.has("eyebrow") && !used.has("contact")) return;
+    const wrap = document.createElement("div"); wrap.className = "crow";
+    wrap.innerHTML = `<span class="lbl">${label}</span><div class="row"></div>`;
+    const row = wrap.querySelector(".row"), cur = st.colors[role] || "auto";
+    const auto = document.createElement("button"); auto.type = "button"; auto.className = "auto-chip"; auto.textContent = "Auto";
+    auto.setAttribute("aria-pressed", String(cur === "auto"));
+    auto.addEventListener("click", () => { st.colors[role] = "auto"; buildColors(); requestRender(); persist(); });
+    row.appendChild(auto);
+    TEXT_PALETTE.forEach(([hex, name]) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "swatch sm"; b.style.background = hex;
+      b.title = name; b.setAttribute("aria-label", `${label}: ${name}`); b.setAttribute("aria-pressed", String(cur === hex));
+      b.addEventListener("click", () => { st.colors[role] = hex; buildColors(); requestRender(); persist(); });
+      row.appendChild(b);
+    });
+    host.appendChild(wrap);
+  });
+}
+const SIZE_ROLES = [["head","Headline"],["body","Supporting"],["eyebrow","Small line"],["ui","Buttons, tags"]];
+function buildSizes(){
+  const host = $("sizeList"); host.innerHTML = "";
+  SIZE_ROLES.forEach(([role, label]) => {
+    const row = document.createElement("div"); row.className = "slider";
+    row.innerHTML = `<span>${label}</span><input type="range" min="0.6" max="1.8" step="0.01" aria-label="${label} size"><output></output>`;
+    const inp = row.querySelector("input"), out = row.querySelector("output");
+    inp.value = st.sizes[role]; out.textContent = pct(st.sizes[role]);
+    inp.addEventListener("input", () => { st.sizes[role] = +inp.value; out.textContent = pct(+inp.value); requestRender(); persist(); });
+    host.appendChild(row);
+  });
+}
+function buildShades(){
+  const host = $("shadeList"); host.innerHTML = "";
+  SHADES.forEach(([key, name]) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "swatch sm"; b.style.background = C[key];
+    b.title = name; b.setAttribute("aria-label", "Shade: " + name); b.setAttribute("aria-pressed", String(st.overlayColor === key));
+    b.addEventListener("click", () => { st.overlayColor = key; buildShades(); requestRender(); persist(); });
+    host.appendChild(b);
+  });
+  $("shadeHint").hidden = st.overlayColor !== "lime";
+}
+/* ---------- logo preview tiles ---------- */
+function logoThumb(kind, tone, bgKey){
+  const ratio = 1 / logoAspect(kind), h = 120, w = Math.round(h * ratio);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  if (tone === "auto"){ /* half light / half dark to show it adapts */
+    const hw = Math.round(w / 2);
+    x.save(); x.beginPath(); x.rect(0, 0, hw, h); x.clip(); drawLogo(x, kind, "light", 0, 0, w); x.restore();
+    x.save(); x.beginPath(); x.rect(hw, 0, w - hw, h); x.clip(); drawLogo(x, kind, "dark", 0, 0, w); x.restore();
+  } else drawLogo(x, kind, tone, 0, 0, w);
+  return c;
+}
+function tileBg(key){
+  if (key === "split") return `linear-gradient(90deg, ${C.lime} 50%, ${C.slate} 50%)`;
+  return C[key] || C.lime;
+}
+function makeTile(label, canvas, bg, checked, onPick){
+  const b = document.createElement("button"); b.type = "button"; b.className = "ltile";
+  b.setAttribute("role", "radio"); b.setAttribute("aria-checked", String(checked));
+  const pv = document.createElement("div"); pv.className = "pv"; pv.style.background = bg; pv.appendChild(canvas);
+  const sp = document.createElement("span"); sp.textContent = label;
+  b.append(pv, sp); b.addEventListener("click", onPick);
+  return b;
+}
+function buildLogoTiles(){
+  const kinds = [["lockup","Horizontal"],["stacked","Stacked"],["mark","Mark only"]];
+  const kHost = $("logoKindList"); kHost.innerHTML = "";
+  const previewTone = st.logoTone === "auto" ? "light" : st.logoTone;
+  const previewBg = (LOGO_STYLES.find(s => s[0] === previewTone) || [,,"lime"])[2];
+  kinds.forEach(([k, label]) => kHost.appendChild(makeTile(label, logoThumb(k, previewTone, previewBg), tileBg(previewBg), st.logoKind === k,
+    () => { st.logoKind = k; buildLogoTiles(); requestRender(); persist(); })));
+  const tHost = $("logoToneList"); tHost.innerHTML = "";
+  LOGO_STYLES.forEach(([v, label, bg]) => tHost.appendChild(makeTile(label, logoThumb(st.logoKind, v, bg), tileBg(bg), st.logoTone === v,
+    () => { st.logoTone = v; buildLogoTiles(); requestRender(); persist(); })));
+}
+function bindSlider(id, key, fmtOut, opts){
+  const el = $(id), out = $(id + "Out");
+  el.value = st[key]; if (out) out.textContent = fmtOut(st[key]);
+  el.addEventListener("input", () => { st[key] = +el.value; if (out) out.textContent = fmtOut(st[key]); requestRender(!(opts && opts.mediaOnly)); if (!(opts && opts.noSave)) persist(); });
+}
+const pct = v => Math.round(v * 100) + "%";
+
+function setFormat(key){
+  if (document.body.classList.contains("recording")) return;
+  st.format = key; syncUI(); requestRender(); persist();
+}
+function syncUI(){
+  const f = fmt(), lk = layoutKey();
+  document.querySelectorAll(".fmt").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.key === st.format)));
+  $("fmtTitle").textContent = `${f.platform} ${f.short}`;
+  $("fmtDims").textContent = `${f.w} x ${f.h}`;
+  buildLayoutList(); buildFields(); buildColors();
+  document.querySelectorAll("[data-for]").forEach(el => el.hidden = !el.dataset.for.split(" ").includes(lk));
+  $("overlay").value = st.overlay;
+  $("indField").hidden = !fmt().carousel;
+  buildGuides(); fitCanvas(); updateExportUI(); updateAria();
+}
+function updateAria(){ cv.setAttribute("aria-label", `${fmt().platform} ${fmt().short} preview: ${(st.fields.headline || st.fields.tagline || "").replace(/\*/g, "")}`); }
+
+/* ---------- guides ---------- */
+function buildGuides(){
+  const g = $("guides"), f = fmt(); g.innerHTML = "";
+  if (!st.guides) return;
+  const list = [...(f.guides || [])];
+  if (f.safe){
+    const s = f.safe;
+    list.push({ kind:"block", x:0, y:0, w:f.w, h:s.t, label:"App UI (top)" });
+    list.push({ kind:"block", x:0, y:f.h - s.b, w:f.w, h:s.b, label:"Caption and buttons" });
+    if (s.r > 100) list.push({ kind:"block", x:f.w - s.r, y:s.t, w:s.r, h:f.h - s.t - s.b, label:"" });
+  }
+  (f.extra || []).forEach(x => list.push(x));
+  list.forEach(r => {
+    const d = document.createElement("div"); d.className = r.kind === "frame" ? "g-frame" : "g-block";
+    Object.assign(d.style, { left:(r.x / f.w * 100) + "%", top:(r.y / f.h * 100) + "%", width:(r.w / f.w * 100) + "%", height:(r.h / f.h * 100) + "%" });
+    if (r.label){ const l = document.createElement("span"); l.className = "g-label"; l.textContent = r.label; d.appendChild(l); }
+    g.appendChild(d);
+  });
+}
+
+/* ---------- canvas fit ---------- */
+function fitCanvas(){
+  const f = fmt(), area = $("canvasArea"), holder = $("holder");
+  const narrow = window.innerWidth <= 1180;
+  const availW = Math.max(200, area.clientWidth - (narrow ? 32 : 40));
+  const availH = narrow ? Math.min(window.innerHeight * .72, 900) : Math.max(260, area.clientHeight - 28);
+  let w = availW, h = w * f.h / f.w;
+  if (h > availH){ h = availH; w = h * f.w / f.h; }
+  holder.style.width = Math.floor(w) + "px"; holder.style.height = Math.floor(h) + "px";
+}
+new ResizeObserver(fitCanvas).observe($("canvasArea"));
+window.addEventListener("resize", fitCanvas);
+
+/* =========================================================
+   Media upload, positioning, video controls
+   ========================================================= */
+$("fileIn").addEventListener("change", e => {
+  const file = e.target.files && e.target.files[0]; e.target.value = "";
+  if (!file) return;
+  videoEl.pause();
+  const url = URL.createObjectURL(file), m = media;
+  m.poster = null;
+  st.zoom = 1; st.px = .5; st.py = .5; syncPos();
+  m.url = url; m.name = file.name;
+  if (file.type.startsWith("video/")){
+    m.type = "video"; m.el = videoEl; m.trim = { start:0, end:0 };
+    ensureAudio();
+    videoOwner = m; videoEl.src = url;
+    videoEl.addEventListener("loadedmetadata", () => {
+      m.trim = { start:0, end:+videoEl.duration.toFixed(2) };
+      if (media === m){ $("trimStart").value = 0; $("trimEnd").value = m.trim.end; $("scrub").max = videoEl.duration; updateTrimInfo(); updateTime(); }
+    }, { once:true });
+    videoEl.addEventListener("loadeddata", () => { capturePoster(m); requestRender(); if (media === m) playVideo(); }, { once:true });
+  } else if (file.type.startsWith("image/")){
+    m.type = "image"; if (videoOwner === m){ videoOwner = null; videoEl.removeAttribute("src"); videoEl.load(); }
+    const img = new Image(); img.onload = () => requestRender(); img.src = url; m.el = img;
+  } else { alert("Please choose an image or video file."); return; }
+  $("mediaHint").textContent = file.name;
+  updateMediaUI(); requestRender();
+});
+$("clearMedia").addEventListener("click", () => {
+  videoEl.pause();
+  if (videoOwner === media){ videoOwner = null; videoEl.removeAttribute("src"); videoEl.load(); }
+  Object.assign(media, newMedia());
+  $("mediaHint").textContent = "No file yet. A brand hill scene is used as a placeholder.";
+  updateMediaUI(); requestRender();
+});
+function updateMediaUI(){
+  const has = !!media.type, vid = media.type === "video";
+  $("mediaHint").textContent = has ? media.name : "No file yet. A brand hill scene is used as a placeholder.";
+  if (vid){ $("trimStart").value = media.trim.start; $("trimEnd").value = media.trim.end; if (videoEl.duration) $("scrub").max = videoEl.duration; updateTrimInfo(); }
+  $("clearMedia").disabled = !has; $("posCtl").hidden = !has; $("trimCtl").hidden = !vid;
+  $("vbar").classList.toggle("on", vid);
+  fitCanvas(); updateExportUI();
+}
+function syncPos(){ ["zoom","posX","posY"].forEach(id => { const key = { zoom:"zoom", posX:"px", posY:"py" }[id]; $(id).value = st[key]; $(id + "Out").textContent = pct(id === "zoom" ? st[key] : st[key]); }); }
+bindSlider("zoom", "zoom", pct, { mediaOnly:true, noSave:true });
+bindSlider("posX", "px", pct, { mediaOnly:true, noSave:true });
+bindSlider("posY", "py", pct, { mediaOnly:true, noSave:true });
+
+/* drag to pan */
+let drag = null;
+cv.addEventListener("pointerdown", e => {
+  if (!media.type || !mediaGeom || document.body.classList.contains("recording")) return;
+  drag = { x:e.clientX, y:e.clientY, px:st.px, py:st.py, k:cv.width / cv.getBoundingClientRect().width };
+  cv.setPointerCapture(e.pointerId); cv.classList.add("panning");
+});
+cv.addEventListener("pointermove", e => {
+  cv.classList.toggle("pannable", !!(media.type && mediaGeom));
+  if (!drag || !mediaGeom) return;
+  const dx = (e.clientX - drag.x) * drag.k, dy = (e.clientY - drag.y) * drag.k;
+  if (mediaGeom.ox > 0) st.px = Math.min(1, Math.max(0, drag.px - dx / mediaGeom.ox));
+  if (mediaGeom.oy > 0) st.py = Math.min(1, Math.max(0, drag.py - dy / mediaGeom.oy));
+  syncPos(); requestRender(false);
+});
+["pointerup","pointercancel"].forEach(ev => cv.addEventListener(ev, () => { drag = null; cv.classList.remove("panning"); }));
+
+/* video transport */
+const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
+const ICON_PAUSE = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>';
+const fmtTime = s => { s = Math.max(0, s || 0); return Math.floor(s / 60) + ":" + String(Math.floor(s % 60)).padStart(2, "0"); };
+function updateTime(){
+  $("timeLbl").textContent = `${fmtTime(videoEl.currentTime)} / ${fmtTime(videoEl.duration)}`;
+  if (!scrubbing) $("scrub").value = videoEl.currentTime || 0;
+  $("playBtn").innerHTML = videoEl.paused ? ICON_PLAY : ICON_PAUSE;
+  $("playBtn").setAttribute("aria-label", videoEl.paused ? "Play" : "Pause");
+}
+function setSound(on){
+  sound = on;
+  if (audio){ audio.monitor.gain.value = on ? 1 : 0; audio.ctx.resume(); } else videoEl.muted = !on;
+  $("soundBtn").setAttribute("aria-pressed", String(on));
+  $("soundBtn").textContent = on ? "Sound on" : "Sound off";
+}
+async function playVideo(){
+  if (audio) audio.ctx.resume().catch(() => {});
+  if (videoEl.currentTime < media.trim.start || videoEl.currentTime >= media.trim.end) videoEl.currentTime = media.trim.start;
+  try { await videoEl.play(); } catch(e) {}
+  updateTime();
+}
+$("playBtn").addEventListener("click", () => { videoEl.paused ? playVideo() : (videoEl.pause(), updateTime()); });
+$("soundBtn").addEventListener("click", () => setSound(!sound));
+let scrubbing = false;
+$("scrub").addEventListener("input", () => { scrubbing = true; videoEl.currentTime = +$("scrub").value; updateTime(); });
+$("scrub").addEventListener("change", () => { scrubbing = false; });
+videoEl.addEventListener("seeked", () => requestRender(false));
+videoEl.addEventListener("pause", updateTime);
+videoEl.addEventListener("ended", () => { if (!recording){ videoEl.currentTime = media.trim.start; videoEl.play().catch(() => {}); } });
+videoEl.addEventListener("error", () => {
+  if (media.type !== "video") return;
+  $("mediaHint").textContent = "This video could not be opened in this browser. Try an MP4 (H.264) or an iPhone MOV, or export it again from your editor.";
+  Object.assign(media, { type:null, el:null }); updateMediaUI(); requestRender();
+});
+videoEl.addEventListener("play", updateTime);
+
+function updateTrimInfo(){
+  const len = Math.max(0, media.trim.end - media.trim.start), f = fmt();
+  $("trimLen").textContent = `Clip length: ${len.toFixed(1)} s`;
+  const w = $("durWarn");
+  if (f.max && len > f.max){ w.textContent = `This clip is ${len.toFixed(0)} s. ${f.maxNote} Trim it to ${f.max} s or less.`; w.classList.add("on"); }
+  else w.classList.remove("on");
+}
+function setTrim(start, end){
+  const d = videoEl.duration || 0;
+  start = Math.min(Math.max(0, start), d); end = Math.min(Math.max(0, end), d);
+  if (end - start < .5){ if (start + .5 <= d) end = start + .5; else start = Math.max(0, end - .5); }
+  media.trim = { start:+start.toFixed(2), end:+end.toFixed(2) };
+  $("trimStart").value = media.trim.start; $("trimEnd").value = media.trim.end; updateTrimInfo();
+}
+$("trimStart").addEventListener("change", () => setTrim(+$("trimStart").value, media.trim.end));
+$("trimEnd").addEventListener("change", () => setTrim(media.trim.start, +$("trimEnd").value));
+$("setStart").addEventListener("click", () => setTrim(videoEl.currentTime, media.trim.end));
+$("setEnd").addEventListener("click", () => setTrim(media.trim.start, videoEl.currentTime));
+
+/* main loop: redraw while video plays, loop inside trim range */
+function tick(){
+  if (media.type === "video" && videoOwner === media && !videoEl.paused && !recording){
+    if (videoEl.currentTime >= media.trim.end - .03){ videoEl.currentTime = media.trim.start; }
+    draw(); updateTime();
+  }
+  requestAnimationFrame(tick);
+}
+
+/* =========================================================
+   Pages (carousel)
+   ========================================================= */
+function renderStrip(){
+  const host = $("thumbs"); host.innerHTML = "";
+  st.pages.forEach((p, i) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "thumb";
+    b.setAttribute("role", "tab"); b.setAttribute("aria-selected", String(i === st.page)); b.setAttribute("aria-label", `Page ${i + 1}`);
+    let t = thumbCanvases.get(p.id); if (!t){ t = document.createElement("canvas"); t.width = 80; t.height = 100; thumbCanvases.set(p.id, t); }
+    b.appendChild(t); const n = document.createElement("b"); n.textContent = i + 1; b.appendChild(n);
+    b.addEventListener("click", () => switchPage(i));
+    host.appendChild(b);
+  });
+  const n = st.pages.length;
+  $("pageLbl").textContent = `Page ${st.page + 1} of ${n}`;
+  $("prevPage").disabled = st.page === 0; $("nextPage").disabled = st.page === n - 1;
+  $("moveLeft").disabled = st.page === 0; $("moveRight").disabled = st.page === n - 1;
+  $("delPage").disabled = n === 1; $("addPage").disabled = $("dupPage").disabled = n >= MAX_PAGES;
+  $("zipBtn").hidden = n < 2;
+  const sel = host.children[st.page]; if (sel) sel.scrollIntoView({ block:"nearest", inline:"nearest" });
+}
+function switchPage(i){
+  if (recording || i < 0 || i >= st.pages.length) return;
+  capturePoster(media); videoEl.pause();
+  st.page = i; media = mediaFor(pg().id);
+  if (media.type === "video" && videoOwner !== media){
+    const m = media; videoOwner = m; videoEl.src = m.url;
+    videoEl.addEventListener("loadeddata", () => { if (videoOwner === m){ videoEl.currentTime = m.trim.start; if (media === m) updateMediaUI(); requestRender(false); } }, { once:true });
+  }
+  syncUI(); syncPos(); updateMediaUI(); updateTime(); renderStrip(); requestRender(); persist();
+}
+const bumpNumber = v => /^\d+$/.test(String(v || "").trim()) ? String(+v + 1).padStart(String(v).trim().length, "0") : v;
+function addPage(copyMedia){
+  if (st.pages.length >= MAX_PAGES){ alert(`A carousel can have up to ${MAX_PAGES} pages.`); return; }
+  const cur = pg(), p = newPage(nextPageId++, cur.layout, { ...cur.fields, number: bumpNumber(cur.fields.number) });
+  if (copyMedia){
+    p.zoom = cur.zoom; p.px = cur.px; p.py = cur.py; p.fields.number = cur.fields.number;
+    const src = media, m = mediaFor(p.id);
+    if (src.type === "video") capturePoster(src);
+    Object.assign(m, { ...src, trim:{ ...src.trim } });
+  }
+  st.pages.splice(st.page + 1, 0, p);
+  switchPage(st.page + 1);
+}
+function movePage(dir){
+  const i = st.page, j = i + dir; if (j < 0 || j >= st.pages.length) return;
+  [st.pages[i], st.pages[j]] = [st.pages[j], st.pages[i]];
+  st.page = j; renderStrip(); requestRender(); persist();
+}
+let delArmed = 0;
+function deletePage(){
+  const b = $("delPage");
+  if (st.pages.length < 2) return;
+  if (!delArmed){ b.textContent = "Click again to delete"; delArmed = setTimeout(() => { delArmed = 0; b.textContent = "Delete"; }, 3000); return; }
+  clearTimeout(delArmed); delArmed = 0; b.textContent = "Delete";
+  const p = pg(); videoEl.pause();
+  if (videoOwner === media) videoOwner = null;
+  mediaStore.delete(p.id); thumbCanvases.delete(p.id);
+  st.pages.splice(st.page, 1);
+  const to = Math.min(st.page, st.pages.length - 1);
+  st.page = to; media = mediaFor(pg().id);
+  switchPage(to);
+}
+$("prevPage").addEventListener("click", () => switchPage(st.page - 1));
+$("nextPage").addEventListener("click", () => switchPage(st.page + 1));
+$("addPage").addEventListener("click", () => addPage(false));
+$("dupPage").addEventListener("click", () => addPage(true));
+$("moveLeft").addEventListener("click", () => movePage(-1));
+$("moveRight").addEventListener("click", () => movePage(1));
+$("delPage").addEventListener("click", deletePage);
+
+/* ---------- tiny ZIP writer (stored, no compression: PNGs are already compressed) ---------- */
+const CRC_T = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++){ let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+function crc32(b){ let c = 0xFFFFFFFF; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xFFFFFFFF) >>> 0; }
+function makeZip(files){
+  const enc = new TextEncoder(), parts = [], central = [], d = new Date();
+  const dosT = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1);
+  const dosD = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  let off = 0;
+  for (const f of files){
+    const nm = enc.encode(f.name), crc = crc32(f.data), sz = f.data.length;
+    const lh = new DataView(new ArrayBuffer(30));
+    lh.setUint32(0, 0x04034b50, true); lh.setUint16(4, 20, true); lh.setUint16(10, dosT, true); lh.setUint16(12, dosD, true);
+    lh.setUint32(14, crc, true); lh.setUint32(18, sz, true); lh.setUint32(22, sz, true); lh.setUint16(26, nm.length, true);
+    parts.push(lh.buffer, nm, f.data);
+    const ch = new DataView(new ArrayBuffer(46));
+    ch.setUint32(0, 0x02014b50, true); ch.setUint16(4, 20, true); ch.setUint16(6, 20, true); ch.setUint16(12, dosT, true); ch.setUint16(14, dosD, true);
+    ch.setUint32(16, crc, true); ch.setUint32(20, sz, true); ch.setUint32(24, sz, true); ch.setUint16(28, nm.length, true); ch.setUint32(42, off, true);
+    central.push(ch.buffer, nm);
+    off += 30 + nm.length + sz;
+  }
+  const cdSize = central.reduce((s, p) => s + p.byteLength, 0);
+  const end = new DataView(new ArrayBuffer(22));
+  end.setUint32(0, 0x06054b50, true); end.setUint16(8, files.length, true); end.setUint16(10, files.length, true); end.setUint32(12, cdSize, true); end.setUint32(16, off, true);
+  return new Blob([...parts, ...central, end.buffer], { type:"application/zip" });
+}
+const canvasPNG = () => new Promise(res => cv.toBlob(res, "image/png"));
+$("zipBtn").addEventListener("click", async e => {
+  const btn = e.currentTarget, label = btn.textContent; btn.disabled = true;
+  try {
+    capturePoster(media);
+    const files = [], n = st.pages.length, pad = Math.max(2, String(n).length);
+    for (let i = 0; i < n; i++){
+      btn.textContent = `Preparing page ${i + 1} of ${n}...`;
+      const blob = await withPage(i, canvasPNG); /* toBlob copies the pixels at call time */
+      files.push({ name:`${String(i + 1).padStart(pad, "0")}-${FILE_PREFIX}-${st.format}.png`, data:new Uint8Array(await blob.arrayBuffer()) });
+    }
+    downloadBlob(makeZip(files), fileName("zip"));
+  } finally { btn.textContent = label; btn.disabled = false; }
+});
+
+/* =========================================================
+   Export
+   ========================================================= */
+function fileName(ext){
+  const d = new Date(), p = n => String(n).padStart(2, "0");
+  const pn = ext === "zip" ? "carousel-" : st.pages.length > 1 ? `p${st.page + 1}-${layoutKey()}-` : `${layoutKey()}-`;
+  return `${FILE_PREFIX}-${st.format}-${pn}${d.getFullYear()}${p(d.getMonth()+1)}${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}.${ext}`;
+}
+function downloadBlob(blob, name){
+  const a = document.createElement("a"), url = URL.createObjectURL(blob);
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 4000);
+}
+$("pngBtn").addEventListener("click", () => {
+  draw();
+  cv.toBlob(b => { if (b) downloadBlob(b, fileName("png")); }, "image/png");
+});
+
+function pickMime(){
+  const list = ['video/mp4;codecs="avc1.640032,mp4a.40.2"','video/mp4;codecs="avc1.640028,mp4a.40.2"','video/mp4;codecs="avc1.4d0032,mp4a.40.2"','video/mp4;codecs=avc1,mp4a.40.2','video/webm;codecs="vp9,opus"','video/webm;codecs="vp8,opus"','video/webm'];
+  return list.find(m => window.MediaRecorder && MediaRecorder.isTypeSupported(m)) || "";
+}
+function updateExportUI(){
+  const f = fmt(), vid = media.type === "video";
+  $("vidBtn").hidden = !(vid && f.video);
+  $("pngBtn").textContent = vid ? "Save PNG (this frame, use as cover)" : "Save PNG";
+  let hint = `Exports at full ${f.w} x ${f.h}.`;
+  if (vid && f.video){
+    const m = pickMime();
+    hint += m.startsWith("video/mp4") ? " Video saves as MP4 with sound, in real time." : " This browser cannot record H.264 MP4, so it will save WebM (convert it before posting). Use desktop Chrome for MP4.";
+  } else if (vid && !f.video) hint += " This format is image only.";
+  $("exportHint").textContent = hint;
+  if (vid) updateTrimInfo();
+}
+
+let recording = null;
+const seek = t => new Promise(res => { const done = () => res(); videoEl.addEventListener("seeked", done, { once:true }); videoEl.currentTime = t; setTimeout(done, 2000); });
+
+$("vidBtn").addEventListener("click", async () => {
+  if (recording || media.type !== "video" || !(media.trim.end > media.trim.start)) return;
+  const mime = pickMime();
+  if (!mime){ alert("Video recording is not supported in this browser. Please use Chrome."); return; }
+  const btn = $("vidBtn"), prog = $("prog"), bar = prog.querySelector("i");
+  const a = ensureAudio(); if (a) await a.ctx.resume().catch(() => {});
+  videoEl.pause(); await seek(media.trim.start);
+  draw();
+  const vTrack = cv.captureStream(30).getVideoTracks()[0];
+  const tracks = [vTrack, ...(a ? a.dest.stream.getAudioTracks() : [])];
+  const rec = new MediaRecorder(new MediaStream(tracks), { mimeType:mime, videoBitsPerSecond:12_000_000, audioBitsPerSecond:192_000 });
+  const chunks = [];
+  rec.ondataavailable = e => { if (e.data && e.data.size) chunks.push(e.data); };
+  recording = { rec, cancelled:false };
+  document.body.classList.add("recording");
+  btn.disabled = true; $("pngBtn").disabled = true; $("cancelBtn").hidden = false; prog.classList.add("on"); bar.style.width = "0%";
+  const len = Math.max(.1, media.trim.end - media.trim.start);
+  const finished = new Promise(res => rec.onstop = res);
+  rec.start(500);
+  try { await videoEl.play(); } catch(e) { rec.stop(); }
+  await new Promise(res => {
+    const step = () => {
+      if (!recording || recording.cancelled || rec.state !== "recording") return res();
+      draw();
+      const t = videoEl.currentTime - media.trim.start;
+      bar.style.width = Math.min(100, t / len * 100) + "%";
+      btn.textContent = `Recording ${fmtTime(t)} / ${fmtTime(len)}`;
+      if (videoEl.currentTime >= media.trim.end || videoEl.ended) return res();
+      requestAnimationFrame(step);
+    };
+    step();
+  });
+  videoEl.pause();
+  if (rec.state !== "inactive") rec.stop();
+  await finished;
+  vTrack.stop();
+  const cancelled = recording.cancelled;
+  recording = null;
+  document.body.classList.remove("recording");
+  btn.disabled = false; $("pngBtn").disabled = false; $("cancelBtn").hidden = true; prog.classList.remove("on");
+  btn.textContent = "Save MP4"; updateTime();
+  if (!cancelled && chunks.length) downloadBlob(new Blob(chunks, { type:mime.split(";")[0] }), fileName(mime.startsWith("video/mp4") ? "mp4" : "webm"));
+});
+$("cancelBtn").addEventListener("click", () => { if (recording){ recording.cancelled = true; } });
+
+let resetArmed = 0;
+$("resetBtn").addEventListener("click", e => {
+  const b = e.currentTarget;
+  if (!resetArmed){ b.textContent = "Click again to confirm"; resetArmed = setTimeout(() => { resetArmed = 0; b.textContent = "Reset this page's text and colours"; }, 3000); return; }
+  clearTimeout(resetArmed); resetArmed = 0; b.textContent = "Reset this page's text and colours";
+  st.fields = { ...DEFAULT_FIELDS }; st.colors = { ...DEFAULT_STATE.colors }; syncUI(); requestRender(); persist();
+});
+
+/* =========================================================
+   Init
+   ========================================================= */
+(function init(){
+  $("brandMark").innerHTML = GIRIKA.KIT.id === "girika" && !GIRIKA.IMG ? `<svg viewBox="45 57 1067 1294" width="100%" height="100%"><path d="${LOGO.arch}" fill="${C.lime}"/><path d="${LOGO.sun}" fill="${C.clayLt}"/></svg>` : `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="${C.clayLt}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8.5" r="1.6"/><path d="M20 15l-4.5-4.5L6 20"/></svg>`;
+  GIRIKA.onReady(() => { if (typeof buildLogoTiles === "function") buildLogoTiles(); fgDirty = true; requestRender(); });
+  buildFormatList(); buildThemes();
+  chipGroup("alignList", [["left","Left"],["center","Centred"]], "align");
+  chipGroup("ctaList", [["clay","Clay"],["light","Limestone"],["deodar","Deodar"]], "cta");
+  bindSlider("overlayK", "overlayK", pct);
+  bindSlider("textScale", "textScale", pct);
+  buildSizes(); buildShades();
+  chipGroup("indList", [["count","1 / 5"],["swipe","Swipe arrow"],["dots","Dots"],["none","None"]], "indicator");
+  $("sizeReset").addEventListener("click", () => { st.textScale = 1; st.sizes = { ...DEFAULT_STATE.sizes }; $("textScale").value = 1; $("textScaleOut").textContent = "100%"; buildSizes(); requestRender(); persist(); });
+  if (st.overlay === "slate"){ st.overlay = "full"; st.overlayColor = "slate"; }
+  $("overlay").addEventListener("change", e => { st.overlay = e.target.value; requestRender(); persist(); });
+  $("showLogo").checked = st.showLogo;
+  $("showLogo").addEventListener("change", e => { st.showLogo = e.target.checked; $("logoCtl").hidden = !st.showLogo; requestRender(); persist(); });
+  $("logoCtl").hidden = !st.showLogo;
+  buildLogoTiles();
+  $("guidesToggle").checked = st.guides;
+  $("guidesToggle").addEventListener("change", e => { st.guides = e.target.checked; buildGuides(); persist(); });
+  setSound(false);
+  syncUI(); syncPos(); updateMediaUI(); updateTime(); renderStrip();
+  draw();
+  const faces = [`500 40px "${GIRIKA.FONTS.head}"`,`italic 500 40px "${GIRIKA.FONTS.head}"`,`400 20px "${GIRIKA.FONTS.body}"`,`500 20px "${GIRIKA.FONTS.body}"`,`600 20px "${GIRIKA.FONTS.body}"`,`700 20px "${GIRIKA.FONTS.body}"`];
+  Promise.all(faces.map(f => document.fonts.load(f))).catch(() => {}).then(() => document.fonts.ready).then(() => requestRender());
+  requestAnimationFrame(tick);
+})();
+</script>
+<script>
+/* ---------- Girika Studio: simple / pro mode and the home screen connection ---------- */
+(() => {
+  const MODE_KEY = "girika-ui-mode", EMBED = window.parent !== window; let quiet = false;
+  function setUiMode(m){
+    m = m === "pro" ? "pro" : "simple"; document.body.classList.toggle("simple", m === "simple");
+    try { localStorage.setItem(MODE_KEY, m); } catch(e) {}
+    document.querySelectorAll(".mode-sw button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === m)));
+    if (EMBED && !quiet) parent.postMessage({ girika:"mode", mode:m }, "*");
+  }
+  document.querySelectorAll(".mode-sw button").forEach(b => b.addEventListener("click", () => setUiMode(b.dataset.m)));
+  let m0 = "simple"; try { m0 = localStorage.getItem(MODE_KEY) || "simple"; } catch(e) {} quiet = true; setUiMode(m0); quiet = false;
+  if (!EMBED) return;
+  document.documentElement.classList.add("embedded");
+  const thumbURL = c => { try { return c.toDataURL("image/jpeg", .82); } catch(e) { return ""; } };
+  window.addEventListener("message", e => {
+    const m = e.data; if (!m || !m.girika) return;
+    if (m.girika === "mode"){ quiet = true; setUiMode(m.mode); quiet = false; }
+    if (m.girika === "template"){ const t = TEMPLATES[+String(m.id).split(":")[1]]; if (!t) return; if (m.format && FORMATS[m.format]) setFormat(m.format); applyTemplate(t, "replace"); }
+    if (m.girika === "start"){
+      if (m.format && FORMATS[m.format]) setFormat(m.format);
+      if (m.files && m.files.length){ const inp = $("fileIn"), dt = new DataTransfer(); dt.items.add(m.files[0]); inp.files = dt.files; inp.dispatchEvent(new Event("change", { bubbles:true })); }
+    }
+  });
+  const announce = () => parent.postMessage({ girika:"ready", app:"post", templates:TEMPLATES.map((t, i) => ({ id:`post:${i}`, app:"post", cat:t.cat, name:t.name, sub:t.sub, tag:t.pages.length > 1 ? `Carousel, ${t.pages.length} pages` : "Post", thumb:thumbURL(renderTplThumb(t)) })) }, "*");
+  /* brand fonts load async now (brand.js), so wait for onReady before making the thumbnails */
+  new Promise(r => GIRIKA.onReady(r)).then(() => Promise.all([`500 40px "${GIRIKA.FONTS.head}"`,`italic 500 40px "${GIRIKA.FONTS.head}"`,`700 20px "${GIRIKA.FONTS.body}"`].map(f => document.fonts.load(f)))).catch(() => {}).then(() => setTimeout(announce, 150));
+})();
+</script>
+</body>
+</html>

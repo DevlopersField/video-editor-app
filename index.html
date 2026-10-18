@@ -1,0 +1,692 @@
+<!doctype html>
+<html lang="en">
+<head>
+<script>try{var t=localStorage.getItem("reelstudio-theme");document.documentElement.dataset.theme=t==="light"||t==="dark"?t:"system";}catch(e){document.documentElement.dataset.theme="system";}</script>
+
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reel Studio</title>
+<meta name="description" content="Reel Studio: simple, fast posts, carousels, stories, reels and videos for any brand. Runs offline in your browser.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap">
+<style>
+:root{
+  --slate:#2C3A47;--deodar:#556348;--sage:#A9B896;--clay:#9A5B40;--clay-lt:#C98B6E;
+  --lime:#F4F1EC;--mist:#E4E8DC;--ink:#1C2128;--fog:#5E6773;--line:#DAD5CC;--white:#FFFFFF;
+  --serif:"Fraunces",Georgia,serif;--sans:"Manrope",Arial,sans-serif;--bar:56px;
+  --bg:var(--lime);--surface:var(--white);--soft:var(--mist);--heading:var(--slate);--text:var(--ink);--muted:var(--fog);color-scheme:light;
+}
+:root[data-theme="dark"]{--bg:#14181D;--surface:#1C2229;--soft:#262D36;--heading:#EEF1F4;--text:#D7DCE2;--muted:#9AA3AE;--line:#343C46;--mist:#2A323B;color-scheme:dark;}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--bg:#14181D;--surface:#1C2229;--soft:#262D36;--heading:#EEF1F4;--text:#D7DCE2;--muted:#9AA3AE;--line:#343C46;--mist:#2A323B;color-scheme:dark;}}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font:14px/1.5 var(--sans);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input{font:inherit;color:inherit}
+[hidden]{display:none!important}
+.bar{height:var(--bar);display:flex;align-items:center;gap:20px;padding:0 20px;background:var(--slate);color:var(--lime)}
+.brand{display:flex;align-items:center;gap:12px;font:500 19px var(--serif);white-space:nowrap;background:none;border:0;color:inherit;cursor:pointer;padding:0}
+.brand .mark{width:28px;height:34px}
+.tabs{display:flex;gap:4px;margin-right:auto}
+.tabs button{border:0;background:none;color:var(--sage);font:600 13px var(--sans);padding:7px 12px;border-radius:8px;cursor:pointer}
+.tabs button:hover{color:var(--lime);background:rgba(255,255,255,.06)}
+.tabs button[aria-pressed="true"]{color:var(--heading);background:var(--bg)}
+.mode-sw{display:flex;background:rgba(255,255,255,.08);border-radius:9px;padding:3px;gap:2px}
+.mode-sw button{border:0;background:none;color:var(--sage);font:700 12px var(--sans);padding:6px 12px;border-radius:7px;cursor:pointer}
+.mode-sw button[aria-pressed="true"]{background:var(--bg);color:var(--heading)}
+.status{font-size:12px;color:var(--sage);white-space:nowrap}
+button:focus-visible,input:focus-visible{outline:2px solid var(--clay-lt);outline-offset:2px}
+
+.view{position:absolute;top:var(--bar);left:0;right:0;bottom:0;border:0;width:100%;height:calc(100% - var(--bar))}
+.home{overflow-y:auto}
+.wrap{max-width:1240px;margin:0 auto;padding:36px 28px 60px}
+.hero h1{font:500 38px/1.15 var(--serif);color:var(--heading);margin:0 0 8px}
+.hero h1 em{color:var(--clay);font-style:italic}
+.hero p{color:var(--muted);margin:0;max-width:640px;font-size:15px}
+.sec{margin-top:34px}
+.sec-head{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.sec-head h2{font:700 12px/1 var(--sans);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin:0}
+.sizes{display:flex;gap:6px;flex-wrap:wrap;margin-left:auto;align-items:center}
+.sizes span{font-size:12px;font-weight:600;color:var(--muted);margin-right:4px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font:600 12px var(--sans);cursor:pointer;color:var(--heading)}
+.chip:hover{background:var(--soft)}
+.chip[aria-pressed="true"]{background:var(--slate);border-color:var(--heading);color:var(--lime)}
+.quick{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.qcard{display:flex;gap:14px;align-items:flex-start;text-align:left;border:1px solid var(--line);background:var(--surface);border-radius:16px;padding:18px;cursor:pointer}
+.qcard:hover{border-color:var(--deodar);box-shadow:0 6px 20px rgba(28,33,40,.08)}
+.qcard svg{flex:0 0 34px;width:34px;height:34px;color:var(--deodar)}
+.qcard b{display:block;font:500 18px/1.25 var(--serif);color:var(--heading);margin-bottom:4px}
+.qcard small{display:block;color:var(--muted);font-size:12.5px;line-height:1.45}
+.qcard.star{background:var(--slate);border-color:var(--heading)}
+.qcard.star b{color:var(--lime)} .qcard.star small{color:var(--sage)} .qcard.star svg{color:var(--clay-lt)}
+.search{flex:1;min-width:200px;max-width:320px;margin-left:auto;border:1px solid var(--line);border-radius:10px;padding:9px 12px;background:var(--surface)}
+.cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;text-align:left;padding:0}
+.card:hover{border-color:var(--deodar);box-shadow:0 6px 20px rgba(28,33,40,.12)}
+.thumb{height:250px;background:var(--soft);display:grid;place-items:center;padding:12px;position:relative}
+.thumb img{max-width:100%;max-height:100%;border-radius:6px;box-shadow:0 4px 14px rgba(28,33,40,.15);display:block}
+.tag{position:absolute;left:10px;top:10px;font:700 10px/1 var(--sans);letter-spacing:.04em;background:var(--surface);color:var(--deodar);padding:5px 8px;border-radius:999px;box-shadow:0 1px 4px rgba(0,0,0,.1)}
+.tag.vid{background:var(--clay);color:#fff}
+.info{padding:10px 12px 13px;display:flex;flex-direction:column;gap:3px}
+.info b{font-weight:700;color:var(--heading);font-size:14px}
+.info small{color:var(--muted);font-size:12px;line-height:1.4}
+.skel .thumb{background:linear-gradient(90deg,var(--mist),#EEF0E8,var(--mist));background-size:200% 100%;animation:sh 1.2s infinite}
+@keyframes sh{to{background-position:-200% 0}}
+.empty{color:var(--muted);padding:20px 0}
+.note{margin-top:30px;color:var(--muted);font-size:12px}
+@media (max-width:900px){.quick{grid-template-columns:1fr}.hero h1{font-size:30px}.status{display:none}}
+@media (max-width:640px){.bar{gap:10px;padding:0 12px}.brand span.txt{display:none}.tabs button{padding:6px 8px}.wrap{padding:24px 16px 48px}.search{max-width:none}}
+.bsw{position:relative}
+.bsw-btn{display:flex;align-items:center;gap:8px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.06);color:var(--lime);border-radius:10px;padding:5px 10px 5px 6px;cursor:pointer;font:600 13px var(--sans);max-width:240px}
+.bsw-btn:hover{background:rgba(255,255,255,.12)}
+.bsw-logo{width:26px;height:26px;border-radius:7px;background:var(--surface);display:grid;place-items:center;overflow:hidden;flex:0 0 26px}
+.bsw-logo img{max-width:22px;max-height:22px}
+.bsw-logo b{font:800 11px var(--sans);color:#fff}
+.bsw-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bsw-menu{position:absolute;top:44px;left:0;z-index:20;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(28,33,40,.2);min-width:260px;padding:6px}
+.bsw-menu button{display:flex;align-items:center;gap:10px;width:100%;border:0;background:none;padding:8px 10px;border-radius:8px;cursor:pointer;text-align:left;font:600 13px var(--sans);color:var(--heading)}
+.bsw-menu button:hover{background:var(--bg)}
+.bsw-menu .on{background:var(--soft)}
+.bsw-menu hr{border:0;border-top:1px solid var(--line);margin:6px 0}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--line);background:var(--surface);color:var(--heading);border-radius:10px;padding:10px 16px;font:600 13px var(--sans);cursor:pointer;position:relative}
+.btn:hover{background:var(--bg)}
+.btn.primary{background:var(--clay);border-color:var(--clay);color:#fff}
+.btn.primary:hover{background:#86492F}
+.btn.ghost{background:none}
+.btn.sm{padding:6px 11px;font-size:12px}
+.upl{position:relative;overflow:hidden}
+.upl input{position:absolute;inset:0;opacity:0;cursor:pointer}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.setup-intro{background:var(--slate);color:var(--lime);border-radius:22px;padding:40px;margin-bottom:28px}
+.setup-intro .eyebrow{font:700 11px var(--sans);letter-spacing:.16em;text-transform:uppercase;color:var(--sage)}
+.setup-intro h1{font:500 38px/1.15 var(--serif);margin:10px 0}
+.setup-intro h1 em{color:var(--clay-lt)}
+.setup-intro p{color:var(--sage);max-width:620px;margin:0 0 22px;font-size:15px}
+.setup-intro .btn.ghost{color:var(--lime);border-color:rgba(255,255,255,.25)}
+.setup-intro .btn.ghost:hover{background:rgba(255,255,255,.08)}
+.bgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.bcard{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:12px}
+.bcard.on{border-color:var(--deodar);box-shadow:0 0 0 2px rgba(85,99,72,.25)}
+.bcard-top{display:flex;gap:12px;align-items:center}
+.bcard-logo{width:54px;height:54px;border-radius:12px;background:var(--bg);display:grid;place-items:center;overflow:hidden;flex:0 0 54px}
+.bcard-logo img{max-width:46px;max-height:46px}
+.bcard b{display:block;font:500 18px var(--serif);color:var(--heading)}
+.bcard small{color:var(--muted)}
+.bcard .where{font-size:11px;margin-top:-4px}
+.bfolder{display:flex;flex-direction:column;gap:2px;margin:0 0 14px}
+.bfolder .fhint{margin:4px 0 0}
+#bStale{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+#bMsg:empty{display:none}
+.dots{display:flex;gap:5px}
+.dots i{width:20px;height:20px;border-radius:50%;border:1px solid rgba(0,0,0,.1)}
+.badge{font:700 10px var(--sans);letter-spacing:.04em;background:var(--deodar);color:#fff;padding:4px 8px;border-radius:999px;margin-left:auto;white-space:nowrap;align-self:flex-start}
+.bform{display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:28px;align-items:start}
+.bform-main{background:var(--surface);border:1px solid var(--line);border-radius:18px;padding:24px}
+.bform-prev{position:sticky;top:20px;display:flex;flex-direction:column;gap:10px}
+.bform-prev canvas{width:100%;height:auto;border-radius:12px;box-shadow:0 10px 30px rgba(28,33,40,.18);display:block}
+.fsec{padding-bottom:22px;margin-bottom:22px;border-bottom:1px solid var(--line)}
+.fsec h2{font:500 22px var(--serif);color:var(--heading);margin:0 0 14px;letter-spacing:0;text-transform:none}
+.fld{display:block;margin-bottom:12px}
+.fld > span,.flbl{display:block;font:600 12px var(--sans);color:var(--heading);margin-bottom:6px}
+.fld input,.fld select{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:var(--surface);font:14px var(--sans)}
+.fhint{font-size:12px;color:var(--muted);margin:6px 0 12px}
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.logos{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:10px}
+.lslot{display:flex;flex-direction:column;gap:8px;align-items:flex-start}
+.lslot small{color:var(--muted);font-size:11px}
+.lprev{width:100%;height:96px;border-radius:12px;border:1px dashed var(--line);display:grid;place-items:center;overflow:hidden;padding:10px}
+.lprev.light{background:var(--bg)} .lprev.dark{background:#2C3A47}
+.lprev img{max-width:100%;max-height:76px}
+.cpick{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.cbox{display:flex;flex-direction:column;gap:6px}
+.cbox input[type=color]{width:100%;height:54px;border:1px solid var(--line);border-radius:12px;padding:3px;background:var(--surface);cursor:pointer}
+.cbox b{font:700 12px var(--sans);color:var(--heading)} .cbox small{font-size:11px;color:var(--muted)}
+.cbox input[type=text]{border:1px solid var(--line);border-radius:8px;padding:6px 8px;font:12px var(--sans);width:100%}
+.pals{display:flex;gap:8px;flex-wrap:wrap}
+.pal{display:flex;border-radius:9px;overflow:hidden;border:1px solid var(--line);cursor:pointer;padding:0;background:none}
+.pal i{width:22px;height:30px} .pal span{font:600 11px var(--sans);padding:0 9px;align-self:center;color:var(--heading)}
+.steps{display:flex;gap:6px;margin-bottom:20px;flex-wrap:wrap}
+.steps span{font:700 11px var(--sans);padding:6px 10px;border-radius:999px;background:var(--bg);color:var(--muted)}
+.steps span.on{background:var(--slate);color:var(--lime)}
+.steps span.done{background:var(--soft);color:var(--deodar)}
+.fnav{display:flex;gap:10px;align-items:center}
+.fsp{flex:1}
+.bform.wizard .fsec{border:0;margin:0;padding:0 0 16px}
+@media (max-width:980px){.bform{grid-template-columns:1fr}.bform-prev{position:static;max-width:360px}.cpick{grid-template-columns:repeat(2,1fr)}.logos{grid-template-columns:1fr}.g2{grid-template-columns:1fr}}
+/* reel-skin: neutral editing-desk chrome; brand colours live only in the preview */
+:root{--slate:#1B1D21;--deodar:#1B1D21;--sage:#A3A8AF;--clay:#F2C230;--clay-lt:#F2C230;--lime:#F4F4F2;--mist:#EAEBE8;--ink:#1B1D21;--fog:#666B72;--line:#DEDFDC;--accent:#F2C230;--on-accent:#1B1D21;
+  --serif:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;--sans:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif}
+:root[data-theme="dark"]{--deodar:#F2C230}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--deodar:#F2C230}}
+.sec-head h2,
+.setup-intro .eyebrow{text-transform:none;letter-spacing:0;font-size:13px;font-weight:650}
+
+body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
+.btn,.chip,.tbtn,.st-btn,input,select,textarea{border-radius:6px}
+.chip{border-radius:6px;font-weight:600}
+.chip[aria-pressed=true]{background:var(--slate);color:#fff;border-color:var(--slate)}
+:root[data-theme="dark"] .chip[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+@media (prefers-color-scheme:dark){:root[data-theme="system"] .chip[aria-pressed=true]{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}}
+.btn.primary,.btn.primary:hover{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.btn.primary:hover{filter:brightness(.96)}
+.group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
+:focus-visible{outline-color:var(--accent)!important}
+</style>
+</head>
+<body>
+<header class="bar">
+  <button class="brand" id="goHome" type="button" aria-label="Reel Studio home"><span class="mark" id="brandMark" aria-hidden="true"></span><span class="txt">Reel Studio</span></button>
+  <div class="bsw">
+    <button type="button" class="bsw-btn" id="bswBtn" aria-haspopup="true" aria-expanded="false"><span class="bsw-logo" id="bswLogo"></span><span class="bsw-name" id="bswName">Brand</span><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg></button>
+    <div class="bsw-menu" id="bswMenu" hidden role="menu"></div>
+  </div>
+  <nav class="tabs" aria-label="Sections">
+    <button type="button" data-v="home" aria-pressed="true">Home</button>
+    <button type="button" data-v="post" aria-pressed="false">Post editor</button>
+    <button type="button" data-v="video" aria-pressed="false">Video editor</button>
+    <button type="button" data-v="settings" aria-pressed="false">Brand settings</button>
+  </nav>
+  <span class="theme-slot"></span>
+  <div class="mode-sw" role="group" aria-label="Editing mode"><button type="button" data-m="simple">Simple</button><button type="button" data-m="pro">Pro</button></div>
+  <span class="status" id="status">Everything stays on this computer</span>
+</header>
+
+<main class="view home" id="home">
+  <div class="wrap">
+    <section class="hero">
+      <h1>What are we making for <em id="heroBrand">your brand</em> today?</h1>
+      <p id="heroSub">All your templates in one place: posts, carousels, stories, reels and motion scenes. Pick one, add your photos, change the words, export.</p>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head">
+        <h2>Start fast</h2>
+        <div class="sizes" id="sizes"><span>Video size</span></div>
+      </div>
+      <div class="quick" id="quick"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head">
+        <h2>All templates</h2>
+        <input class="search" id="q" type="search" placeholder="Search: plot, site visit, Diwali, drone..." aria-label="Search templates">
+      </div>
+      <div class="cats" id="cats" role="group" aria-label="Template categories"></div>
+      <div class="grid" id="grid"></div>
+    </section>
+    <p class="note">Simple shows the essentials. Pro adds keyframes, colour sliders, speed ramps, frame rate and fine text controls. Switch any time at the top.</p>
+  </div>
+</main>
+
+<main class="view home" id="settings" hidden>
+  <div class="wrap">
+    <section id="setupIntro" class="setup-intro" hidden>
+      <span class="eyebrow">Welcome to Reel Studio</span>
+      <h1>Set up your brand in <em>2 minutes</em></h1>
+      <p>Your name, logo, colours, fonts and contact details go into every template automatically. You can change anything later in Brand settings, and add more brands.</p>
+      <div class="row"><button type="button" class="btn primary" id="setupStart">Set up my brand</button><button type="button" class="btn ghost" id="setupDemo">Try with the example brand first</button></div>
+    </section>
+    <section id="brandList" class="sec" hidden>
+      <div class="sec-head"><h2>Your brands</h2><div class="sizes"><button type="button" class="chip" id="brandAdd">Add a brand</button><label class="chip upl">Import brands<input type="file" id="brandImport" accept=".json,application/json" multiple></label></div></div>
+      <div class="bfolder" id="bFolder"><p class="fhint" id="bFolderLine" hidden>Each brand is saved as its own file in this folder.</p></div>
+      <p class="fhint" id="bStale" hidden>A brand changed in your save folder. <button type="button" class="btn sm" id="bStaleBtn">Reload to apply</button></p>
+      <p class="fhint" id="bMsg" role="status" aria-live="polite"></p>
+      <div class="bgrid" id="bgrid"></div>
+      <p class="note">Use Export to back up one brand or move it to another computer. Import takes several .brand.json files at once.</p>
+    </section>
+    <section id="brandForm" class="bform" hidden>
+      <div class="bform-main">
+        <div class="steps" id="steps"></div>
+        <div class="fsec" data-step="0">
+          <h2>Basics</h2>
+          <label class="fld"><span>Brand or business name</span><input id="kName" type="text" placeholder="e.g. Sunrise Cafe" maxlength="40"></label>
+          <label class="fld"><span>What do you do, in one line</span><input id="kTag" type="text" placeholder="e.g. Fresh coffee and bakes in Rajpur" maxlength="90"></label>
+          <span class="flbl">Industry (picks your templates)</span><div class="chips" id="kInd"></div>
+        </div>
+        <div class="fsec" data-step="1">
+          <h2>Logo</h2>
+          <p class="fhint">PNG with a transparent background or SVG works best. No logo? Skip this and your name is used as a clean wordmark.</p>
+          <div class="logos">
+            <div class="lslot"><div class="lprev light" id="lpLight"></div><label class="btn sm upl">Main logo<input type="file" id="kLogoLight" accept="image/png,image/svg+xml,image/jpeg,image/webp"></label><small>For light backgrounds</small></div>
+            <div class="lslot"><div class="lprev dark" id="lpDark"></div><label class="btn sm upl">White version<input type="file" id="kLogoDark" accept="image/png,image/svg+xml,image/webp"></label><small>Optional. Made for you if empty</small></div>
+            <div class="lslot"><div class="lprev light" id="lpIcon"></div><label class="btn sm upl">Icon only<input type="file" id="kLogoIcon" accept="image/png,image/svg+xml,image/webp"></label><small>Optional. Small corner logo</small></div>
+          </div>
+          <button type="button" class="btn sm ghost" id="kLogoClear">Remove logos</button>
+        </div>
+        <div class="fsec" data-step="2">
+          <h2>Colours</h2>
+          <div class="row" style="margin-bottom:12px"><button type="button" class="btn sm" id="kFromLogo">Use colours from my logo</button></div>
+          <div class="cpick" id="kColors"></div>
+          <span class="flbl">Or start from a palette</span><div class="pals" id="kPals"></div>
+          <p class="fhint" id="kContrast"></p>
+        </div>
+        <div class="fsec" data-step="3">
+          <h2>Fonts</h2>
+          <div class="fld"><span>Headings</span><div id="kHead"></div></div>
+          <div class="fld"><span>Body text</span><div id="kBody"></div></div>
+          <p class="fhint">Pick from the list or type the name of any font on Google Fonts. Offline, a similar system font is used until you reconnect.</p>
+        </div>
+        <div class="fsec" data-step="4">
+          <h2>Contact and place</h2>
+          <div class="g2">
+            <label class="fld"><span>City</span><input id="kCity" type="text" placeholder="e.g. Dehradun"></label>
+            <label class="fld"><span>Full location line</span><input id="kLoc" type="text" placeholder="e.g. Dehradun, Uttarakhand"></label>
+            <label class="fld"><span>Area or street (used in templates)</span><input id="kArea" type="text" placeholder="e.g. Rajpur Road"></label>
+            <label class="fld"><span>Phone or WhatsApp</span><input id="kPhone" type="text" placeholder="e.g. 98765 43210"></label>
+            <label class="fld"><span>Second phone (optional)</span><input id="kPhone2" type="text"></label>
+            <label class="fld"><span>Website</span><input id="kWeb" type="text" placeholder="e.g. sunrisecafe.in"></label>
+            <label class="fld"><span>Social handle</span><input id="kHandle" type="text" placeholder="e.g. @sunrisecafe"></label>
+          </div>
+        </div>
+        <div class="fnav"><button type="button" class="btn ghost" id="fBack">Back</button><span class="fsp"></span><button type="button" class="btn ghost" id="fCancel">Cancel</button><button type="button" class="btn primary" id="fNext">Next</button></div>
+        <p class="fhint" id="fMsg"></p>
+      </div>
+      <aside class="bform-prev"><span class="flbl">Live preview</span><canvas id="kPrev" width="540" height="675"></canvas><canvas id="kPrev2" width="540" height="300"></canvas></aside>
+    </section>
+  </div>
+</main>
+
+<iframe class="view" id="f-post" src="post.html" title="Post editor" hidden></iframe>
+<iframe class="view" id="f-video" src="video.html" title="Video editor" hidden></iframe>
+
+<script src="rs-store.js"></script>
+<script>RS.theme.mount(document.querySelector(".theme-slot"));</script>
+<script src="brand.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const C = window.GIRIKA ? GIRIKA.C : {}, LOGO = window.GIRIKA ? GIRIKA.LOGO : null;
+/* Reel Studio product mark (neutral, not a client logo) */
+$("brandMark").innerHTML = `<svg viewBox="0 0 32 38" width="100%" height="100%"><rect x="2" y="4" width="28" height="30" rx="8" fill="#F4F1EC"/><path d="M13 13.5v11l9-5.5z" fill="#C98B6E"/></svg>`;
+
+/* ---------- views ---------- */
+const FR = { post:$("f-post"), video:$("f-video") }, READY = { post:false, video:false }, QUEUE = { post:[], video:[] }, TPL = { post:[], video:[] };
+let view = "home";
+function show(v){
+  view = v; $("home").hidden = v !== "home"; $("settings").hidden = v !== "settings"; FR.post.hidden = v !== "post"; FR.video.hidden = v !== "video";
+  if (v === "settings") openSettings();
+  document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
+  if (location.hash !== "#" + v) history.replaceState(null, "", v === "home" ? location.pathname : "#" + v);
+  if (FR[v]) setTimeout(() => FR[v].focus(), 50);
+}
+document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
+$("goHome").addEventListener("click", () => show("home"));
+function send(app, msg){ if (READY[app]) FR[app].contentWindow.postMessage(msg, "*"); else QUEUE[app].push(msg); }
+
+/* ---------- simple / pro ---------- */
+const MODE_KEY = "girika-ui-mode";
+let mode = "simple"; try { mode = localStorage.getItem(MODE_KEY) || "simple"; } catch(e) {}
+function setMode(m, fromChild){
+  mode = m === "pro" ? "pro" : "simple"; try { localStorage.setItem(MODE_KEY, mode); } catch(e) {}
+  document.querySelectorAll(".mode-sw button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.m === mode)));
+  ["post","video"].forEach(a => { if (a !== fromChild) send(a, { girika:"mode", mode }); });
+}
+document.querySelectorAll(".mode-sw button").forEach(b => b.addEventListener("click", () => setMode(b.dataset.m)));
+setMode(mode);
+
+/* ---------- file picking happens here (the click is here), files are handed to the editor ---------- */
+function pickFiles(accept, multiple){
+  return new Promise(res => { const i = document.createElement("input"); i.type = "file"; i.accept = accept; i.multiple = !!multiple;
+    i.addEventListener("change", () => res([...(i.files || [])]), { once:true }); i.addEventListener("cancel", () => res([]), { once:true }); i.click(); });
+}
+
+/* ---------- start fast ---------- */
+const SIZES = [["9x16","Reel 9:16"],["4x5","Feed 4:5"],["1x1","Square"],["16x9","Landscape"]];
+let vsize = "9x16"; try { vsize = localStorage.getItem("girika-home-vsize") || "9x16"; } catch(e) {}
+function buildSizes(){
+  const host = $("sizes"); host.querySelectorAll("button").forEach(b => b.remove());
+  SIZES.forEach(([k, l]) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = l; b.setAttribute("aria-pressed", String(k === vsize));
+    b.addEventListener("click", () => { vsize = k; try { localStorage.setItem("girika-home-vsize", k); } catch(e) {} buildSizes(); }); host.appendChild(b); });
+}
+buildSizes();
+const ICON = {
+  post:'<rect x="4" y="3" width="16" height="18" rx="2"/><circle cx="9" cy="8.5" r="1.6"/><path d="M20 15l-4.5-4.5L6 20"/>',
+  photos:'<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-8 9"/>',
+  video:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2v8l-4-2"/>',
+  drone:'<circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><path d="M7 6h10M12 6v4"/><rect x="9" y="10" width="6" height="4" rx="1"/><path d="M4 21l4-5h8l4 5"/>',
+  star:'<path d="M12 3l2.4 5 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/>',
+  open:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
+};
+const QUICK = [
+  { k:"highlights", star:true, icon:"star", title:"Drone footage to highlight reel", sub:"Pick long drone or walkthrough videos. The best shots are found and cut into a reel with cinematic colour.", accept:"video/*", multi:true, app:"video" },
+  { k:"photos", icon:"photos", title:"Reel from photos", sub:"Several photos become a property tour with smooth camera moves and transitions.", accept:"image/*", multi:true, app:"video" },
+  { k:"post", icon:"post", title:"Post from a photo", sub:"One photo plus your text for Instagram, Facebook or X. Add pages for a carousel.", accept:"image/*,video/*", multi:false, app:"post" },
+  { k:"videos", icon:"video", title:"Edit a video", sub:"Trim clips, add captions, voiceover, music and your brand intro and outro.", accept:"video/*", multi:true, app:"video" },
+  { k:"drone", icon:"drone", title:"Drone video from photos", sub:"1 to 4 aerial photos with drone-style fly-in, orbit and rise. Then mark the plot.", accept:"image/*", multi:true, app:"video" },
+  { k:"project", icon:"open", title:"Open a saved video project", sub:"Continue a .girika project exactly where you left it.", accept:".girika", multi:false, app:"video" }
+];
+if (GIRIKA.industry !== "realestate"){
+  const hl = QUICK.find(q => q.k === "highlights"); hl.title = "Long videos to highlight reel"; hl.sub = "Pick long clips (events, walkthroughs, drone). The best shots are found and cut into a short reel.";
+  const ph = QUICK.find(q => q.k === "photos"); ph.sub = "Several photos become a smooth video with camera moves and transitions.";
+  const dr = QUICK.findIndex(q => q.k === "drone"); if (dr >= 0) QUICK.splice(dr, 1);
+  $("q").placeholder = "Search: offer, menu, festival, tips...";
+}
+QUICK.forEach(q => {
+  const b = document.createElement("button"); b.type = "button"; b.className = "qcard" + (q.star ? " star" : "");
+  b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICON[q.icon]}</svg><span><b></b><small></small></span>`;
+  b.querySelector("b").textContent = q.title; b.querySelector("small").textContent = q.sub;
+  b.addEventListener("click", async () => {
+    const files = await pickFiles(q.accept, q.multi); if (!files.length) return;
+    show(q.app);
+    if (q.app === "post") send("post", { girika:"start", files });
+    else send("video", { girika:"start", action:q.k, files, format:vsize });
+  });
+  $("quick").appendChild(b);
+});
+
+/* ---------- template library ---------- */
+const CAT_ORDER = ["All","Reels"];
+let cat = "All", query = "";
+function allTemplates(){ return [...TPL.video.filter(t => t.cat === "Reels"), ...TPL.post, ...TPL.video.filter(t => t.cat !== "Reels")]; }
+function buildCats(){
+  const host = $("cats"); host.innerHTML = "";
+  const cats = [...new Set([...CAT_ORDER, ...allTemplates().map(t => t.cat)])].filter(c => c === "All" || allTemplates().some(t => t.cat === c));
+  cats.forEach(c => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = c; b.setAttribute("aria-pressed", String(c === cat));
+    b.addEventListener("click", () => { cat = c; buildCats(); buildGrid(); }); host.appendChild(b); });
+}
+function buildGrid(){
+  const host = $("grid"); host.innerHTML = "";
+  const q = query.trim().toLowerCase();
+  const list = allTemplates().filter(t => (cat === "All" || t.cat === cat) && (!q || `${t.name} ${t.sub} ${t.cat} ${t.tag}`.toLowerCase().includes(q)));
+  list.forEach(t => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "card";
+    b.innerHTML = `<div class="thumb"><span class="tag${t.app === "video" ? " vid" : ""}"></span>${t.thumb ? '<img alt="">' : ""}</div><div class="info"><b></b><small></small></div>`;
+    b.querySelector(".tag").textContent = t.tag; b.querySelector("b").textContent = t.name; b.querySelector("small").textContent = t.sub;
+    if (t.thumb) b.querySelector("img").src = t.thumb;
+    b.addEventListener("click", () => useTemplate(t));
+    host.appendChild(b);
+  });
+  const loading = (!READY.post || !READY.video) && !q;
+  if (loading) for (let i = 0; i < 6; i++){ const d = document.createElement("div"); d.className = "card skel"; d.innerHTML = '<div class="thumb"></div><div class="info"><b>&nbsp;</b><small>Loading templates...</small></div>'; host.appendChild(d); }
+  if (!list.length && !loading){ const p = document.createElement("p"); p.className = "empty"; p.textContent = "No templates match. Try another word."; host.appendChild(p); }
+}
+async function useTemplate(t){
+  let files = [];
+  if (t.app === "video" && t.accept){ files = await pickFiles(t.accept, true); if (!files.length && t.needsFiles) return; }
+  show(t.app);
+  send(t.app, { girika:"template", id:t.id, files, format:t.app === "video" && t.cat === "Reels" ? vsize : undefined });
+}
+$("q").addEventListener("input", e => { query = e.target.value; buildGrid(); });
+
+/* ---------- messages from the editors ---------- */
+window.addEventListener("message", e => {
+  const m = e.data; if (!m || !m.girika) return;
+  const app = e.source === FR.post.contentWindow ? "post" : e.source === FR.video.contentWindow ? "video" : null; if (!app) return;
+  if (m.girika === "ready"){
+    READY[app] = true; TPL[app] = m.templates || [];
+    FR[app].contentWindow.postMessage({ girika:"mode", mode }, "*");
+    QUEUE[app].splice(0).forEach(x => FR[app].contentWindow.postMessage(x, "*"));
+    buildCats(); buildGrid();
+  }
+  if (m.girika === "mode") setMode(m.mode, app);
+});
+
+/* =========================================================
+   Brand kits: switcher, setup guide, Brand settings
+   ========================================================= */
+const G = window.GIRIKA, esc = t => String(t || "").replace(/[&<>"]/g, c => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]));
+const initials = n => (n || "R").trim().split(/\s+/).map(w => w[0]).join("").slice(0, 2).toUpperCase();
+function kitLogoHTML(k, dark){
+  if (k.logo && k.logo.type === "image" && (k.logo.icon || k.logo.light)) return `<img alt="" src="${dark && k.logo.dark ? k.logo.dark : k.logo.icon || k.logo.light}">`;
+  if (k.id === "girika" && (!k.logo || k.logo.type === "vector")) return `<svg viewBox="45 57 1067 1294" width="80%" height="80%"><path d="${G.LOGO.arch}" fill="${k.colors.brand}"/><path d="${G.LOGO.sun}" fill="${k.colors.accent}"/></svg>`;
+  return `<b style="background:${k.colors.brand};width:100%;height:100%;display:grid;place-items:center;color:#fff">${esc(initials(k.name))}</b>`;
+}
+function renderSwitcher(){
+  const k = G.KIT; $("bswName").textContent = k.name || "Brand"; $("bswLogo").innerHTML = kitLogoHTML(k);
+  $("heroBrand").textContent = k.name || "your brand";
+  const m = $("bswMenu"); m.innerHTML = "";
+  G.readKits().forEach(x => { const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "menuitem"); if (x.id === k.id) b.className = "on";
+    b.innerHTML = `<span class="bsw-logo">${kitLogoHTML(x)}</span><span>${esc(x.name)}</span>`; b.addEventListener("click", () => switchKit(x.id)); m.appendChild(b); });
+  m.appendChild(document.createElement("hr"));
+  [["Brand settings", () => { closeMenu(); show("settings"); }], ["Add a brand", () => { closeMenu(); show("settings"); editKit(null); }]].forEach(([t, f]) => { const b = document.createElement("button"); b.type = "button"; b.textContent = t; b.addEventListener("click", f); m.appendChild(b); });
+}
+const closeMenu = () => { $("bswMenu").hidden = true; $("bswBtn").setAttribute("aria-expanded", "false"); };
+$("bswBtn").addEventListener("click", e => { e.stopPropagation(); const m = $("bswMenu"); m.hidden = !m.hidden; $("bswBtn").setAttribute("aria-expanded", String(!m.hidden)); });
+document.addEventListener("click", e => { if (!e.target.closest(".bsw")) closeMenu(); });
+async function switchKit(id){
+  let ok = false; try { ok = await G.switchTo(id); } catch(e) {}
+  if (!ok){ show("settings"); brandMsg("This brand's logo is stored in your save folder. Reconnect the folder, then try again."); return; }
+  location.hash = "home"; location.reload();
+}
+/* kit with its logos (the browser copy may be a light one when storage is tight) */
+async function fullKit(k){
+  if (!G.isSlim || !G.isSlim(k.id)) return k;
+  const f = await G.fullKit(k.id).catch(() => null);
+  if (!f) brandMsg("This brand's logo is stored in your save folder. Reconnect the folder, then try again.");
+  return f;
+}
+renderSwitcher();
+
+/* ---------- settings: list ---------- */
+function openSettings(){
+  const first = G.isFirstRun();
+  $("setupIntro").hidden = !first || !$("brandForm").hidden;
+  $("brandList").hidden = first || !$("brandForm").hidden;
+  if (!first) renderBrandList();
+}
+function renderBrandList(){
+  const host = $("bgrid"); host.innerHTML = "";
+  const list = G.readKits(), activeId = G.KIT.id;
+  list.forEach(k => {
+    const d = document.createElement("div"); d.className = "bcard" + (k.id === activeId ? " on" : "");
+    const ind = (G.INDUSTRIES.find(i => i[0] === k.industry) || [, "General"])[1];
+    const where = G.whereSaved ? G.whereSaved(k.id) : "browser", whereTxt = where === "folder" ? "Saved in folder" : where === "builtin" ? "Built-in example" : "In this browser only";
+    d.innerHTML = `<div class="bcard-top"><span class="bcard-logo">${kitLogoHTML(k)}</span><span><b>${esc(k.name)}</b><small>${esc(ind)}${k.city ? " · " + esc(k.city) : ""}</small></span>${k.id === activeId ? '<span class="badge">In use</span>' : ""}</div>
+      <div class="dots">${["dark","brand","accent","light"].map(c => `<i style="background:${k.colors[c]}" title="${c}"></i>`).join("")}</div>
+      <small class="where">${whereTxt}</small>
+      <div class="row"></div>`;
+    const row = d.querySelector(".row");
+    const mk = (t, f, cls = "btn sm") => { const b = document.createElement("button"); b.type = "button"; b.className = cls; b.textContent = t; b.addEventListener("click", f); row.appendChild(b); return b; };
+    if (k.id !== activeId) mk("Use this brand", () => switchKit(k.id), "btn sm primary");
+    mk("Edit", async () => { const f = await fullKit(k); if (f) editKit(f); });
+    mk("Duplicate", async () => {
+      const f = await fullKit(k); if (!f) return;
+      const c = JSON.parse(JSON.stringify(f)); ["id", "builtin", "updated", "_slim"].forEach(x => delete c[x]); c.name = k.name + " copy";
+      try { const r = await G.saveKitAsync(c); brandMsg(r.folderError ? `Made ${c.name}, but it is in this browser only. The save folder could not be written.` : `Made ${c.name}.`); }
+      catch(e){ brandMsg(e.message || "Could not copy that brand."); }
+      renderBrandList(); renderSwitcher();
+    });
+    mk("Export", async () => { const f = await fullKit(k); if (!f) return; const x = { ...f }; delete x._slim; const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([JSON.stringify({ app:"reel-studio", kit:x }, null, 1)], { type:"application/json" })); a.download = (k.name || "brand").toLowerCase().replace(/[^a-z0-9]+/g, "-") + ".brand.json"; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000); });
+    if (list.length > 1){ const del = mk("Delete", async () => { if (del.dataset.arm){ del.disabled = true; let r = {}; try { r = await G.deleteKitAsync(k.id); } catch(e) { r = { folderError:true }; } if (k.id === activeId) location.reload(); else { renderBrandList(); renderSwitcher(); brandMsg(r.folderError ? `Removed ${k.name} here, but its file is still in your save folder.` : `Deleted ${k.name}.`); } } else { del.dataset.arm = 1; del.textContent = "Click again to delete"; setTimeout(() => { delete del.dataset.arm; del.textContent = "Delete"; }, 3000); } }); }
+    host.appendChild(d);
+  });
+}
+$("brandAdd").addEventListener("click", () => editKit(null));
+$("brandImport").addEventListener("change", async e => {
+  const files = [...(e.target.files || [])]; e.target.value = ""; if (!files.length) return;
+  const ok = [], bad = []; let folderErr = 0, saveErr = "";
+  for (const f of files){
+    let k = null;
+    try { const j = JSON.parse(await f.text()); k = j && (j.kit || j); } catch(err) {}
+    if (!k || typeof k !== "object" || !k.name || !k.colors){ bad.push(f.name); continue; }
+    ["id", "builtin", "updated", "_slim", "deleted"].forEach(x => delete k[x]);
+    try { const r = await G.saveKitAsync(k); ok.push(k.name); if (r.folderError) folderErr++; }
+    catch(err){ saveErr = err.message || "Could not save."; bad.push(f.name); }
+  }
+  renderBrandList(); renderSwitcher();
+  const parts = [];
+  if (ok.length) parts.push(ok.length === 1 ? `Imported ${ok[0]}.` : `Imported ${ok.length} brands.`);
+  if (folderErr) parts.push(folderErr === ok.length ? "The save folder could not be written, so they are in this browser only." : `${folderErr} could not be written to the save folder, so they are in this browser only.`);
+  if (saveErr) parts.push(saveErr);
+  else if (bad.length) parts.push(`${bad.length === 1 ? bad[0] + " is" : bad.length + " files are"} not a Reel Studio brand.`);
+  brandMsg(parts.join(" "));
+});
+function brandMsg(t){ $("bMsg").textContent = t || ""; if (t) status(t); }
+
+/* save folder: brands are files in <folder>/brands */
+if (window.RS && RS.fs){
+  RS.fs.badge($("bFolder"), { onChange: async () => {
+    const r = await G.syncKits(); renderBrandList(); renderSwitcher();
+    if (RS.fs.state === "ready") brandMsg(r.activeChanged ? "Folder connected. Your brand changed there, reload to apply." : "Folder connected. Your brands are saved there.");
+  } });
+  $("bFolder").appendChild($("bFolderLine"));
+  const paintLine = () => { $("bFolderLine").hidden = RS.fs.state === "unsupported"; if (!$("brandList").hidden) renderBrandList(); };
+  RS.fs.onChange(paintLine); RS.fs.ready.then(paintLine, () => {}); paintLine();
+}
+if (G.onKitsSynced) G.onKitsSynced(info => {
+  if (info.activeChanged){ $("bStale").hidden = false; status("Brand updated. Reload to apply."); }
+  if (!$("brandList").hidden) renderBrandList();
+  renderSwitcher();
+});
+$("bStaleBtn").addEventListener("click", () => { location.hash = view === "home" ? "" : view; location.reload(); });
+function status(t){ $("status").textContent = t; clearTimeout(status.t); status.t = setTimeout(() => { $("status").textContent = "Everything stays on this computer"; }, 5000); }
+
+/* ---------- settings: brand form (setup guide in steps on first run) ---------- */
+const PALETTES = [
+  ["Forest", { dark:"#2C3A47", brand:"#556348", accent:"#9A5B40", light:"#F4F1EC" }], ["Ocean", { dark:"#1F3B57", brand:"#2F6F8F", accent:"#E07A3F", light:"#F2F6F8" }],
+  ["Royal", { dark:"#2A1F45", brand:"#5B3E96", accent:"#D4A23A", light:"#F6F3FA" }], ["Rose", { dark:"#3A2230", brand:"#B24C6A", accent:"#E8A33D", light:"#FBF3F5" }],
+  ["Charcoal and gold", { dark:"#1E1E1E", brand:"#3C3C3C", accent:"#C9A227", light:"#F5F2EA" }], ["Fresh green", { dark:"#16352A", brand:"#2E8B57", accent:"#F2994A", light:"#F2F7F3" }],
+  ["Coffee", { dark:"#2E211B", brand:"#6F4E37", accent:"#C8873A", light:"#F7F1EA" }], ["Bold red", { dark:"#1C1C24", brand:"#C8102E", accent:"#F5B700", light:"#F8F5F2" }]
+];
+const COLOR_ROLES = [["dark","Dark","Text, dark backgrounds"],["brand","Brand","Badges, panels"],["accent","Accent","Buttons, highlights"],["light","Light","Light backgrounds"]];
+const STEP_NAMES = ["Basics","Logo","Colours","Fonts","Contact"];
+let draft = null, step = 0, wizard = false;
+function editKit(k){
+  wizard = G.isFirstRun();
+  draft = k ? JSON.parse(JSON.stringify(k)) : { name:"", tagline:"", industry:"general", city:"", location:"", area:"", phone:"", phone2:"", web:"", handle:"", colors:{ ...PALETTES[1][1] }, fonts:{ head:"Playfair Display", body:"Inter" }, logo:{ type:"text" } };
+  draft.colors = { ...G.BUILTIN.colors, ...draft.colors }; draft.fonts = { ...G.BUILTIN.fonts, ...draft.fonts }; draft.logo = draft.logo || { type:"text" };
+  step = 0; $("setupIntro").hidden = true; $("brandList").hidden = true; $("brandForm").hidden = false; $("brandForm").classList.toggle("wizard", wizard);
+  fillForm(); showStep(); $("home") && window.scrollTo(0, 0); $("settings").scrollTop = 0;
+}
+function fillForm(){
+  const d = draft;
+  [["kName","name"],["kTag","tagline"],["kCity","city"],["kLoc","location"],["kArea","area"],["kPhone","phone"],["kPhone2","phone2"],["kWeb","web"],["kHandle","handle"]].forEach(([id, key]) => { $(id).value = d[key] || ""; $(id).oninput = () => { d[key] = $(id).value; drawPreview(); }; });
+  const ih = $("kInd"); ih.innerHTML = "";
+  G.INDUSTRIES.forEach(([v, l]) => { const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = l; b.setAttribute("aria-pressed", String(d.industry === v)); b.addEventListener("click", () => { d.industry = v; [...ih.children].forEach(x => x.setAttribute("aria-pressed", String(x === b))); }); ih.appendChild(b); });
+  const ch = $("kColors"); ch.innerHTML = "";
+  COLOR_ROLES.forEach(([key, label, use]) => {
+    const box = document.createElement("label"); box.className = "cbox";
+    box.innerHTML = `<input type="color"><b>${label}</b><small>${use}</small><input type="text" maxlength="7" aria-label="${label} hex">`;
+    const [pick, , , hex] = box.children; pick.value = d.colors[key]; hex.value = d.colors[key].toUpperCase();
+    pick.addEventListener("input", () => { d.colors[key] = pick.value.toUpperCase(); hex.value = d.colors[key]; drawPreview(); });
+    hex.addEventListener("change", () => { if (/^#?[0-9a-f]{6}$/i.test(hex.value)){ d.colors[key] = ("#" + hex.value.replace("#", "")).toUpperCase(); pick.value = d.colors[key]; drawPreview(); } });
+    ch.appendChild(box);
+  });
+  const ph = $("kPals"); ph.innerHTML = "";
+  PALETTES.forEach(([n, cols]) => { const b = document.createElement("button"); b.type = "button"; b.className = "pal"; b.title = n; b.innerHTML = ["dark","brand","accent","light"].map(c => `<i style="background:${cols[c]}"></i>`).join("") + `<span>${n}</span>`; b.addEventListener("click", () => { d.colors = { ...cols }; fillForm(); drawPreview(); }); ph.appendChild(b); });
+  if (!fpHead) fpHead = mountFont("kHead", "head", "Headings"); if (!fpBody) fpBody = mountFont("kBody", "body", "Body text");
+  setFont(fpHead, d.fonts.head); setFont(fpBody, d.fonts.body);
+  showLogos(); loadFonts(); drawPreview();
+}
+/* font pickers: any Google Font (RS.fonts), with a plain list as fallback */
+let fpHead = null, fpBody = null;
+function mountFont(id, key, label){
+  const host = $(id); host.innerHTML = "";
+  if (window.RS && RS.fonts){
+    const p = RS.fonts.picker({ value:draft.fonts[key], label, onChange:f => { draft.fonts[key] = f; $("fMsg").textContent = ""; loadFonts(); }, onError:f => { $("fMsg").textContent = `Could not load "${f}". Check the name, or your internet connection.`; } });
+    host.appendChild(p); return p;
+  }
+  const sel = document.createElement("select"); sel.setAttribute("aria-label", label);
+  (key === "head" ? G.FONTS_HEAD : G.FONTS_BODY).forEach(f => sel.appendChild(new Option(f, f)));
+  sel.onchange = () => { draft.fonts[key] = sel.value; loadFonts(); }; host.appendChild(sel); return sel;
+}
+function setFont(el, f){ if (el.tagName === "SELECT" && ![...el.options].some(o => o.value === f)) el.appendChild(new Option(f, f)); el.value = f; }
+const fontLinks = new Set();
+function loadFonts(){
+  if (window.RS && RS.fonts){ Promise.all([draft.fonts.head, draft.fonts.body].map(f => RS.fonts.load(f))).catch(() => {}).then(drawPreview); drawPreview(); return; }
+  const url = G.fontURL([draft.fonts.head, draft.fonts.body]);
+  if (!fontLinks.has(url)){ fontLinks.add(url); const l = document.createElement("link"); l.rel = "stylesheet"; l.href = url; document.head.appendChild(l); }
+  Promise.all([`600 40px "${draft.fonts.head}"`, `italic 500 40px "${draft.fonts.head}"`, `700 20px "${draft.fonts.body}"`].map(f => document.fonts.load(f))).catch(() => {}).then(drawPreview);
+  drawPreview();
+}
+/* logos: downscale raster files so many brands fit in browser storage */
+function readLogo(file){
+  return new Promise((res, rej) => {
+    const r = new FileReader(); r.onerror = rej;
+    r.onload = () => {
+      if (file.type === "image/svg+xml"){ res(r.result); return; }
+      const img = new Image(); img.onload = () => { const k = Math.min(1, 900 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k); c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); res(c.toDataURL("image/png")); }; img.onerror = rej; img.src = r.result;
+    };
+    r.readAsDataURL(file);
+  });
+}
+[["kLogoLight","light"],["kLogoDark","dark"],["kLogoIcon","icon"]].forEach(([id, key]) => $(id).addEventListener("change", async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  try { const url = await readLogo(f); draft.logo = { ...(draft.logo || {}), type:"image", [key]:url }; showLogos(); drawPreview(); if (key === "light") suggestColors(true); }
+  catch(err){ status("Could not read that image."); }
+}));
+$("kLogoClear").addEventListener("click", () => { draft.logo = draft.id === "girika" ? { type:"vector" } : { type:"text" }; showLogos(); drawPreview(); });
+function showLogos(){
+  const L = draft.logo || {};
+  [["lpLight","light"],["lpDark","dark"],["lpIcon","icon"]].forEach(([id, key]) => { $(id).innerHTML = L.type === "image" && L[key] ? `<img alt="" src="${L[key]}">` : `<small style="color:${key === "dark" ? "#A9B896" : "#5E6773"}">${key === "light" ? (L.type === "vector" ? "Built-in logo" : "No logo yet") : "Empty"}</small>`; });
+}
+/* colours from the logo: most common strong colours become brand and accent */
+function suggestColors(auto){
+  const src = draft.logo && draft.logo.light; if (!src){ status("Add your main logo first."); return; }
+  const img = new Image(); img.onload = () => {
+    const c = document.createElement("canvas"), n = 64; c.width = n; c.height = n; const x = c.getContext("2d", { willReadFrequently:true }); x.drawImage(img, 0, 0, n, n);
+    const d = x.getImageData(0, 0, n, n).data, bins = new Map();
+    for (let i = 0; i < d.length; i += 4){ if (d[i + 3] < 200) continue; const key = (d[i] >> 4) << 8 | (d[i + 1] >> 4) << 4 | (d[i + 2] >> 4); const b = bins.get(key) || { n:0, r:0, g:0, b:0 }; b.n++; b.r += d[i]; b.g += d[i + 1]; b.b += d[i + 2]; bins.set(key, b); }
+    const cols = [...bins.values()].sort((a, b) => b.n - a.n).map(b => { const r = b.r / b.n, g = b.g / b.n, bl = b.b / b.n, mx = Math.max(r, g, bl), mn = Math.min(r, g, bl); return { hex:"#" + [r, g, bl].map(v => Math.round(v).toString(16).padStart(2, "0")).join("").toUpperCase(), sat:mx ? (mx - mn) / mx : 0, l:(mx + mn) / 510, n:b.n }; });
+    const hue = h => { const [r, g, b] = G.hex2rgb(h).map(v => v / 255), mx = Math.max(r, g, b), mn = Math.min(r, g, b), d = mx - mn; if (!d) return 0; const x = mx === r ? ((g - b) / d) % 6 : mx === g ? (b - r) / d + 2 : (r - g) / d + 4; return (x * 60 + 360) % 360; };
+    const strong = cols.filter(c => c.sat > .3 && c.l > .22 && c.l < .85), darkC = cols.filter(c => c.l < .28).sort((a, b) => b.n - a.n)[0];
+    if (!strong.length && !darkC){ if (!auto) status("No clear colours found in the logo."); return; }
+    const brand = strong[0] || darkC, hd = (a, b) => { const d = Math.abs(hue(a) - hue(b)); return Math.min(d, 360 - d); };
+    const accent = strong.find(c => c !== brand && hd(c.hex, brand.hex) > 25) || (strong[0] ? { hex:G.mix(brand.hex, "#FFFFFF", .25) } : { hex:"#C9A227" });
+    draft.colors = { dark:darkC ? darkC.hex : G.mix(brand.hex, "#000000", .6), brand:brand.hex, accent:accent.hex, light:G.mix(brand.hex, "#FFFFFF", .93) };
+    fillForm(); if (!auto) status("Colours taken from your logo. Adjust them if you like."); else status("We picked colours from your logo. Check the Colours step.");
+  };
+  img.src = src;
+}
+$("kFromLogo").addEventListener("click", () => suggestColors(false));
+/* live preview: a post and a story bar drawn with the draft brand */
+const prevImgs = {};
+function prevImg(src){ if (!src) return null; if (!prevImgs[src]){ const i = new Image(); i.onload = drawPreview; i.src = src; prevImgs[src] = i; } return prevImgs[src].complete && prevImgs[src].naturalWidth ? prevImgs[src] : null; }
+function drawPreview(){
+  if (!draft) return;
+  const k = draft, D = G.derive(k.colors), cv = $("kPrev"), x = cv.getContext("2d"), W = cv.width, H = cv.height, hf = `"${k.fonts.head}", Georgia, serif`, bf = `"${k.fonts.body}", Arial, sans-serif`;
+  x.fillStyle = D.lime; x.fillRect(0, 0, W, H);
+  const g = x.createLinearGradient(0, 0, 0, H * .55); g.addColorStop(0, G.mix(D.deodar, "#FFFFFF", .55)); g.addColorStop(1, D.deodar); x.fillStyle = g; x.fillRect(0, 0, W, H * .55);
+  x.fillStyle = D.clayLt; x.beginPath(); x.arc(W * .72, H * .2, 44, 0, Math.PI * 2); x.fill();
+  x.fillStyle = D.slate; x.beginPath(); x.moveTo(0, H * .55); [[.15,.42],[.32,.5],[.5,.38],[.7,.49],[.86,.4],[1,.47]].forEach(([a, b]) => x.lineTo(W * a, H * b)); x.lineTo(W, H * .55); x.closePath(); x.fill();
+  const L = k.logo || {}, logo = L.type === "image" ? prevImg(L.light) : null;
+  if (logo){ const lw = 170, lh = lw * logo.naturalHeight / logo.naturalWidth; x.drawImage(logo, 36, H * .6, lw, Math.min(lh, 70)); }
+  else { x.fillStyle = D.slate; x.font = `600 30px ${hf}`; x.fillText(k.name || "Your brand", 36, H * .6 + 34); }
+  x.fillStyle = D.fog; x.font = `700 15px ${bf}`; x.fillText((k.area || k.city || "Your city").toUpperCase(), 36, H * .6 + 100);
+  x.fillStyle = D.slate; x.font = `600 40px ${hf}`; x.fillText("Your headline", 36, H * .6 + 152); x.fillStyle = D.clay; x.font = `italic 500 40px ${hf}`; x.fillText("goes here", 36, H * .6 + 198);
+  x.fillStyle = D.clay; x.beginPath(); x.roundRect(36, H - 74, 200, 46, 23); x.fill(); x.fillStyle = "#fff"; x.font = `700 16px ${bf}`; x.fillText("Book now", 70, H - 45);
+  x.fillStyle = D.deodar; x.beginPath(); x.roundRect(W - 170, 24, 140, 34, 8); x.fill(); x.fillStyle = "#fff"; x.font = `700 13px ${bf}`; x.fillText("NEW OFFER", W - 152, 46);
+  const c2 = $("kPrev2"), y = c2.getContext("2d"), W2 = c2.width, H2 = c2.height;
+  y.fillStyle = D.slate; y.fillRect(0, 0, W2, H2);
+  const dl = L.type === "image" ? prevImg(L.dark || L.light) : null;
+  if (dl){ const lw = 150, lh = Math.min(70, lw * dl.naturalHeight / dl.naturalWidth);
+    if (L.dark) y.drawImage(dl, 36, 30, lw, lh);
+    else { const t = document.createElement("canvas"); t.width = lw; t.height = lh; const tx = t.getContext("2d"); tx.drawImage(dl, 0, 0, lw, lh); tx.globalCompositeOperation = "source-in"; tx.fillStyle = "#FFFFFF"; tx.fillRect(0, 0, lw, lh); y.drawImage(t, 36, 30); } }
+  else { y.fillStyle = D.lime; y.font = `600 28px ${hf}`; y.fillText(k.name || "Your brand", 36, 62); }
+  y.fillStyle = D.lime; y.font = `600 34px ${hf}`; y.fillText("Call or WhatsApp", 36, 160); y.fillStyle = D.clayLt; y.font = `800 34px ${bf}`; y.fillText(k.phone || "98765 43210", 36, 210);
+  y.fillStyle = D.sage; y.font = `600 17px ${bf}`; y.fillText([k.web, k.handle].filter(Boolean).join("   |   ") || "yourwebsite.com   |   @yourhandle", 36, 254);
+  const cr = (Math.max(G.lum(k.colors.light), G.lum(k.colors.dark)) + .05) / (Math.min(G.lum(k.colors.light), G.lum(k.colors.dark)) + .05);
+  $("kContrast").textContent = cr < 4.5 ? `Dark and Light are close (contrast ${cr.toFixed(1)}:1). Text may be hard to read. Aim for 4.5:1 or more.` : `Good contrast between Dark and Light (${cr.toFixed(1)}:1).`;
+}
+function showStep(){
+  const secs = [...document.querySelectorAll("#brandForm .fsec")];
+  secs.forEach((el, i) => { el.hidden = wizard && i !== step; });
+  $("steps").innerHTML = wizard ? STEP_NAMES.map((n, i) => `<span class="${i === step ? "on" : i < step ? "done" : ""}">${i + 1}. ${n}</span>`).join("") : `<span class="on">${draft.id ? "Edit " + esc(draft.name) : "New brand"}</span>`;
+  $("fBack").hidden = !wizard || step === 0; $("fNext").textContent = wizard && step < 4 ? "Next" : "Save brand";
+  $("fCancel").hidden = wizard && G.isFirstRun(); $("fMsg").textContent = "";
+}
+$("fBack").addEventListener("click", () => { step = Math.max(0, step - 1); showStep(); });
+$("fNext").addEventListener("click", async () => {
+  if (step === 0 && !String(draft.name || "").trim()){ $("fMsg").textContent = "Add your brand name to continue."; $("kName").focus(); return; }
+  if (wizard && step < 4){ step++; showStep(); $("settings").scrollTop = 0; return; }
+  draft.name = draft.name.trim(); if (draft.logo && draft.logo.type === "image" && !draft.logo.light && !draft.logo.dark) draft.logo = { type:"text" };
+  const btn = $("fNext"); btn.disabled = true; $("fMsg").textContent = "Saving...";
+  let r;
+  try { r = await G.saveKitAsync(draft); }
+  catch(e){ btn.disabled = false; $("fMsg").textContent = e.message || "Could not save this brand."; return; }
+  btn.disabled = false;
+  if (r.folderError){ $("fMsg").textContent = "Saved in this browser only. The save folder could not be written. Check the folder and save again, or press Cancel to keep it here."; renderSwitcher(); return; }
+  try { sessionStorage.setItem("reelstudio-flash", r.folder ? `Saved ${draft.name} to your save folder.` : `Saved ${draft.name}.`); } catch(e) {}
+  G.setActive(r.kit.id); location.hash = "home"; location.reload();
+});
+$("fCancel").addEventListener("click", () => { [fpHead, fpBody].forEach(p => p && p.close && p.close()); draft = null; $("brandForm").hidden = true; openSettings(); });
+$("setupStart").addEventListener("click", () => editKit(null));
+$("setupDemo").addEventListener("click", () => { G.setActive("girika"); location.hash = "home"; location.reload(); });
+buildCats(); buildGrid();
+try { const fl = sessionStorage.getItem("reelstudio-flash"); if (fl){ sessionStorage.removeItem("reelstudio-flash"); status(fl); } } catch(e) {}
+const start = location.hash.slice(1);
+if (GIRIKA.isFirstRun()) show("settings"); else show(["post","video","settings"].includes(start) ? start : "home");
+</script>
+</body>
+</html>
