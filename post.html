@@ -221,6 +221,12 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 .btn.primary:hover{filter:brightness(.96)}
 .group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
 :focus-visible{outline-color:var(--accent)!important}
+.recnote{color:var(--on-accent)}
+[style*="background:var(--clay)"],[style*="background: var(--clay)"]{color:var(--on-accent)!important}
+
+:root{--stage:#E6E7E4}
+:root[data-theme="dark"]{--stage:#0E1013}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--stage:#0E1013}}
 </style>
 </head>
 <body>

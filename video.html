@@ -357,6 +357,28 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 .btn.primary:hover{filter:brightness(.96)}
 .group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
 :focus-visible{outline-color:var(--accent)!important}
+[style*="background:var(--clay)"],[style*="background: var(--clay)"]{color:var(--on-accent)!important}
+
+.tr-btn{position:absolute;top:50%;width:24px;height:24px;margin:-12px 0 0 -12px;z-index:6;display:grid;place-items:center;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--heading);cursor:pointer;box-shadow:0 2px 6px rgba(0,0,0,.25)}
+.tr-btn:hover,.tr-btn:focus-visible{background:var(--accent);color:var(--on-accent);border-color:var(--accent)}
+.tr-btn.cut{opacity:.6}
+.tr-pop{position:fixed;z-index:90;width:300px;max-width:calc(100vw - 16px);padding:12px;border-radius:10px;background:var(--surface);border:1px solid var(--line);box-shadow:0 14px 40px rgba(0,0,0,.25);color:var(--text)}
+.tr-pop b{display:block;font-size:13px;margin-bottom:8px;color:var(--heading)}
+.tr-grid{display:flex;flex-wrap:wrap;gap:6px}
+.tr-pop .hint{margin:8px 0 0}
+
+.clip-plus{position:absolute;top:5px;left:50%;margin-left:-12px;z-index:6;width:24px;height:24px;display:grid;place-items:center;border-radius:6px;border:0;background:var(--accent);color:var(--on-accent);cursor:pointer;opacity:0;transform:scale(.85);transition:opacity .12s,transform .12s;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.blk:hover .clip-plus,.blk.sel .clip-plus,.clip-plus:focus-visible{opacity:1;transform:none}
+@media (hover:none){.clip-plus{opacity:1;transform:none}}
+.tr-pop{max-height:min(70vh,560px);overflow:auto}
+
+.blk.clip{background:#3A3F47}
+.blk.capb{background:#4F5E4A}
+.blk.sel{border-color:var(--accent);box-shadow:0 0 0 2px rgba(242,194,48,.35)}
+.blk:hover{box-shadow:0 0 0 2px rgba(242,194,48,.45)}
+:root{--stage:#E6E7E4;--tl:#F7F7F5;--tl-line:#ECEDEA;--rule:#CFD1CD}
+:root[data-theme="dark"]{--stage:#0E1013;--tl:#16181C;--tl-line:#22252A;--rule:#363A41}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--stage:#0E1013;--tl:#16181C;--tl-line:#22252A;--rule:#363A41}}
 </style>
 </head>
 <body>
@@ -3790,9 +3812,9 @@ function drawStageUI(c, t){
     if (SE.guides.v != null){ c.beginPath(); c.moveTo(SE.guides.v, 0); c.lineTo(SE.guides.v, H); c.stroke(); }
     if (SE.guides.h != null){ c.beginPath(); c.moveTo(0, SE.guides.h); c.lineTo(W, SE.guides.h); c.stroke(); } }
   const r = selRect(t);
-  if (r && (selected.type === "caption" || selected.type === "clip")){ c.setLineDash([12 * u, 8 * u]); c.strokeStyle = C.clayLt; c.lineWidth = 3 * u; c.strokeRect(r.x - 12 * u, r.y - 12 * u, r.w + 24 * u, r.h + 24 * u); }
+  if (r && (selected.type === "caption" || selected.type === "clip")){ c.setLineDash([12 * u, 8 * u]); c.strokeStyle = "#F2C230"; c.lineWidth = 3 * u; c.strokeRect(r.x - 12 * u, r.y - 12 * u, r.w + 24 * u, r.h + 24 * u); }
   if (r && seTarget()){ c.setLineDash([]); c.fillStyle = "#FFFFFF"; c.strokeStyle = C.slate; c.lineWidth = 3 * u; c.beginPath(); c.arc(r.x + r.w, r.y + r.h, 13 * u, 0, Math.PI * 2); c.fill(); c.stroke(); }
-  if (selected && selected.type === "clip" && frameClip(selected.item) && t >= selected.item._start && t <= selected.item._start + selected.item.dur){ c.setLineDash([]); c.strokeStyle = C.clayLt; c.lineWidth = 6 * u; c.strokeRect(3 * u, 3 * u, W - 6 * u, H - 6 * u); }
+  if (selected && selected.type === "clip" && frameClip(selected.item) && t >= selected.item._start && t <= selected.item._start + selected.item.dur){ c.setLineDash([]); c.strokeStyle = "#F2C230"; c.lineWidth = 6 * u; c.strokeRect(3 * u, 3 * u, W - 6 * u, H - 6 * u); }
   c.restore();
 }
 
@@ -4456,7 +4478,7 @@ function renderOff(fn){
   const { W, H } = geo();
   if (!offCanvas || offCanvas.width !== W || offCanvas.height !== H){ offCanvas = document.createElement("canvas"); offCanvas.width = W; offCanvas.height = H; }
   const oc = offCanvas.getContext("2d"); oc.setTransform(1, 0, 0, 1, 0, 0); oc.clearRect(0, 0, W, H); fn(oc);
-  const th = 220, tw = Math.round(th * W / H), t = document.createElement("canvas"); t.width = tw; t.height = th; t.getContext("2d").drawImage(offCanvas, 0, 0, tw, th); return t;
+  const th = 600, tw = Math.round(th * W / H), t = document.createElement("canvas"); t.width = tw; t.height = th; const tc = t.getContext("2d"); tc.imageSmoothingQuality = "high"; tc.drawImage(offCanvas, 0, 0, tw, th); return t;
 }
 function sceneThumb(sc, at){ return renderOff(oc => drawSceneClip(oc, sc, (at ?? .8) * sc.dur)); }
 function openGallery(title, sub, cards){
@@ -5806,7 +5828,7 @@ async function openProjDlg(){
         vbox.appendChild(el("div", { class:"pj-v" }, [el("span", { text:t ? timeLabel(t) : v }), btn("Open this version", () => projGuard(() => openFolderProject(r.slug, v)), "btn sm")])); });
     }, "btn sm");
     box.appendChild(el("div", { class:"pj-row" + (r.slug === PROJ.slug ? " on" : "") }, [
-      el("div", { class:"pj-info" }, [el("b", { text:r.name }), el("small", { text:`${r.cat}  ·  ${r.at ? timeLabel(r.at) : ""}  ·  ${r.n} media file${r.n === 1 ? "" : "s"}${r.fmt ? "  ·  " + r.fmt.replace("x", ":") : ""}` })]),
+      el("div", { class:"pj-info" }, [el("b", { text:r.name }), el("small", { text:`${r.cat}, saved ${r.at ? timeLabel(r.at) : ""}, ${r.n} media file${r.n === 1 ? "" : "s"}${r.fmt ? ", " + r.fmt.replace("x", ":") : ""}` })]),
       el("div", { class:"row" }, [btn(r.slug === PROJ.slug ? "Reopen" : "Open", () => projGuard(() => openFolderProject(r.slug)), "btn sm dark"), vbtn]), vbox]));
   });
 }
@@ -5945,6 +5967,78 @@ document.addEventListener("keydown", e => {
 /* first frame: show the brand intro with its content, not the empty fade-in */
 RS.fs.ready.then(() => { if (!playing && playT === 0 && SEQ.length && SEQ[0].kind === "intro") seek(Math.min(1.2, SEQ[0].dur * .5)); });
 
+
+/* =========================================================
+   Transition buttons on the timeline: one between every two clips
+   ========================================================= */
+const TR_ICON = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M4 5l8 7-8 7zM20 5l-8 7 8 7z"/></svg>';
+let trPop = null;
+function trClose(){ if (trPop){ trPop.remove(); trPop = null; document.removeEventListener("pointerdown", trOutside, true); } }
+const trOutside = e => { if (trPop && !trPop.contains(e.target) && !e.target.closest(".tr-btn")) trClose(); };
+function trGet(c){ return c.kind === "intro" ? (P.intro.transition || "fade") : (c.transition || "fade"); }
+function trSet(c, v){ if (c.kind === "intro"){ P.intro.transition = v; delete P.intro.tdur; persist(); } else { c.transition = v; delete c.tdur; } changed(); }
+function trOpen(c, btn){
+  trClose(); pause();
+  const r = btn.getBoundingClientRect();
+  trPop = el("div", { class:"tr-pop", role:"dialog", "aria-label":"Transition" });
+  trPop.appendChild(el("b", { text:"Transition" }));
+  const grid = el("div", { class:"tr-grid" });
+  TRANSITIONS.forEach(([v, l]) => { const on = trGet(c) === v; const x = el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:l }); x.addEventListener("click", () => { trSet(c, v); trClose(); renderTimeline(); const at = c._start + c.dur - (c._td || 0) - .5; seek(Math.max(0, at)); play(Math.max(0, at)); setTimeout(() => { if (playing && now() > at + 1.6) pause(); }, 1700); }); grid.appendChild(x); });
+  trPop.appendChild(grid);
+  trPop.appendChild(el("p", { class:"hint", text:"Plays into the next clip. Cut means no effect." }));
+  document.body.appendChild(trPop);
+  const w = trPop.offsetWidth, h = trPop.offsetHeight;
+  trPop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + "px";
+  trPop.style.top = Math.max(8, r.top - h - 8) + "px";
+  setTimeout(() => document.addEventListener("pointerdown", trOutside, true));
+  const f = trPop.querySelector('[aria-pressed="true"]') || trPop.querySelector("button"); f && f.focus();
+}
+function trButtons(){
+  const host = $("trClips"); if (!host) return;
+  SEQ.forEach((c, i) => {
+    const next = SEQ[i + 1]; if (!next || c.kind === "outro") return;
+    const v = trGet(c), x = (c._start + c.dur - (c._td || 0) / 2) * P.pps;
+    const b = el("button", { type:"button", class:"tr-btn" + (v === "cut" ? " cut" : ""), title:`Transition: ${(TRANSITIONS.find(t => t[0] === v) || [, "Crossfade"])[1]}`, "aria-label":"Change transition" });
+    b.innerHTML = TR_ICON; b.style.left = x + "px";
+    b.addEventListener("pointerdown", e => e.stopPropagation());
+    b.addEventListener("click", e => { e.stopPropagation(); trPop ? trClose() : trOpen(c, b); });
+    host.appendChild(b);
+  });
+}
+(function(){ const _rt = renderTimeline; renderTimeline = function(){ _rt.apply(this, arguments); trButtons(); }; })();
+document.addEventListener("keydown", e => { if (e.key === "Escape") trClose(); });
+
+/* clip + menu: shown on hover (or when selected, for touch). Add media after, look, camera move */
+function clipMenu(c, anchor){
+  const r = anchor.getBoundingClientRect();
+  trClose(); pause(); select("clip", c);
+  trPop = el("div", { class:"tr-pop", role:"dialog", "aria-label":"Clip options" });
+  const sec = (title, opts, cur, on) => { trPop.appendChild(el("b", { text:title })); const g = el("div", { class:"tr-grid" }); opts.forEach(([v, l]) => { const x = el("button", { type:"button", class:"chip", "aria-pressed":String(cur === v), text:l }); x.addEventListener("click", () => { on(v); g.querySelectorAll(".chip").forEach(y => y.setAttribute("aria-pressed", String(y === x))); }); g.appendChild(x); }); trPop.appendChild(g); };
+  const addAfter = async (accept, fn) => { trClose(); const files = await pickFiles(accept, true); if (!files || !files.length) return; const n0 = P.clips.length; await fn(files); const added = P.clips.splice(n0); P.clips.splice(P.clips.indexOf(c) + 1, 0, ...added); refresh(); if (added[0]) select("clip", added[0]); };
+  trPop.appendChild(el("b", { text:"Add after this" }));
+  trPop.appendChild(el("div", { class:"tr-grid" }, [btn("Photos", () => addAfter("image/*", addPhotos)), btn("Video clips", () => addAfter("video/*", addVideos)), btn("Duplicate", () => { trClose(); duplicateClip(c); }), btn("Delete", () => { trClose(); deleteSelected(); })]));
+  trPop.lastChild.style.marginBottom = "12px";
+  sec("Look", LOOKS, c.look || "none", v => { c.look = v; changed(false); seek(Math.max(c._start + .3, Math.min(now(), c._start + c.dur - .1))); });
+  if (c.kind === "image"){ trPop.lastChild.style.marginBottom = "12px"; sec("Camera move", MOTIONS, c.motion || "auto", v => { c.motion = v; c.kf = []; changed(false); seek(c._start + .2); play(c._start + .2); setTimeout(() => { if (playing) pause(); }, Math.min(3000, c.dur * 1000)); }); }
+  document.body.appendChild(trPop);
+  const w = trPop.offsetWidth, h = trPop.offsetHeight;
+  trPop.style.left = Math.max(8, Math.min(r.left + r.width / 2 - w / 2, innerWidth - w - 8)) + "px";
+  trPop.style.top = Math.max(8, r.top - h - 8) + "px";
+  setTimeout(() => document.addEventListener("pointerdown", trOutside, true));
+  const f = trPop.querySelector("button"); f && f.focus();
+}
+function clipPlusButtons(){
+  const blocks = [...$("trClips").querySelectorAll(".blk.clip")];
+  SEQ.forEach((c, i) => {
+    const b0 = blocks[i]; if (!b0 || !(c.kind === "image" || c.kind === "video")) return;
+    const b = el("button", { type:"button", class:"clip-plus", title:"Clip options", "aria-label":"Clip options" });
+    b.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>';
+    b.addEventListener("pointerdown", e => e.stopPropagation());
+    b.addEventListener("click", e => { e.stopPropagation(); trPop ? trClose() : clipMenu(c, b); });
+    b0.appendChild(b);
+  });
+}
+(function(){ const _rt = renderTimeline; renderTimeline = function(){ _rt.apply(this, arguments); clipPlusButtons(); }; })();
 /* ---------- panel wiring ---------- */
 function chipRow(host, opts, value, on){
   host.innerHTML = "";

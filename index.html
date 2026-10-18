@@ -173,9 +173,44 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 .btn.primary:hover{filter:brightness(.96)}
 .group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
 :focus-visible{outline-color:var(--accent)!important}
+.hero h1 em,.setup-intro h1 em{color:inherit;font-style:normal}
+.tag.vid,.badge{color:var(--on-accent)}
+.badge{background:var(--accent)}
+[style*="background:var(--clay)"],[style*="background: var(--clay)"]{color:var(--on-accent)!important}
+
+:root{--thumb-bg:#E4E5E2}
+:root[data-theme="dark"]{--thumb-bg:#3A3E45}
+@media (prefers-color-scheme:dark){:root[data-theme="system"]{--thumb-bg:#3A3E45}}
+.thumb{height:320px;padding:14px;background:var(--thumb-bg);overflow:hidden}
+.thumb img{height:auto;width:auto;max-height:292px;max-width:100%;object-fit:contain;border-radius:6px;box-shadow:0 8px 22px rgba(0,0,0,.35);outline:1px solid rgba(255,255,255,.14);outline-offset:-1px}
+.grid{grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+
+.rs-splash{position:fixed;inset:0;z-index:1000;display:grid;place-items:center;background:#1B1D21;color:#F4F4F2;transition:opacity .3s ease}
+#rsSplash{opacity:1;background:#1B1D21!important;isolation:isolate}
+#rsSplash.out{opacity:0;pointer-events:none}
+.rs-sp-in{width:min(320px,70vw);display:flex;flex-direction:column;gap:18px}
+.rs-sp-track{position:relative;height:28px;display:flex;gap:4px}
+.rs-sp-track i{height:100%;width:var(--w);border-radius:5px;background:#3A3F47;transform:scaleX(0);transform-origin:left;animation:rsClip .45s cubic-bezier(.2,.8,.2,1) var(--d) forwards}
+.rs-sp-track i:nth-child(2){background:#4F5E4A}
+.rs-sp-head{position:absolute;top:-6px;bottom:-6px;left:0;width:2px;background:#F2C230;border-radius:2px;animation:rsHead .9s cubic-bezier(.5,0,.2,1) .2s forwards}
+.rs-sp-head::before{content:"";position:absolute;top:-4px;left:-4px;width:10px;height:6px;background:#F2C230;border-radius:2px}
+.rs-sp-name{font:600 22px "Instrument Sans",system-ui,sans-serif;letter-spacing:-.01em;opacity:0;transform:translateY(6px);animation:rsName .4s ease .85s forwards}
+@keyframes rsClip{to{transform:scaleX(1)}}
+@keyframes rsHead{to{left:calc(100% - 2px)}}
+@keyframes rsName{to{opacity:1;transform:none}}
 </style>
 </head>
 <body>
+<div class="rs-splash" id="rsSplash" aria-hidden="true">
+  <div class="rs-sp-in">
+    <div class="rs-sp-track"><i style="--w:34%;--d:.05s"></i><i style="--w:22%;--d:.15s"></i><i style="--w:30%;--d:.25s"></i><b class="rs-sp-head"></b></div>
+    <div class="rs-sp-name">Reel Studio</div>
+  </div>
+</div>
+<script>(function(){var s=document.getElementById("rsSplash"),seen=false;try{seen=sessionStorage.getItem("rs-splash")==="1";sessionStorage.setItem("rs-splash","1");}catch(e){}
+var rm=window.matchMedia&&matchMedia("(prefers-reduced-motion: reduce)").matches;if(seen||rm){s.remove();return;}
+var done=function(){if(!s.isConnected)return;s.classList.add("out");setTimeout(function(){s.remove();},320);};setTimeout(done,1500);s.addEventListener("click",done);document.addEventListener("keydown",done,{once:true});})();</script>
+
 <header class="bar">
   <button class="brand" id="goHome" type="button" aria-label="Reel Studio home"><span class="mark" id="brandMark" aria-hidden="true"></span><span class="txt">Reel Studio</span></button>
   <div class="bsw">
@@ -223,8 +258,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 <main class="view home" id="settings" hidden>
   <div class="wrap">
     <section id="setupIntro" class="setup-intro" hidden>
-      <span class="eyebrow">Welcome to Reel Studio</span>
-      <h1>Set up your brand in <em>2 minutes</em></h1>
+      <h1>Add your brand first</h1>
       <p>Your name, logo, colours, fonts and contact details go into every template automatically. You can change anything later in Brand settings, and add more brands.</p>
       <div class="row"><button type="button" class="btn primary" id="setupStart">Set up my brand</button><button type="button" class="btn ghost" id="setupDemo">Try with the example brand first</button></div>
     </section>
