@@ -227,6 +227,39 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 :root{--stage:#E6E7E4}
 :root[data-theme="dark"]{--stage:#0E1013}
 @media (prefers-color-scheme:dark){:root[data-theme="system"]{--stage:#0E1013}}
+/* canvas editor: floating toolbar, selection box, element panel */
+.stage-tools{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:4px;margin:0 auto 6px;padding:4px 6px;min-height:38px;background:var(--surface);border:1px solid var(--line);box-shadow:0 4px 14px rgba(0,0,0,.08);max-width:calc(100% - 32px)}
+.st-btn{min-width:34px;height:30px;padding:0 10px;border:0;border-radius:8px;background:transparent;color:var(--heading);font:700 13px var(--sans);cursor:pointer}
+.st-btn:hover:not(:disabled){background:var(--soft)}
+.st-btn:disabled{opacity:.4;cursor:not-allowed}
+.st-btn.on{background:var(--slate);color:#fff}
+:root[data-theme="dark"] .st-btn.on{background:var(--accent);color:var(--on-accent)}
+@media (prefers-color-scheme:dark){:root[data-theme="system"] .st-btn.on{background:var(--accent);color:var(--on-accent)}}
+.st-btn:focus-visible{outline:2px solid var(--deodar);outline-offset:1px}
+.st-sep{width:1px;height:20px;background:var(--line);margin:0 4px}
+.st-val{min-width:46px;text-align:center;font:700 12px var(--sans);color:var(--muted);font-variant-numeric:tabular-nums}
+.st-name{font:650 13px var(--sans);color:var(--heading);padding:0 8px 0 4px}
+.st-hint{font-size:12px;color:var(--muted);padding:0 8px}
+#selLayer{position:absolute;inset:0;pointer-events:none}
+.sel-box{position:absolute;outline:2px solid var(--accent);box-shadow:0 0 0 1px rgba(0,0,0,.35)}
+.sel-box.off{outline-style:dashed;opacity:.75}
+.sel-box.photo{outline-style:dashed;outline-offset:-3px;box-shadow:none}
+.hov-box{position:absolute;outline:1px dashed rgba(242,194,48,.95)}
+.sel-handle{position:absolute;right:-9px;bottom:-9px;width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid #1B1D21;pointer-events:auto;cursor:nwse-resize;touch-action:none}
+.sel-box.photo .sel-handle{right:-6px;bottom:-6px}
+.snap{position:absolute}
+.snap.v{top:0;bottom:0;border-left:2px solid #FF4FA3;margin-left:-1px}
+.snap.h{left:0;right:0;border-top:2px solid #FF4FA3;margin-top:-1px}
+body.recording #selLayer,body.recording .stage-tools{display:none}
+.el-list{display:flex;flex-wrap:wrap;gap:6px}
+.el-list .chip{padding:5px 10px;font-size:12px}
+.el-list .chip.off{opacity:.55;text-decoration:line-through}
+.el-color{width:34px;height:26px;padding:2px;border:1px solid var(--line);border-radius:6px;background:var(--surface);cursor:pointer;flex:0 0 34px}
+.el-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:12px}
+.el-head b{font:650 15px var(--sans);color:var(--heading)}
+.el-head .btn{padding:5px 10px;font-size:12px}
+#elPanel .chips .chip{padding:5px 10px;font-size:12px}
+#elPanel .slider{grid-template-columns:92px 1fr 42px}
 </style>
 </head>
 <body>
@@ -282,10 +315,12 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       <div class="title"><b id="fmtTitle">Instagram Post</b><span id="fmtDims">1080 x 1350</span></div>
       <label class="toggle"><input type="checkbox" id="guidesToggle" checked> Safe zone guides</label>
     </div>
+    <div class="stage-tools" id="stageTools" role="toolbar" aria-label="Edit the selected element"></div>
     <div class="canvas-area" id="canvasArea">
       <div class="holder" id="holder">
         <canvas id="cv" role="img" aria-label="Post preview"></canvas>
         <div id="guides" aria-hidden="true"></div>
+        <div id="selLayer" aria-hidden="true"></div>
       </div>
     </div>
     <div class="pages" id="pagesBar">
@@ -313,6 +348,12 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 
   <!-- RIGHT: media, text, style, export -->
   <aside class="panel right" aria-label="Edit">
+    <div class="group" id="elGroup">
+      <h2>Edit on the post</h2>
+      <div id="elPanel"></div>
+      <p class="hint" id="elHint" style="margin:0 0 10px">Click any part of the post to move, resize or restyle it, or pick it here.</p>
+      <div class="el-list" id="elList" aria-label="Elements on this page"></div>
+    </div>
     <div class="group">
       <h2>Photo or video</h2>
       <div class="row">
@@ -528,7 +569,12 @@ const STORE_KEY = GIRIKA.storeKey("girika-studio-v2");
 const DEFAULT_STATE = { format:"ig-post", layout:"feature", fields:{...DEFAULT_FIELDS}, theme:"lime", overlay:"auto", overlayK:0.85, align:"left", cta:"clay", textScale:1, sizes:{ head:1, body:1, eyebrow:1, ui:1 }, overlayColor:"ink", showLogo:true, indicator:"count", logoTone:"auto", logoKind:"lockup", colors:{ head:"auto", hl:"auto", body:"auto", eyebrow:"auto" }, guides:true, zoom:1, px:0.5, py:0.5 };
 let st = structuredClone(DEFAULT_STATE);
 const MAX_PAGES = 20; /* Instagram carousel limit */
-const newPage = (id, layout, fields) => ({ id, layout: layout || "feature", fields: { ...DEFAULT_FIELDS, ...(fields || {}) }, zoom:1, px:.5, py:.5 });
+/* els: edits made on the canvas, per element ("headline", "logo", "x3" for added text). See "Element layer".
+   extras: text boxes the user added ({ id, text, x, y }, x and y as fractions of the canvas).
+   Both are optional, so drafts saved before they existed render exactly as before. */
+const newPage = (id, layout, fields, els, extras) => ({ id, layout: layout || "feature", fields: { ...DEFAULT_FIELDS, ...(fields || {}) },
+  els: els && typeof els === "object" && !Array.isArray(els) ? structuredClone(els) : {},
+  extras: Array.isArray(extras) ? structuredClone(extras).filter(x => x && typeof x.id === "number") : [], zoom:1, px:.5, py:.5 });
 try {
   const saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
   if (saved && typeof saved === "object") st = { ...st, ...saved, colors:{ ...DEFAULT_STATE.colors, ...(saved.colors||{}) }, sizes:{ ...DEFAULT_STATE.sizes, ...(saved.sizes||{}) } };
@@ -536,7 +582,7 @@ try {
 } catch(e) {}
 /* pages: per-page layout, text and photo position. Style stays shared across pages. */
 if (!Array.isArray(st.pages) || !st.pages.length) st.pages = [newPage(1, st.layout, st.fields)];
-st.pages = st.pages.slice(0, MAX_PAGES).map((p, i) => newPage(p.id || i + 1, p.layout, p.fields));
+st.pages = st.pages.slice(0, MAX_PAGES).map((p, i) => newPage(p.id || i + 1, p.layout, p.fields, p.els, p.extras));
 st.page = Math.min(Math.max(0, st.page | 0), st.pages.length - 1);
 delete st.layout; delete st.fields; delete st.zoom; delete st.px; delete st.py;
 let nextPageId = Math.max(...st.pages.map(p => p.id)) + 1;
@@ -545,9 +591,10 @@ const pg = () => st.pages[st.page];
 let saveTimer = 0;
 function persist(){
   clearTimeout(saveTimer);
+  histNote(); /* undo history (canvas editor) */
   saveTimer = setTimeout(() => {
     try {
-      const keep = { ...st, pages: st.pages.map(({ id, layout, fields }) => ({ id, layout, fields })) };
+      const keep = { ...st, pages: st.pages.map(({ id, layout, fields, els, extras }) => ({ id, layout, fields, ...(els && Object.keys(els).length ? { els } : {}), ...(extras && extras.length ? { extras } : {}) })) };
       localStorage.setItem(STORE_KEY, JSON.stringify(keep));
       $("saveStatus").textContent = "Draft saved on this browser";
     } catch(e) { $("saveStatus").textContent = "Draft not saved (storage blocked)"; }
@@ -662,10 +709,11 @@ function drawMedia(c, b, placeholder){
   }
   const s = Math.max(b.w / mw, b.h / mh) * st.zoom, dw = mw * s, dh = mh * s;
   const ox = dw - b.w, oy = dh - b.h;
+  if (st.zoom < 1){ c.fillStyle = THEMES[st.theme].bg; c.fillRect(b.x, b.y, b.w, b.h); } /* "Fit" shows the whole photo */
   c.save(); c.beginPath(); c.rect(b.x, b.y, b.w, b.h); c.clip();
   c.drawImage(src, b.x - ox * st.px, b.y - oy * st.py, dw, dh);
   c.restore();
-  mediaGeom = { ox, oy };
+  mediaGeom = { ox, oy, mw, mh, b };
 }
 
 const SHADES = [["ink","Ink"],["slate","Mountain slate"],["deodar","Deodar green"],["clay","Earth clay"],["lime","Limestone (light wash)"]];
@@ -691,6 +739,78 @@ function drawOverlay(c, b, type, k){
   else if (type === "full") fill = a(.6);
   if (!fill) return;
   c.fillStyle = fill; c.fillRect(b.x, b.y, b.w, b.h);
+}
+
+/* =========================================================
+   Element layer. Every visible part of a layout (headline, tag, button, logo, indicator...) is a
+   named element. Layouts still work out the template position; tagEl() then records the box for
+   clicking and applies this page's edits from pg().els[key]:
+     dx, dy  move, as fractions of the canvas width / height (so they adapt to every format)
+     s       scale around the element's centre        z     stacking order      hide  hidden
+     font, weight, color, hl, ls, lh, align, box, boxColor, boxOpacity, shadow   style
+   Drawing is queued and painted in z order by elFlush(), so the preview, page thumbnails and
+   every export (PNG, ZIP, video) go through the same path. No edits = the template as before.
+   ========================================================= */
+const NO_OV = Object.freeze({});
+const EL = { L:null, list:[], n:0, mbox:null };
+const elOv = key => { const p = st.pages && st.pages[st.page]; return (key && p && p.els && p.els[key]) || NO_OV; };
+/* a canvas font string with the family / weight swapped, keeping the original stack as fallback */
+function ovFontStr(str, ov){
+  if (!ov.font && !ov.weight) return str;
+  const m = /^(italic )?(\d+) ([\d.e+-]+)px (.*)$/.exec(str); if (!m) return str;
+  const fam = ov.font ? `"${String(ov.font).replace(/["';{}<>\\]/g, "")}", ${m[4]}` : m[4];
+  return `${m[1] || ""}${ov.weight || m[2]} ${m[3]}px ${fam}`;
+}
+const ovFont = (fn, ov) => (!fn || (!ov.font && !ov.weight)) ? fn : s => ovFontStr(fn(s), ov);
+const rgbaOf = (hex, a) => { const [r, g, b] = GIRIKA.hex2rgb(hex); return `rgba(${r},${g},${b},${a == null ? 1 : a})`; };
+function elBegin(L){ EL.L = L; EL.list = []; EL.n = 0; }
+function tagEl(key, item, info){
+  if (!item || !key) return item;
+  const ov = elOv(key), draw0 = item.draw;
+  info = info || {};
+  item.key = key;
+  item.draw = function(x, y, W, align){
+    const c = fctx, L = EL.L, al = (info.kind === "text" && ov.align) || align;
+    const w = item.w != null ? item.w : (W || 0), h = item.h;
+    const bx = W && al === "center" ? x + (W - w) / 2 : W && al === "right" ? x + W - w : x;
+    const s = ov.s || 1, dx = (ov.dx || 0) * L.W, dy = (ov.dy || 0) * L.H, cx = bx + w / 2, cy = y + h / 2;
+    const boxOn = info.kind === "text" && ov.box && ov.box !== "none", fs = info.size || 30, bpx = boxOn ? fs * .45 : 0, bpy = boxOn ? fs * .28 : 0;
+    const rec = { key, kind:info.kind || "shape", fam:info.fam || "body", base:info.base || {}, size:info.size || 0, color:info.color, hl:info.hl, weight:info.weight,
+      z:ov.z || 0, order:EL.n++, hide:!!ov.hide, x:cx + dx - (w / 2 + bpx) * s, y:cy + dy - (h / 2 + bpy) * s, w:(w + bpx * 2) * s, h:(h + bpy * 2) * s };
+    EL.list.push(rec);
+    if (rec.hide) return;
+    const sh = [c.shadowColor, c.shadowBlur, c.shadowOffsetX, c.shadowOffsetY];
+    rec.paint = () => {
+      c.save();
+      [c.shadowColor, c.shadowBlur, c.shadowOffsetX, c.shadowOffsetY] = sh;
+      if (ov.shadow === "on" && info.kind !== "pill"){ c.shadowColor = "rgba(0,0,0,.42)"; c.shadowBlur = 16 * L.u; c.shadowOffsetX = 0; c.shadowOffsetY = 3 * L.u; }
+      else if (ov.shadow === "off") c.shadowColor = "rgba(0,0,0,0)";
+      if (s !== 1 || dx || dy){ c.translate(cx + dx, cy + dy); c.scale(s, s); c.translate(-cx, -cy); }
+      if (boxOn){ /* background box or pill behind a text element */
+        const bh = h + bpy * 2, col = ov.boxColor || (GIRIKA.lum(info.color || "#FFFFFF") > .4 ? C.ink : "#FFFFFF");
+        c.save(); c.fillStyle = rgbaOf(col, ov.boxOpacity != null ? ov.boxOpacity : .85); c.beginPath();
+        c.roundRect(bx - bpx, y - bpy, w + bpx * 2, bh, ov.box === "pill" ? bh / 2 : Math.min(bh / 2, fs * .18)); c.fill(); c.restore();
+      }
+      c.textAlign = "left";
+      draw0.call(item, x, y, W, al);
+      c.restore();
+    };
+  };
+  return item;
+}
+function elFlush(){ EL.list.filter(r => r.paint).sort((a, b) => (a.z - b.z) || (a.order - b.order)).forEach(r => r.paint()); }
+/* text boxes the user added on this page */
+function drawExtras(L){
+  const p = st.pages[st.page]; if (!p || !p.extras || !p.extras.length) return;
+  const lk = layoutKey(), onPhoto = lk === "feature" || lk === "listing", c = fctx, u = L.u, maxW = L.W * .84;
+  p.extras.forEach(x => {
+    const blk = textBlock(c, x.text, { key:"x" + x.id, font:fSans(600), size:56 * u, min:10 * u, lh:1.2, maxW, maxLines:40 });
+    const it = textEl(c, blk, onPhoto ? "#FFFFFF" : L.T.head, onPhoto ? C.clayLt : L.T.hl);
+    if (!it) return;
+    c.save(); if (onPhoto){ c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 14 * u; c.shadowOffsetY = 2 * u; }
+    it.draw(x.x * L.W - maxW / 2, x.y * L.H - it.h / 2, maxW, "center");
+    c.restore();
+  });
 }
 
 /* ---------- rich text: *word* = highlight ---------- */
@@ -729,6 +849,8 @@ function layoutRich(c, paras, maxW, f, hf, ls){
 /* Fit text into maxW / maxLines / maxH by shrinking the size step by step. */
 function textBlock(c, text, o){
   if (!text || !String(text).trim()) return null;
+  const ov = elOv(o.key), fam = o.font === fSerif ? "head" : "body", base = { ls:o.ls || 0, lh:o.lh, upper:!!o.upper };
+  if (ov !== NO_OV) o = { ...o, font:ovFont(o.font, ov), hlFont:ovFont(o.hlFont, ov), ls:ov.ls != null ? ov.ls : o.ls, lh:ov.lh != null ? ov.lh : o.lh };
   const paras = parseRich(o.upper ? String(text).toUpperCase() : text);
   let s = o.size, res;
   for (let i = 0; i < 60; i++){
@@ -738,13 +860,14 @@ function textBlock(c, text, o){
     if (ok || s <= o.min) break;
     s = Math.max(o.min, s * .95);
   }
-  const blk = { ...res, size:s, lh:o.lh };
+  const blk = { ...res, size:s, lh:o.lh, key:o.key, base, fam };
   blk.h = res.lines.length * s * o.lh;
   return blk;
 }
 function textEl(c, blk, color, hlColor, gap){
   if (!blk) return null;
-  return { h:blk.h, gap:gap || 0, w:blk.widest, draw(x, y, w, align){
+  const ov = elOv(blk.key); color = ov.color || color; hlColor = ov.hl || hlColor;
+  return tagEl(blk.key, { h:blk.h, gap:gap || 0, w:blk.widest, draw(x, y, w, align){
     c.textBaseline = "middle";
     blk.lines.forEach((ln, i) => {
       let lx = align === "center" ? x + (w - ln.w) / 2 : align === "right" ? x + w - ln.w : x;
@@ -756,73 +879,80 @@ function textEl(c, blk, color, hlColor, gap){
       });
     });
     c.letterSpacing = "0px";
-  }};
+  }}, { kind:"text", fam:blk.fam, base:blk.base, size:blk.size, color, hl:hlColor, weight:+((/(\d+) /.exec(blk.f) || [0, 500])[1]) });
 }
 const fSerif = s => `500 ${s}px ${SERIF}`, fSerifI = s => `italic 500 ${s}px ${SERIF}`;
 const fSans = w => s => `${w} ${s}px ${SANS}`;
 
 function pill(c, text, u, opts){
   if (!text || !text.trim()) return null;
+  const ov = elOv(opts.key), ls0 = opts.ls || 0;
+  if (ov !== NO_OV) opts = { ...opts, fg:ov.color || opts.fg, ls:ov.ls != null ? ov.ls : opts.ls, bg:ov.box === "none" ? null : (ov.boxColor || opts.bg), bgA:ov.boxOpacity,
+    radius:ov.box === "pill" ? 999 : ov.box === "box" ? 3 : opts.radius, shadow:ov.shadow ? ov.shadow === "on" : opts.shadow };
   const k = SZ("ui"), size = opts.size * u * k, padX = opts.padX * u * k, padY = opts.padY * u * k, ls = (opts.ls || 0) * size;
-  const t = opts.upper ? text.toUpperCase() : text;
-  c.font = `${opts.weight || 700} ${size}px ${SANS}`; c.letterSpacing = ls + "px";
+  const t = opts.upper ? text.toUpperCase() : text, PF = ovFontStr(`${opts.weight || 700} ${size}px ${SANS}`, ov);
+  c.font = PF; c.letterSpacing = ls + "px";
   const tw = c.measureText(t).width - ls; c.letterSpacing = "0px";
   const w = Math.min(tw + padX*2, opts.maxW || Infinity), h = size + padY*2;
-  return { w, h, gap:opts.gap || 0, draw(x, y, W, align){
+  return tagEl(opts.key, { w, h, gap:opts.gap || 0, draw(x, y, W, align){
     const bx = align === "center" && W ? x + (W - w)/2 : align === "right" && W ? x + W - w : x;
     if (opts.shadow){ c.save(); c.shadowColor = "rgba(0,0,0,.28)"; c.shadowBlur = 24*u; c.shadowOffsetY = 8*u; }
-    c.fillStyle = opts.bg; c.beginPath(); c.roundRect(bx, y, w, h, (opts.radius || 10) * u); c.fill();
+    if (opts.bg){ c.globalAlpha = opts.bgA != null ? opts.bgA : 1; c.fillStyle = opts.bg; c.beginPath(); c.roundRect(bx, y, w, h, Math.min(h / 2, (opts.radius || 10) * u)); c.fill(); c.globalAlpha = 1; }
     if (opts.shadow) c.restore();
-    c.font = `${opts.weight || 700} ${size}px ${SANS}`; c.letterSpacing = ls + "px";
+    c.font = PF; c.letterSpacing = ls + "px";
     c.fillStyle = opts.fg; c.textBaseline = "middle"; c.textAlign = "center";
     c.fillText(t, bx + w/2 + ls/2, y + h/2 + size*.04, w - padX*1.2);
     c.textAlign = "left"; c.letterSpacing = "0px";
-  }};
+  }}, { kind:"pill", base:{ ls:ls0 } });
 }
-const badgeEl = (c, t, u, bg, fg, gap) => pill(c, t, u, { size:24, padX:24, padY:14, ls:.1, upper:true, bg, fg, radius:10, gap });
+const badgeEl = (c, t, u, bg, fg, gap) => pill(c, t, u, { key:"badge", size:24, padX:24, padY:14, ls:.1, upper:true, bg, fg, radius:10, gap });
 function buttonEl(c, t, u, style, maxW, gap){
   const s = { clay:[C.clay,"#FFFFFF"], light:[C.lime,C.slate], deodar:[C.deodar,C.lime] }[style] || [C.clay,"#FFFFFF"];
-  return pill(c, t, u, { size:30, padX:46, padY:27, weight:600, bg:s[0], fg:s[1], radius:14, maxW, gap, shadow:true });
+  return pill(c, t, u, { key:"cta", size:30, padX:46, padY:27, weight:600, bg:s[0], fg:s[1], radius:14, maxW, gap, shadow:true });
 }
 function arrowLinkEl(c, t, u, color, gap){
   if (!t || !t.trim()) return null;
-  const size = 26*u*SZ("ui"), ls = .12*size, txt = t.toUpperCase();
-  c.font = `700 ${size}px ${SANS}`; c.letterSpacing = ls + "px"; const tw = c.measureText(txt).width; c.letterSpacing = "0px";
+  const ov = elOv("cta"); color = ov.color || color;
+  const size = 26*u*SZ("ui"), ls = (ov.ls != null ? ov.ls : .12)*size, txt = t.toUpperCase(), F = ovFontStr(`700 ${size}px ${SANS}`, ov);
+  c.font = F; c.letterSpacing = ls + "px"; const tw = c.measureText(txt).width; c.letterSpacing = "0px";
   const aw = 34*u, w = tw + 16*u + aw, h = size * 1.3;
-  return { w, h, gap:gap||0, draw(x, y, W, align){
-    const bx = align === "center" ? x + (W - w)/2 : x, cy = y + h/2;
-    c.font = `700 ${size}px ${SANS}`; c.letterSpacing = ls + "px"; c.fillStyle = color; c.textBaseline = "middle";
+  return tagEl("cta", { w, h, gap:gap||0, draw(x, y, W, align){
+    const bx = align === "center" ? x + (W - w)/2 : align === "right" && W ? x + W - w : x, cy = y + h/2;
+    c.font = F; c.letterSpacing = ls + "px"; c.fillStyle = color; c.textBaseline = "middle";
     c.fillText(txt, bx, cy); c.letterSpacing = "0px";
     const ax = bx + tw + 16*u;
     c.strokeStyle = color; c.lineWidth = 3.2*u; c.lineCap = "round"; c.lineJoin = "round";
     c.beginPath(); c.moveTo(ax, cy); c.lineTo(ax + aw, cy); c.moveTo(ax + aw - 12*u, cy - 12*u); c.lineTo(ax + aw, cy); c.lineTo(ax + aw - 12*u, cy + 12*u); c.stroke();
-  }};
+  }}, { kind:"link", base:{ ls:.12 } });
 }
 function chipsEl(c, list, u, maxW, T, gap){
   const items = String(list || "").split(",").map(s => s.trim()).filter(Boolean);
   if (!items.length) return null;
-  const size = 24*u*SZ("ui"), padX = 18*u*SZ("ui"), h = size + 24*u*SZ("ui"), g = 12*u;
-  c.font = `600 ${size}px ${SANS}`;
+  const ov = elOv("specs"), chipBg = ov.box === "none" ? null : ov.boxColor ? rgbaOf(ov.boxColor, ov.boxOpacity != null ? ov.boxOpacity : 1) : T.chip, chipFg = ov.color || T.chipText;
+  const size = 24*u*SZ("ui"), padX = 18*u*SZ("ui"), h = size + 24*u*SZ("ui"), g = 12*u, F = ovFontStr(`600 ${size}px ${SANS}`, ov);
+  c.font = F;
   const rows = [[]]; let rw = 0;
   items.forEach(t => {
     const w = Math.min(c.measureText(t).width + padX*2, maxW);
     if (rows[rows.length-1].length && rw + g + w > maxW){ rows.push([]); rw = 0; }
     rw += (rows[rows.length-1].length ? g : 0) + w; rows[rows.length-1].push({ t, w });
   });
-  return { h: rows.length*h + (rows.length-1)*g, gap:gap||0, draw(x, y){
-    rows.forEach((row, ri) => { let cx = x; const cy = y + ri*(h+g);
+  const wMax = Math.max(...rows.map(r => r.reduce((s, ch, i) => s + ch.w + (i ? g : 0), 0)));
+  return tagEl("specs", { w:wMax, h: rows.length*h + (rows.length-1)*g, gap:gap||0, draw(x, y, W, align){
+    const ox = align === "center" && W ? (W - wMax)/2 : align === "right" && W ? W - wMax : 0;
+    rows.forEach((row, ri) => { let cx = x + ox; const cy = y + ri*(h+g);
       row.forEach(ch => {
-        c.fillStyle = T.chip; c.beginPath(); c.roundRect(cx, cy, ch.w, h, 10*u); c.fill();
-        c.font = `600 ${size}px ${SANS}`; c.fillStyle = T.chipText; c.textBaseline = "middle";
+        if (chipBg){ c.fillStyle = chipBg; c.beginPath(); c.roundRect(cx, cy, ch.w, h, 10*u); c.fill(); }
+        c.font = F; c.fillStyle = chipFg; c.textBaseline = "middle";
         c.fillText(ch.t, cx + padX, cy + h/2, ch.w - padX*2); cx += ch.w + g;
       });
     });
-  }};
+  }}, { kind:"chips" });
 }
-function ruleEl(w, h, color, gap){ return { h, gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - w)/2 : x; fctx.fillStyle = color; fctx.fillRect(bx, y, w, h); } }; }
+function ruleEl(w, h, color, gap, key){ color = elOv(key).color || color; return tagEl(key, { w, h, gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - w)/2 : align === "right" ? x + W - w : x; fctx.fillStyle = color; fctx.fillRect(bx, y, w, h); } }, { kind:"shape" }); }
 function logoEl(c, tone, width, gap){
   const d = logoDims(width);
-  return { h: d.w * logoAspect(d.kind), gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - d.w)/2 : align === "right" ? x + W - d.w : x; drawLogo(c, d.kind, logoTone(tone), bx, y, d.w); } };
+  return tagEl("logo", { w:d.w, h: d.w * logoAspect(d.kind), gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - d.w)/2 : align === "right" ? x + W - d.w : x; drawLogo(c, d.kind, logoTone(tone), bx, y, d.w); } }, { kind:"logo" });
 }
 
 function stackH(items){ const a = items.filter(Boolean); return a.reduce((s, it, i) => s + it.h + (i < a.length - 1 ? it.gap : 0), 0); }
@@ -860,16 +990,16 @@ const LAYOUT_DRAW = {
       const x = center ? box.x + (box.w - maxW) / 2 : box.x;
       let topH = 0;
       const flip = L.landscape;
-      if (st.showLogo){ const d = logoDims(230 * u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(P.logo), center ? (W - lw)/2 : flip ? box.x : box.x + box.w - lw, box.y, lw); }
+      if (st.showLogo){ const lg = logoEl(c, P.logo, 230 * u, 0), lw = lg.w; topH = lg.h; lg.draw(center ? (W - lw)/2 : flip ? box.x : box.x + box.w - lw, box.y); }
       const badge = badgeEl(c, F.badge, u, C.deodar, C.lime, 30*u);
       if (badge && !center){ badge.draw(flip ? box.x + box.w - badge.w : box.x, box.y); topH = Math.max(topH, badge.h); }
-      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:24*u*SZ("eyebrow"), min:16*u, lh:1.3, maxW, maxLines:2, ls:.2, upper:true }), col("eyebrow", P.eyebrow), col("hl", P.head), 22*u);
-      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:(L.tall ? 34 : 31)*u*SZ("body"), min:20*u, lh:1.45, maxW, maxLines:4 }), col("body", P.body), col("hl", P.head), 44*u);
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { key:"eyebrow", font:fSans(700), size:24*u*SZ("eyebrow"), min:16*u, lh:1.3, maxW, maxLines:2, ls:.2, upper:true }), col("eyebrow", P.eyebrow), col("hl", P.head), 22*u);
+      const body = textEl(c, textBlock(c, F.body, { key:"body", font:fSans(500), size:(L.tall ? 34 : 31)*u*SZ("body"), min:20*u, lh:1.45, maxW, maxLines:4 }), col("body", P.body), col("hl", P.head), 44*u);
       const cta = buttonEl(c, F.cta, u, st.cta, maxW);
       const before = [center && badge, eyebrow].filter(Boolean), after = [body, cta].filter(Boolean);
       const avail = box.h - topH - 60*u - stackH([...before, ...after]) - (before.length ? before[before.length-1].gap : 0) - (after.length ? 40*u : 0);
       const base = L.tall ? 96 : L.landscape ? 92 : L.ratio > .95 ? 80 : 86;
-      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:34*u, lh:1.08, maxW, maxLines:5, maxH:avail }), col("head", P.head), col("hl", P.hl), body ? 26*u : 40*u);
+      const head = textEl(c, textBlock(c, F.headline, { key:"headline", font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:34*u, lh:1.08, maxW, maxLines:5, maxH:avail }), col("head", P.head), col("hl", P.hl), body ? 26*u : 40*u);
       const items = [center && badge, eyebrow, head, body, cta];
       const textTop = box.y + box.h - stackH(items);
       if (ovType === "band"){
@@ -901,16 +1031,16 @@ const LAYOUT_DRAW = {
         c.fillStyle = T.bg; c.fillRect(0, 0, mb.x, H);
         px = box.x; pw = mb.x - box.x - 64*u; py = box.y; ph = box.h;
       }
-      const badge = pill(c, F.badge, u, { size:22, padX:22, padY:12, ls:.1, upper:true, bg:"rgba(28,33,40,.82)", fg:C.lime, radius:10 });
+      const badge = pill(c, F.badge, u, { key:"badge", size:22, padX:22, padY:12, ls:.1, upper:true, bg:"rgba(28,33,40,.82)", fg:C.lime, radius:10 });
       if (badge) badge.draw(L.landscape ? mb.x + mb.w - Math.max(L.m, 64*u) - badge.w : box.x + box.w - badge.w, box.y);
       const logo = st.showLogo ? logoEl(c, T.logo, 200*u, 34*u) : null;
-      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:pw, maxLines:2, ls:.2, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 18*u);
-      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:30*u*SZ("body"), min:19*u, lh:1.45, maxW:pw, maxLines:3 }), col("body", T.body), col("hl", T.accent), 34*u);
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { key:"eyebrow", font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:pw, maxLines:2, ls:.2, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 18*u);
+      const body = textEl(c, textBlock(c, F.body, { key:"body", font:fSans(500), size:30*u*SZ("body"), min:19*u, lh:1.45, maxW:pw, maxLines:3 }), col("body", T.body), col("hl", T.accent), 34*u);
       const cta = arrowLinkEl(c, F.cta, u, T.accent);
       const others = [logo, eyebrow, body, cta].filter(Boolean);
       const avail = ph - stackH(others) - others.reduce((s, it) => s + it.gap, 0) - 10*u;
       const base = L.tall ? 84 : L.landscape ? 76 : L.ratio > .95 ? 68 : 74;
-      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW:pw, maxLines:4, maxH:Math.max(60*u, avail) }), col("head", T.head), col("hl", T.hl), body ? 22*u : 34*u);
+      const head = textEl(c, textBlock(c, F.headline, { key:"headline", font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW:pw, maxLines:4, maxH:Math.max(60*u, avail) }), col("head", T.head), col("hl", T.hl), body ? 22*u : 34*u);
       const items = [logo, eyebrow, head, body, cta];
       const total = stackH(items);
       drawStack(items, px, L.landscape ? py + (ph - total)/2 : py, pw, "left");
@@ -923,13 +1053,13 @@ const LAYOUT_DRAW = {
       const { u, box, F, T } = L, c = fctx;
       drawOverlay(c, { x:0, y:0, w:L.W, h:L.H }, resolveOverlay(L, "listing"), st.overlayK * .75);
       let topH = 0;
-      if (st.showLogo){ const d = logoDims(220*u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(st.overlayColor === "lime" && resolveOverlay(L, "listing") !== "none" ? "light" : "dark"), box.x + box.w - lw, box.y, lw); }
+      if (st.showLogo){ const lg = logoEl(c, st.overlayColor === "lime" && resolveOverlay(L, "listing") !== "none" ? "light" : "dark", 220*u, 0), lw = lg.w; topH = lg.h; lg.draw(box.x + box.w - lw, box.y); }
       const badge = badgeEl(c, F.badge, u, C.deodar, C.lime);
       if (badge){ badge.draw(box.x, box.y); topH = Math.max(topH, badge.h); }
       const cardW = L.landscape ? Math.min(box.w * .55, 860*u) : box.w, pad = 46*u, inner = cardW - pad*2;
-      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:inner, maxLines:2, ls:.18, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 14*u);
+      const eyebrow = textEl(c, textBlock(c, F.eyebrow, { key:"eyebrow", font:fSans(700), size:22*u*SZ("eyebrow"), min:15*u, lh:1.3, maxW:inner, maxLines:2, ls:.18, upper:true }), col("eyebrow", T.eyebrow), col("eyebrow", T.eyebrow), 14*u);
       const chips = chipsEl(c, F.specs, u, inner, T, 30*u);
-      const price = textEl(c, textBlock(c, F.price, { font:fSerif, hlFont:fSerifI, size:54*u*SZ("head"), min:30*u, lh:1.1, maxW:inner, maxLines:1 }), T.accent, T.accent);
+      const price = textEl(c, textBlock(c, F.price, { key:"price", font:fSerif, hlFont:fSerifI, size:54*u*SZ("head"), min:30*u, lh:1.1, maxW:inner, maxLines:1 }), T.accent, T.accent);
       const btn = buttonEl(c, F.cta, u, st.cta, inner);
       let bottom = null;
       if (price || btn){
@@ -940,11 +1070,11 @@ const LAYOUT_DRAW = {
           else drawStack([price && { ...price, gap:20*u }, btn], x, y, inner, "left");
         }};
       }
-      const divider = (chips || eyebrow) && bottom ? ruleEl(inner, Math.max(1, 2*u), T.line, 28*u) : null;
+      const divider = (chips || eyebrow) && bottom ? ruleEl(inner, Math.max(1, 2*u), T.line, 28*u, "divider") : null;
       const others = [eyebrow, chips, divider, bottom].filter(Boolean);
       const avail = box.h - topH - 50*u - pad*2 - stackH(others) - others.reduce((s, it) => s + it.gap, 0);
       const base = L.tall ? 64 : L.landscape ? 58 : 58;
-      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:28*u, lh:1.1, maxW:inner, maxLines:3, maxH:Math.max(50*u, avail) }), col("head", T.head), col("hl", T.hl), chips ? 24*u : 30*u);
+      const head = textEl(c, textBlock(c, F.headline, { key:"headline", font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:28*u, lh:1.1, maxW:inner, maxLines:3, maxH:Math.max(50*u, avail) }), col("head", T.head), col("hl", T.hl), chips ? 24*u : 30*u);
       const items = [eyebrow, head, chips, divider, bottom];
       const cardH = stackH(items) + pad*2, cy = box.y + box.h - cardH;
       c.save(); c.shadowColor = "rgba(0,0,0,.25)"; c.shadowBlur = 40*u; c.shadowOffsetY = 12*u;
@@ -961,19 +1091,19 @@ const LAYOUT_DRAW = {
       c.fillStyle = T.ridge[0]; ridgePath(c, RIDGE_A, 1440, 140, 0, H - 230*u, W, 150*u, H); c.fill();
       c.fillStyle = T.ridge[1]; ridgePath(c, RIDGE_B, 1440, 140, 0, H - 200*u, W, 200*u, H); c.fill();
       let topH = 0;
-      if (st.showLogo){ const d = logoDims(180*u), lw = d.w; topH = drawLogo(c, d.kind, logoTone(T.logo), box.x + box.w - lw, box.y + 8*u, lw) + 8*u; }
-      const num = textEl(c, textBlock(c, F.number, { font:fSerif, size:150*u*SZ("head"), min:60*u, lh:1, maxW:box.w * .6, maxLines:1 }), T.num, T.num);
+      if (st.showLogo){ const lg = logoEl(c, T.logo, 180*u, 0), lw = lg.w; topH = lg.h + 8*u; lg.draw(box.x + box.w - lw, box.y + 8*u); }
+      const num = textEl(c, textBlock(c, F.number, { key:"number", font:fSerif, size:150*u*SZ("head"), min:60*u, lh:1, maxW:box.w * .6, maxLines:1 }), T.num, T.num);
       if (num){ num.draw(box.x, box.y, box.w, "left"); topH = Math.max(topH, num.h); }
       const fsz = 22*u, footY = box.y + box.h - fsz;
-      const foot = (t, align) => { const b = textBlock(c, t, { font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); if (b) textEl(c, b, T.muted, T.muted).draw(box.x, footY - fsz/2, box.w, align); };
-      foot(F.handle, "left");
-      if (!showIndicator() && F.swipe && F.swipe.trim()){ const b = textBlock(c, F.swipe + "  >", { font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); textEl(c, b, T.accent, T.accent).draw(box.x, footY - fsz/2, box.w, "right"); }
+      const foot = (t, align, key) => { const b = textBlock(c, t, { key, font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); if (b) textEl(c, b, T.muted, T.muted).draw(box.x, footY - fsz/2, box.w, align); };
+      foot(F.handle, "left", "handle");
+      if (!showIndicator() && F.swipe && F.swipe.trim()){ const b = textBlock(c, F.swipe + "  >", { key:"swipe", font:fSans(700), size:fsz, min:14*u, lh:1, maxW:box.w*.48, maxLines:1, ls:.14, upper:true }); textEl(c, b, T.accent, T.accent).draw(box.x, footY - fsz/2, box.w, "right"); }
       const top = box.y + topH + (num ? 64 : 80)*u, bottomLimit = footY - 70*u, maxW = L.landscape ? box.w * .8 : box.w;
-      const rule = ruleEl(84*u, 5*u, T.rule, 36*u);
+      const rule = ruleEl(84*u, 5*u, T.rule, 36*u, "rule");
       const bodyMax = (bottomLimit - top) * .55;
-      const body = textEl(c, textBlock(c, F.body, { font:fSans(500), size:(L.tall ? 44 : 38)*u*SZ("body"), min:20*u, lh:1.55, maxW, maxLines:10, maxH:bodyMax }), col("body", T.body), col("hl", T.hl));
+      const body = textEl(c, textBlock(c, F.body, { key:"body", font:fSans(500), size:(L.tall ? 44 : 38)*u*SZ("body"), min:20*u, lh:1.55, maxW, maxLines:10, maxH:bodyMax }), col("body", T.body), col("hl", T.hl));
       const base = L.tall ? 100 : L.landscape ? 74 : L.ratio > .95 ? 76 : 84;
-      const head = textEl(c, textBlock(c, F.headline, { font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW, maxLines:5, maxH:(bottomLimit - top) - (body ? body.h + 36*u + 5*u + 30*u : 0) }), col("head", T.head), col("hl", T.hl), 30*u);
+      const head = textEl(c, textBlock(c, F.headline, { key:"headline", font:fSerif, hlFont:fSerifI, size:headSize(L, base), min:30*u, lh:1.1, maxW, maxLines:5, maxH:(bottomLimit - top) - (body ? body.h + 36*u + 5*u + 30*u : 0) }), col("head", T.head), col("hl", T.hl), 30*u);
       const parts = [head, (head && body) ? rule : null, body], ph = stackH(parts);
       drawStack(parts, box.x, top + Math.max(0, (bottomLimit - top - ph) * .42), maxW, "left");
     }
@@ -991,8 +1121,8 @@ const LAYOUT_DRAW = {
       c.fillStyle = T.ridge[1]; ridgePath(c, RIDGE_B, 1440, 140, 0, H * .66, W, H * .34, H); c.fill();
       const u = H / 624, inner = Math.min(W * .62, 1000 * u);
       const logo = st.showLogo ? logoEl(c, T.logo, Math.min(W * .32, 520 * u), 30*u) : null;
-      const tag = textEl(c, textBlock(c, F.tagline, { font:fSans(500), size:28*u*SZ("body"), min:16*u, lh:1.35, maxW:inner, maxLines:2 }), col("body", T.body), col("hl", T.hl), 16*u);
-      const contact = textEl(c, textBlock(c, F.contact, { font:fSans(700), size:19*u*SZ("eyebrow"), min:13*u, lh:1.3, maxW:inner, maxLines:1, ls:.08 }), col("eyebrow", T.muted), col("eyebrow", T.muted));
+      const tag = textEl(c, textBlock(c, F.tagline, { key:"tagline", font:fSans(500), size:28*u*SZ("body"), min:16*u, lh:1.35, maxW:inner, maxLines:2 }), col("body", T.body), col("hl", T.hl), 16*u);
+      const contact = textEl(c, textBlock(c, F.contact, { key:"contact", font:fSans(700), size:19*u*SZ("eyebrow"), min:13*u, lh:1.3, maxW:inner, maxLines:1, ls:.08 }), col("eyebrow", T.muted), col("eyebrow", T.muted));
       const items = [logo, tag, contact], total = stackH(items);
       drawStack(items, (W - inner)/2, (H - total)/2 - H*.04, inner, "center");
     }
@@ -1008,30 +1138,43 @@ function drawIndicator(L, lk){
   if (lk === "text"){ color = T.accent; cy = box.y + box.h - 22*u; }
   else if (lk === "split" && !L.landscape) color = T.muted;
   const shadow = color === C.lime;
-  c.save();
-  if (shadow){ c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 8*u; }
-  c.fillStyle = color; c.strokeStyle = color; c.textBaseline = "middle"; c.textAlign = "right";
-  if (st.indicator === "count"){
-    c.font = `700 ${22*u}px ${SANS}`; c.letterSpacing = (.1*22*u) + "px";
-    c.fillText(`${i + 1} / ${n}`, right, cy);
-  } else if (st.indicator === "dots"){
-    const r = 5.5*u, gap = 18*u, w = (n - 1) * gap;
-    for (let k = 0; k < n; k++){ c.globalAlpha = k === i ? 1 : .4; c.beginPath(); c.arc(right - w + k * gap, cy, k === i ? r * 1.25 : r, 0, Math.PI * 2); c.fill(); }
-  } else if (st.indicator === "swipe" && !last){
-    const size = 21*u, aw = 30*u;
-    c.font = `700 ${size}px ${SANS}`; c.letterSpacing = (.14*size) + "px";
-    c.lineWidth = 3*u; c.lineCap = "round"; c.lineJoin = "round";
-    c.beginPath(); c.moveTo(right - aw, cy); c.lineTo(right, cy); c.moveTo(right - 11*u, cy - 11*u); c.lineTo(right, cy); c.lineTo(right - 11*u, cy + 11*u); c.stroke();
-    c.fillText("SWIPE", right - aw - 14*u, cy);
-  }
-  c.restore(); c.letterSpacing = "0px"; c.textAlign = "left";
+  color = elOv("indicator").color || color;
+  /* measure first so the indicator is a normal element (click, move, resize, hide) */
+  let w = 0, h = 30*u, pad = 0;
+  if (st.indicator === "count"){ c.font = `700 ${22*u}px ${SANS}`; c.letterSpacing = (.1*22*u) + "px"; w = c.measureText(`${i + 1} / ${n}`).width; c.letterSpacing = "0px"; }
+  else if (st.indicator === "dots"){ pad = 5.5*u*1.25; w = (n - 1) * 18*u + pad * 2; h = pad * 2.4; }
+  else if (st.indicator === "swipe" && !last){ const size = 21*u; c.font = `700 ${size}px ${SANS}`; c.letterSpacing = (.14*size) + "px"; w = c.measureText("SWIPE").width + 44*u; c.letterSpacing = "0px"; }
+  else return;
+  tagEl("indicator", { w, h, gap:0, draw(x, y){
+    const right = x + w - pad, cy = y + h / 2;
+    c.save();
+    if (shadow){ c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 8*u; }
+    c.fillStyle = color; c.strokeStyle = color; c.textBaseline = "middle"; c.textAlign = "right";
+    if (st.indicator === "count"){
+      c.font = `700 ${22*u}px ${SANS}`; c.letterSpacing = (.1*22*u) + "px";
+      c.fillText(`${i + 1} / ${n}`, right, cy);
+    } else if (st.indicator === "dots"){
+      const r = 5.5*u, gap = 18*u, w = (n - 1) * gap;
+      for (let k = 0; k < n; k++){ c.globalAlpha = k === i ? 1 : .4; c.beginPath(); c.arc(right - w + k * gap, cy, k === i ? r * 1.25 : r, 0, Math.PI * 2); c.fill(); }
+    } else {
+      const size = 21*u, aw = 30*u;
+      c.font = `700 ${size}px ${SANS}`; c.letterSpacing = (.14*size) + "px";
+      c.lineWidth = 3*u; c.lineCap = "round"; c.lineJoin = "round";
+      c.beginPath(); c.moveTo(right - aw, cy); c.lineTo(right, cy); c.moveTo(right - 11*u, cy - 11*u); c.lineTo(right, cy); c.lineTo(right - 11*u, cy + 11*u); c.stroke();
+      c.fillText("SWIPE", right - aw - 14*u, cy);
+    }
+    c.restore(); c.letterSpacing = "0px"; c.textAlign = "left";
+  }}, { kind:"shape" }).draw(right - w + pad, cy - h / 2);
 }
 function rebuildFG(){
   const L = makeCtx(), lay = LAYOUT_DRAW[layoutKey()];
   if (fg.width !== L.W || fg.height !== L.H){ fg.width = L.W; fg.height = L.H; } else fctx.clearRect(0, 0, L.W, L.H);
   fctx.textAlign = "left";
+  elBegin(L);
   lay.fg.call(lay, L);
   drawIndicator(L, layoutKey());
+  drawExtras(L);
+  elFlush();
   fgDirty = false;
 }
 function draw(){
@@ -1039,13 +1182,13 @@ function draw(){
   if (cv.width !== L.W || cv.height !== L.H){ cv.width = L.W; cv.height = L.H; fgDirty = true; }
   if (fgDirty) rebuildFG();
   ctx.fillStyle = C.slate; ctx.fillRect(0, 0, L.W, L.H);
-  drawMedia(ctx, lay.media.call(lay, L), lay.placeholder);
+  drawMedia(ctx, EL.mbox = lay.media.call(lay, L), lay.placeholder);
   ctx.drawImage(fg, 0, 0);
 }
 let rafId = 0;
 function requestRender(full){
   if (full !== false){ fgDirty = true; scheduleThumbs(); }
-  if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; draw(); });
+  if (!rafId) rafId = requestAnimationFrame(() => { rafId = 0; draw(); edPaint(); });
 }
 /* Render any page into the main canvas synchronously, run fn, then restore the current page. */
 function withPage(i, fn){
@@ -1420,27 +1563,12 @@ function updateMediaUI(){
   $("vbar").classList.toggle("on", vid);
   fitCanvas(); updateExportUI();
 }
-function syncPos(){ ["zoom","posX","posY"].forEach(id => { const key = { zoom:"zoom", posX:"px", posY:"py" }[id]; $(id).value = st[key]; $(id + "Out").textContent = pct(id === "zoom" ? st[key] : st[key]); }); }
+function syncPos(){ $("zoom").min = Math.min(1, st.zoom); ["zoom","posX","posY"].forEach(id => { const key = { zoom:"zoom", posX:"px", posY:"py" }[id]; $(id).value = st[key]; $(id + "Out").textContent = pct(id === "zoom" ? st[key] : st[key]); }); }
 bindSlider("zoom", "zoom", pct, { mediaOnly:true, noSave:true });
 bindSlider("posX", "px", pct, { mediaOnly:true, noSave:true });
 bindSlider("posY", "py", pct, { mediaOnly:true, noSave:true });
 
-/* drag to pan */
-let drag = null;
-cv.addEventListener("pointerdown", e => {
-  if (!media.type || !mediaGeom || document.body.classList.contains("recording")) return;
-  drag = { x:e.clientX, y:e.clientY, px:st.px, py:st.py, k:cv.width / cv.getBoundingClientRect().width };
-  cv.setPointerCapture(e.pointerId); cv.classList.add("panning");
-});
-cv.addEventListener("pointermove", e => {
-  cv.classList.toggle("pannable", !!(media.type && mediaGeom));
-  if (!drag || !mediaGeom) return;
-  const dx = (e.clientX - drag.x) * drag.k, dy = (e.clientY - drag.y) * drag.k;
-  if (mediaGeom.ox > 0) st.px = Math.min(1, Math.max(0, drag.px - dx / mediaGeom.ox));
-  if (mediaGeom.oy > 0) st.py = Math.min(1, Math.max(0, drag.py - dy / mediaGeom.oy));
-  syncPos(); requestRender(false);
-});
-["pointerup","pointercancel"].forEach(ev => cv.addEventListener(ev, () => { drag = null; cv.classList.remove("panning"); }));
+/* dragging, zooming and selecting on the canvas: see "Canvas editor" below */
 
 /* video transport */
 const ICON_PLAY = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
@@ -1541,7 +1669,7 @@ function switchPage(i){
 const bumpNumber = v => /^\d+$/.test(String(v || "").trim()) ? String(+v + 1).padStart(String(v).trim().length, "0") : v;
 function addPage(copyMedia){
   if (st.pages.length >= MAX_PAGES){ alert(`A carousel can have up to ${MAX_PAGES} pages.`); return; }
-  const cur = pg(), p = newPage(nextPageId++, cur.layout, { ...cur.fields, number: bumpNumber(cur.fields.number) });
+  const cur = pg(), p = newPage(nextPageId++, cur.layout, { ...cur.fields, number: bumpNumber(cur.fields.number) }, copyMedia ? cur.els : Object.fromEntries(Object.entries(cur.els || {}).filter(([k]) => !/^x\d+$/.test(k))), copyMedia ? cur.extras : null);
   if (copyMedia){
     p.zoom = cur.zoom; p.px = cur.px; p.py = cur.py; p.fields.number = cur.fields.number;
     const src = media, m = mediaFor(p.id);
@@ -1706,8 +1834,424 @@ $("resetBtn").addEventListener("click", e => {
   const b = e.currentTarget;
   if (!resetArmed){ b.textContent = "Click again to confirm"; resetArmed = setTimeout(() => { resetArmed = 0; b.textContent = "Reset this page's text and colours"; }, 3000); return; }
   clearTimeout(resetArmed); resetArmed = 0; b.textContent = "Reset this page's text and colours";
-  st.fields = { ...DEFAULT_FIELDS }; st.colors = { ...DEFAULT_STATE.colors }; syncUI(); requestRender(); persist();
+  st.fields = { ...DEFAULT_FIELDS }; pg().els = {}; pg().extras = []; st.colors = { ...DEFAULT_STATE.colors }; syncUI(); requestRender(); persist();
 });
+
+/* =========================================================
+   Canvas editor: the preview works like a design canvas.
+   Click any element to select it (or the photo behind it). Drag to move, with centre snap guides
+   (hold Alt to skip snapping). Mouse wheel, pinch, + / - or the corner handle to resize.
+   Arrow keys nudge (Shift for bigger steps). Delete hides an element (added text is removed).
+   Cmd or Ctrl + C, V or D duplicate text as a new text box. Cmd or Ctrl + Z undo, Shift to redo.
+   Edits are stored per page in pg().els, see "Element layer" above.
+   ========================================================= */
+const ED = { sel:null, drag:null, pts:new Map(), pinch:null, guides:null, hover:null, clip:null, html:"", listSig:"", panelTag:"" };
+const EL_NAMES = { headline:"Headline", body:"Supporting line", eyebrow:"Small line", badge:"Tag", cta:"Button", price:"Price", specs:"Details",
+  number:"Slide number", handle:"Footer left", swipe:"Footer right", tagline:"Tagline", contact:"Contact line", logo:"Logo",
+  divider:"Divider", rule:"Accent line", indicator:"Page indicator" };
+const STYLE_KEYS = ["font","weight","color","hl","ls","lh","align","box","boxColor","boxOpacity","shadow"];
+const isExtraKey = k => /^x\d+$/.test(k || "");
+const extraOf = k => isExtraKey(k) ? ((pg().extras || []).find(x => "x" + x.id === k) || null) : null;
+const elName = k => k === "photo" ? (media.type ? "Photo" : "Background") : isExtraKey(k) ? "Text" : EL_NAMES[k] || (FIELDS[k] && FIELDS[k].label) || "Element";
+const elRec = k => EL.list.find(r => r.key === k) || null;
+const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
+const edBusy = () => document.body.classList.contains("recording");
+function canvasPt(e){ const r = cv.getBoundingClientRect(); return [(e.clientX - r.left) * cv.width / r.width, (e.clientY - r.top) * cv.height / r.height]; }
+const screenK = () => cv.width / Math.max(1, cv.getBoundingClientRect().width);
+
+/* the words an element shows (null for logo, indicator and lines) */
+function elText(k){ const x = extraOf(k); if (x) return x.text; return FIELDS[k] && LAYOUTS[layoutKey()].fields.includes(k) ? (st.fields[k] || "") : null; }
+function setElText(k, v){
+  const x = extraOf(k);
+  if (x) x.text = v;
+  else if (FIELDS[k]){ st.fields[k] = v; const f = $("f-" + k); if (f && f.value !== v) f.value = v; updateAria(); }
+  requestRender(); persist();
+}
+/* write per-element edits; null or default values are removed so the template value applies again */
+function setOv(k, patch){
+  const p = pg(); if (!p || !k || k === "photo") return;
+  p.els = p.els || {};
+  const o = { ...(p.els[k] || {}), ...patch };
+  Object.keys(o).forEach(n => { const v = o[n]; if (v == null || v === "" || v === false || ((n === "dx" || n === "dy" || n === "z") && v === 0) || (n === "s" && v === 1)) delete o[n]; });
+  if (Object.keys(o).length) p.els[k] = o; else delete p.els[k];
+  requestRender(); persist(); edToolbar(); edSyncSize();
+}
+
+/* ---------- photo framing ---------- */
+function photoZoom(z, allowFit){
+  st.zoom = +clampN(z, allowFit ? .05 : Math.min(1, st.zoom), 4).toFixed(4);
+  syncPos(); requestRender(false); scheduleThumbs(); histNote(); edToolbar();
+}
+function fitZoom(){ const g = mediaGeom; if (!g || !g.mw || !g.b) return 1; const b = g.b, a = b.w / g.mw, c = b.h / g.mh; return Math.min(a, c) / Math.max(a, c); }
+function photoNudge(ddx, ddy){
+  const g = mediaGeom; if (!g || !media.type) return;
+  if (Math.abs(g.ox) > 1) st.px = clampN(st.px - ddx / g.ox, 0, 1);
+  if (Math.abs(g.oy) > 1) st.py = clampN(st.py - ddy / g.oy, 0, 1);
+  syncPos(); requestRender(false);
+}
+
+/* ---------- size, order, delete, duplicate ---------- */
+function edSize(){ const k = ED.sel; return k === "photo" ? st.zoom : (elOv(k).s || 1); }
+function edSetSize(v){
+  const k = ED.sel; if (!k) return false;
+  if (k === "photo"){ if (!media.type) return false; photoZoom(v); return true; }
+  if (!elRec(k)) return false;
+  setOv(k, { s:+clampN(v, .15, 8).toFixed(4) }); return true;
+}
+const edScale = f => edSetSize(edSize() * f);
+function edSyncSize(){ const i = $("elSize"); if (i && document.activeElement !== i){ i.value = edSize(); i.nextElementSibling.textContent = pct(edSize()); } }
+function edOrder(dir){
+  histCut();
+  const k = ED.sel, zs = EL.list.filter(r => r.key !== k).map(r => r.z);
+  setOv(k, { z: dir > 0 ? Math.max(0, ...zs) + 1 : Math.min(0, ...zs) - 1 });
+}
+function edDelete(){
+  const k = ED.sel; if (!k || k === "photo") return;
+  histCut();
+  const x = extraOf(k), p = pg();
+  if (x){ p.extras = p.extras.filter(q => q !== x); if (p.els) delete p.els[k]; ED.sel = null; requestRender(); persist(); edPaint(); return; }
+  setOv(k, { hide:true });
+}
+function edAddText(text, x, y, style){
+  histCut();
+  const p = pg(); p.extras = p.extras || [];
+  const id = p.extras.reduce((m, q) => Math.max(m, q.id), 0) + 1;
+  p.extras.push({ id, text, x:+clampN(x, .04, .96).toFixed(4), y:+clampN(y, .04, .96).toFixed(4) });
+  if (style && Object.keys(style).length){ p.els = p.els || {}; p.els["x" + id] = style; }
+  fgDirty = true; draw(); persist(); scheduleThumbs();
+  edSelect("x" + id); edFocusText();
+}
+function edCopy(){
+  const k = ED.sel, r = elRec(k), t = k && k !== "photo" ? elText(k) : null;
+  if (t == null || !t.trim() || !r) return false;
+  const { dx, dy, z, hide, s, ...style } = elOv(k), L = EL.L;
+  if (!isExtraKey(k)){ /* carry the template look over to the new text box */
+    if (!style.font && r.fam === "head") style.font = GIRIKA.FONTS.head;
+    if (!style.weight && r.weight) style.weight = String(r.weight);
+    if (!style.color && r.color && r.kind === "text") style.color = r.color;
+    if (!style.hl && r.hl && r.kind === "text") style.hl = r.hl;
+    if (style.ls == null && r.base.ls) style.ls = r.base.ls;
+    if (style.lh == null && r.base.lh) style.lh = r.base.lh;
+  }
+  const sc = (s || 1) * (r.kind === "text" && !isExtraKey(k) && r.size ? r.size / (56 * L.u) : 1);
+  if (Math.abs(sc - 1) > .001) style.s = +sc.toFixed(4);
+  ED.clip = { text: r.base.upper ? t.toUpperCase() : t, style, x:(r.x + r.w / 2) / L.W, y:(r.y + r.h / 2) / L.H };
+  return true;
+}
+function edPaste(){
+  const c = ED.clip; if (!c) return false;
+  c.x = clampN(c.x + .03, .05, .95); c.y = clampN(c.y + .03, .05, .95);
+  edAddText(c.text, c.x, c.y, { ...c.style });
+  return true;
+}
+function edFocusText(){ setTimeout(() => { const t = $("elText"); if (t){ t.focus(); t.select && t.select(); } }, 40); }
+
+/* ---------- selection ---------- */
+function edSelect(k){ if (ED.sel === k) return; ED.sel = k; ED.hover = null; edPaint(); }
+function edHit(px, py){
+  const pad = 6 * screenK();
+  const hits = EL.list.filter(r => !r.hide && px >= r.x - pad && px <= r.x + r.w + pad && py >= r.y - pad && py <= r.y + r.h + pad);
+  hits.sort((a, b) => (b.z - a.z) || (b.order - a.order));
+  return hits[0] || null;
+}
+const inMedia = (px, py) => { const b = EL.mbox; return !!b && px >= b.x && px <= b.x + b.w && py >= b.y && py <= b.y + b.h; };
+/* selection box, handle, hover outline and snap guides: DOM on top of the canvas, never in exports */
+function edPaint(){
+  const lay = $("selLayer"), L = EL.L; if (!lay || !L) return;
+  let k = ED.sel, r = null;
+  if (k === "photo") r = EL.mbox ? { ...EL.mbox, photo:true } : null;
+  else if (k) r = elRec(k);
+  /* keep an empty text selected while typing into it; drop selections that no longer exist */
+  if (k && !r && !(k !== "photo" && elText(k) != null)){ ED.sel = k = null; }
+  const tag = (pg() ? pg().id : "") + "|" + (k || "");
+  if (tag !== ED.panelTag){ ED.panelTag = tag; edPanel(); edToolbar(); }
+  const P = (v, t) => (v / t * 100).toFixed(3) + "%";
+  const box = (cls, q, inner) => `<div class="${cls}" style="left:${P(q.x, L.W)};top:${P(q.y, L.H)};width:${P(q.w, L.W)};height:${P(q.h, L.H)}">${inner || ""}</div>`;
+  let html = "";
+  if (ED.hover && ED.hover !== k && !ED.drag){ const h = elRec(ED.hover); if (h && !h.hide) html += box("hov-box", h); }
+  if (r) html += box("sel-box" + (r.photo ? " photo" : "") + (r.hide ? " off" : ""), r, !r.hide && (!r.photo || media.type) ? '<span class="sel-handle" title="Drag to resize"></span>' : "");
+  if (ED.guides){
+    if (ED.guides.v != null) html += `<div class="snap v" style="left:${P(ED.guides.v, L.W)}"></div>`;
+    if (ED.guides.h != null) html += `<div class="snap h" style="top:${P(ED.guides.h, L.H)}"></div>`;
+  }
+  if (html !== ED.html){ ED.html = html; lay.innerHTML = html; }
+  edList();
+}
+/* chips for every element on this page: another way to select, and the way back to hidden ones */
+function edList(){
+  const host = $("elList"); if (!host) return;
+  const keys = [...new Set(EL.list.map(r => r.key))];
+  const sig = (EL.mbox ? "photo" + !!media.type + "|" : "") + keys.map(k => k + (elRec(k).hide ? "-" : "")).join("|") + "#" + ED.sel;
+  if (sig === ED.listSig) return; ED.listSig = sig;
+  host.innerHTML = "";
+  const add = (k, off) => {
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip" + (off ? " off" : ""); b.textContent = isExtraKey(k) ? "Text: " + (() => { const t = (elText(k) || "").replace(/\*/g, "").trim(); return t.length > 16 ? t.slice(0, 15) + "..." : t; })() : elName(k);
+    b.setAttribute("aria-pressed", String(ED.sel === k)); if (off) b.title = "Hidden. Select it, then choose Show.";
+    b.addEventListener("click", () => edSelect(ED.sel === k ? null : k)); host.appendChild(b);
+  };
+  if (EL.mbox) add("photo");
+  keys.forEach(k => add(k, elRec(k).hide));
+}
+
+/* ---------- floating toolbar ---------- */
+function edToolbar(){
+  const bar = $("stageTools"); if (!bar) return;
+  bar.innerHTML = "";
+  const b = (label, fn, title, opts) => { const x = document.createElement("button"); x.type = "button"; x.className = "st-btn" + (opts && opts.on ? " on" : ""); x.innerHTML = label; x.title = title || label; x.setAttribute("aria-label", title || label); if (opts && opts.disabled) x.disabled = true; x.addEventListener("click", () => { histCut(); fn(); }); bar.appendChild(x); return x; };
+  const span = (cls, text) => { const x = document.createElement("span"); x.className = cls; x.textContent = text; bar.appendChild(x); return x; };
+  const sep = () => span("st-sep", "");
+  const k = ED.sel;
+  if (!k){
+    span("st-hint", "Click anything on the post to edit it. Double-click to add text.");
+    b("Add text", () => edAddText("Your text", .5, .45), "Add a text box");
+  } else if (k === "photo"){
+    span("st-name", elName(k));
+    if (!media.type) span("st-hint", "Upload a photo or video to move and zoom it.");
+    else {
+      b("&minus;", () => edScale(1 / 1.1), "Zoom out"); span("st-val", pct(st.zoom)); b("+", () => edScale(1.1), "Zoom in"); sep();
+      const fz = fitZoom();
+      b("Fill", () => { st.px = st.py = .5; photoZoom(1, true); }, "Fill the frame", { on:Math.abs(st.zoom - 1) < .001 });
+      b("Fit", () => { st.px = st.py = .5; photoZoom(fz, true); }, "Show the whole photo", { on:fz < .999 && Math.abs(st.zoom - fz) < .001, disabled:fz > .999 });
+    }
+  } else {
+    const o = elOv(k);
+    span("st-name", elName(k));
+    b("&minus;", () => edScale(1 / 1.1), "Smaller"); span("st-val", pct(o.s || 1)); b("+", () => edScale(1.1), "Bigger"); sep();
+    b("Reset", () => setOv(k, { dx:null, dy:null, s:null, z:null, hide:null }), "Back to the template layout", { disabled:!(o.dx || o.dy || o.s || o.z || o.hide) });
+    b("Front", () => edOrder(1), "Bring to front"); b("Back", () => edOrder(-1), "Send to back");
+    if (o.hide) b("Show", () => setOv(k, { hide:null }), "Show it again");
+    else b("Delete", edDelete, isExtraKey(k) ? "Delete this text" : "Hide this element");
+  }
+  sep();
+  b("Undo", edUndo, "Undo (Cmd or Ctrl + Z)", { disabled:!HIST.undo.length });
+  b("Redo", edRedo, "Redo (Shift + Cmd or Ctrl + Z)", { disabled:!HIST.redo.length });
+}
+
+/* ---------- style panel (right) ---------- */
+function edPanel(){
+  const host = $("elPanel"); if (!host) return;
+  host.innerHTML = "";
+  const k = ED.sel; $("elHint").hidden = !!k;
+  if (!k) return;
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const head = mk("div", "el-head"); head.append(mk("b", "", elName(k)));
+  const done = mk("button", "btn", "Done"); done.type = "button"; done.addEventListener("click", () => edSelect(null)); head.append(done); host.append(head);
+  if (k === "photo"){ host.append(mk("p", "hint", media.type ? "Drag the photo to move it. Scroll, pinch or drag the corner to zoom. Fit shows the whole photo." : "Upload a photo or video under Photo or video. Until then a brand scene fills the background.")); return; }
+  const r = elRec(k), o = elOv(k), kind = r ? r.kind : "text", txt = elText(k);
+  const field = (label, ctrl, cls) => {
+    const f = mk("div", "field" + (cls ? " " + cls : "")), l = mk(ctrl.id ? "label" : "span", "lbl", label);
+    if (ctrl.id) l.htmlFor = ctrl.id; f.append(l, ctrl); host.append(f); return f;
+  };
+  const slider = (label, id, min, max, step, val, show, on, cls) => {
+    const row = mk("div", "slider" + (cls ? " " + cls : "")); row.innerHTML = `<span></span><input type="range" min="${min}" max="${max}" step="${step}"><output></output>`;
+    row.querySelector("span").textContent = label; const i = row.querySelector("input"), out = row.querySelector("output");
+    if (id) i.id = id; i.value = val; i.setAttribute("aria-label", label); out.textContent = show(val);
+    i.addEventListener("input", () => { out.textContent = show(+i.value); on(+i.value); }); host.append(row); return row;
+  };
+  const chips = (label, opts, cur, on, cls) => {
+    const row = mk("div", "chips");
+    opts.forEach(([v, l]) => { const b = mk("button", "chip", l); b.type = "button"; b.setAttribute("aria-pressed", String((cur || "") === v));
+      b.addEventListener("click", () => { histCut(); row.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === b))); on(v || null); }); row.append(b); });
+    return field(label, row, cls);
+  };
+  const colors = (label, cur, on, cls) => {
+    const row = mk("div", "row"); row.style.gap = "6px";
+    const auto = mk("button", "auto-chip", "Auto"); auto.type = "button";
+    const sw = TEXT_PALETTE.map(([hex, name]) => { const b = mk("button", "swatch sm"); b.type = "button"; b.style.background = hex; b.title = name; b.setAttribute("aria-label", label + ": " + name); b.dataset.v = hex; return b; });
+    const inp = document.createElement("input"); inp.type = "color"; inp.className = "el-color"; inp.title = "Any colour"; inp.setAttribute("aria-label", label + ": any colour");
+    inp.value = /^#[0-9a-f]{6}$/i.test(cur || "") ? cur.toLowerCase() : "#ffffff";
+    const paint = v => { auto.setAttribute("aria-pressed", String(!v)); sw.forEach(b => b.setAttribute("aria-pressed", String(!!v && b.dataset.v.toLowerCase() === String(v).toLowerCase()))); };
+    const pick = (v, cut) => { if (cut) histCut(); paint(v); on(v); };
+    auto.addEventListener("click", () => pick(null, true));
+    sw.forEach(b => b.addEventListener("click", () => { inp.value = b.dataset.v.toLowerCase(); pick(b.dataset.v, true); }));
+    inp.addEventListener("input", () => pick(inp.value));
+    row.append(auto, ...sw, inp); paint(cur);
+    return field(label, row, cls);
+  };
+  if (txt != null){
+    const multi = ["headline","body"].includes(k) || isExtraKey(k), ta = document.createElement(multi ? "textarea" : "input");
+    ta.id = "elText"; if (multi) ta.rows = 2; else ta.type = "text"; ta.value = txt;
+    ta.addEventListener("input", () => setElText(k, ta.value));
+    field("Text", ta);
+  }
+  if (!r){ host.append(mk("p", "hint", "This element is empty. Type above to show it.")); return; }
+  slider("Size", "elSize", .2, 4, .01, o.s || 1, pct, v => setOv(k, { s:v }));
+  const typed = ["text","pill","link","chips"].includes(kind);
+  if (typed){
+    const brandF = r.fam === "head" ? GIRIKA.FONTS.head : GIRIKA.FONTS.body;
+    const pk = window.RS && RS.fonts ? RS.fonts.picker({ value:o.font || brandF, label:"Font", pinned:() => [GIRIKA.FONTS.head, GIRIKA.FONTS.body],
+      onChange:f => { setOv(k, { font:f }); RS.fonts.load(f).then(() => { fgDirty = true; requestRender(); }).catch(() => {}); } }) : mk("span", "hint", brandF);
+    field("Font", pk);
+    const sel = document.createElement("select"); sel.id = "elWeight";
+    [["","Default"],["300","Light"],["400","Regular"],["500","Medium"],["600","Semibold"],["700","Bold"],["800","Extra bold"],["900","Black"]].forEach(([v, l]) => { const op = document.createElement("option"); op.value = v; op.textContent = l; sel.append(op); });
+    sel.value = o.weight || ""; sel.addEventListener("change", () => setOv(k, { weight:sel.value || null }));
+    field("Weight", sel);
+  }
+  if (kind !== "logo") colors(kind === "pill" || kind === "chips" ? "Text colour" : "Colour", o.color, v => setOv(k, { color:v }));
+  if (kind === "text") colors("Highlight for *starred* words", o.hl, v => setOv(k, { hl:v }));
+  if (["text","pill","link"].includes(kind)) slider("Letter spacing", "", -.05, .5, .005, o.ls != null ? o.ls : (r.base.ls || 0), v => v.toFixed(2), v => setOv(k, { ls:v }), "pro-only");
+  if (kind === "text"){
+    slider("Line height", "", .8, 2.4, .01, o.lh != null ? o.lh : (r.base.lh || 1.2), v => v.toFixed(2), v => setOv(k, { lh:v }), "pro-only");
+    chips("Alignment", [["","Auto"],["left","Left"],["center","Centre"],["right","Right"]], o.align, v => setOv(k, { align:v }), "pro-only");
+  }
+  if (["text","pill","chips"].includes(kind)){
+    const opts = kind === "text" ? [["","None"],["box","Box"],["pill","Pill"]] : [["","Auto"],["none","None"],["box","Box"],["pill","Pill"]];
+    if (kind !== "chips") chips("Background", opts, o.box, v => setOv(k, { box:v }), "pro-only");
+    colors("Background colour", o.boxColor, v => setOv(k, { boxColor:v }), "pro-only");
+    slider("Opacity", "", 0, 1, .01, o.boxOpacity != null ? o.boxOpacity : (kind === "text" ? .85 : 1), pct, v => setOv(k, { boxOpacity:v }), "pro-only");
+  }
+  if (["text","pill","link"].includes(kind)) chips("Shadow", [["","Auto"],["on","On"],["off","Off"]], o.shadow, v => setOv(k, { shadow:v }), "pro-only");
+  if (kind === "logo") host.append(mk("p", "hint", "Choose the logo type and version under Logo."));
+  if (STYLE_KEYS.some(n => o[n] != null)){
+    const rb = mk("button", "btn block", "Reset style"); rb.type = "button"; rb.style.marginTop = "4px";
+    rb.addEventListener("click", () => { const z = {}; STYLE_KEYS.forEach(n => z[n] = null); setOv(k, z); edPanel(); });
+    host.append(rb);
+  }
+}
+/* keep the panel's text box in step with the Text fields on the left */
+document.addEventListener("input", e => { const t = $("elText"); if (t && e.target && e.target.id === "f-" + ED.sel && t !== e.target) t.value = e.target.value; });
+
+/* ---------- pointer, wheel and keyboard ---------- */
+cv.addEventListener("pointerdown", e => {
+  if (edBusy() || e.button > 0) return;
+  const [px, py] = canvasPt(e);
+  if (!ED.pts.size) histCut();
+  ED.pts.set(e.pointerId, [px, py]);
+  try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+  if (ED.pts.size === 2 && ED.sel){ const [[ax, ay], [bx, by]] = [...ED.pts.values()]; ED.pinch = { d:Math.max(10, Math.hypot(ax - bx, ay - by)), v:edSize() }; ED.drag = null; return; }
+  const hit = edHit(px, py);
+  if (hit){
+    edSelect(hit.key);
+    const o = elOv(hit.key);
+    ED.drag = { kind:"move", key:hit.key, x:px, y:py, dx0:o.dx || 0, dy0:o.dy || 0, cx:hit.x + hit.w / 2, cy:hit.y + hit.h / 2 };
+  } else if (inMedia(px, py)){
+    edSelect("photo");
+    if (media.type && mediaGeom) ED.drag = { kind:"pan", x:px, y:py, px:st.px, py:st.py };
+  } else edSelect(null);
+});
+$("selLayer").addEventListener("pointerdown", e => {
+  if (!e.target.classList.contains("sel-handle") || edBusy()) return;
+  e.preventDefault(); e.stopPropagation();
+  const k = ED.sel, r = k === "photo" ? EL.mbox : elRec(k); if (!r) return;
+  const [px, py] = canvasPt(e), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
+  histCut();
+  ED.pts.set(e.pointerId, [px, py]);
+  ED.drag = { kind:"resize", cx, cy, d0:Math.max(8, Math.hypot(px - cx, py - cy)), v0:edSize() };
+  try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+});
+cv.addEventListener("pointermove", e => {
+  const [px, py] = canvasPt(e);
+  if (!ED.pts.has(e.pointerId)){ /* hover */
+    if (edBusy()) return;
+    const h = edHit(px, py), hk = h ? h.key : null;
+    cv.style.cursor = h ? "move" : (media.type && inMedia(px, py) ? "grab" : "default");
+    if (hk !== ED.hover){ ED.hover = hk; edPaint(); }
+    return;
+  }
+  ED.pts.set(e.pointerId, [px, py]);
+  if (ED.pinch && ED.pts.size === 2){ const [[ax, ay], [bx, by]] = [...ED.pts.values()]; edSetSize(ED.pinch.v * Math.hypot(ax - bx, ay - by) / ED.pinch.d); return; }
+  const D = ED.drag, L = EL.L; if (!D || !L) return;
+  if (D.kind === "move"){
+    let dx = D.dx0 + (px - D.x) / L.W, dy = D.dy0 + (py - D.y) / L.H;
+    const snap = 8 * screenK(), ncx = D.cx + (px - D.x), ncy = D.cy + (py - D.y), g = {};
+    if (!e.altKey){
+      if (Math.abs(ncx - L.W / 2) < snap){ dx += (L.W / 2 - ncx) / L.W; g.v = L.W / 2; }
+      if (Math.abs(ncy - L.H / 2) < snap){ dy += (L.H / 2 - ncy) / L.H; g.h = L.H / 2; }
+    }
+    ED.guides = g; cv.style.cursor = "move";
+    setOv(D.key, { dx:+dx.toFixed(5), dy:+dy.toFixed(5) });
+  } else if (D.kind === "pan" && mediaGeom){
+    const g = mediaGeom; cv.style.cursor = "grabbing";
+    if (Math.abs(g.ox) > 1) st.px = clampN(D.px - (px - D.x) / g.ox, 0, 1);
+    if (Math.abs(g.oy) > 1) st.py = clampN(D.py - (py - D.y) / g.oy, 0, 1);
+    syncPos(); requestRender(false);
+  } else if (D.kind === "resize") edSetSize(D.v0 * Math.hypot(px - D.cx, py - D.cy) / D.d0);
+});
+function edUp(e){
+  ED.pts.delete(e.pointerId); if (ED.pts.size < 2) ED.pinch = null;
+  const D = ED.drag; if (!D) return;
+  ED.drag = null; ED.guides = null;
+  if (D.kind === "pan"){ scheduleThumbs(); histNote(); } else { requestRender(); persist(); }
+  edPaint(); edPanelSyncLater();
+}
+let edPanelT = 0;
+function edPanelSyncLater(){ clearTimeout(edPanelT); edPanelT = setTimeout(edSyncSize, 30); }
+["pointerup","pointercancel"].forEach(ev => cv.addEventListener(ev, edUp));
+cv.addEventListener("pointerleave", () => { if (ED.hover && !ED.drag){ ED.hover = null; edPaint(); } });
+cv.addEventListener("wheel", e => {
+  if (edBusy() || !ED.sel || (ED.sel === "photo" && !media.type)) return;
+  e.preventDefault();
+  edScale(Math.exp(-(e.ctrlKey ? e.deltaY * 3 : e.deltaY) * .0012));
+}, { passive:false });
+cv.addEventListener("dblclick", e => {
+  if (edBusy()) return;
+  const [px, py] = canvasPt(e), hit = edHit(px, py), L = EL.L;
+  if (hit){ if (elText(hit.key) != null){ edSelect(hit.key); edFocusText(); } return; }
+  if (L) edAddText("Your text", px / L.W, py / L.H);
+});
+document.addEventListener("keydown", e => {
+  const tg = e.target, typing = /^(input|textarea|select)$/i.test((tg && tg.tagName) || "") || (tg && tg.isContentEditable);
+  if (typing || edBusy() || !$("tplModal").hidden || e.defaultPrevented) return;
+  const mod = e.metaKey || e.ctrlKey, key = (e.key || "").toLowerCase();
+  if (mod && key === "z"){ e.preventDefault(); e.shiftKey ? edRedo() : edUndo(); return; }
+  if (mod && key === "y"){ e.preventDefault(); edRedo(); return; }
+  if (mod && key === "v"){ if (edPaste()) e.preventDefault(); return; }
+  const k = ED.sel; if (!k) return;
+  if (e.key === "Escape"){ edSelect(null); return; }
+  if (mod && key === "c"){ if (edCopy()) e.preventDefault(); return; }
+  if (mod && key === "d"){ e.preventDefault(); if (edCopy()) edPaste(); return; }
+  if (e.key === "Delete" || e.key === "Backspace"){ if (k !== "photo"){ e.preventDefault(); edDelete(); } return; }
+  if (!mod && (e.key === "+" || e.key === "=")){ if (edScale(1.05)) e.preventDefault(); return; }
+  if (!mod && (e.key === "-" || e.key === "_")){ if (edScale(1 / 1.05)) e.preventDefault(); return; }
+  const mv = { ArrowLeft:[-1, 0], ArrowRight:[1, 0], ArrowUp:[0, -1], ArrowDown:[0, 1] }[e.key];
+  if (!mv || mod) return;
+  e.preventDefault();
+  const L = EL.L, step = e.shiftKey ? 20 : 2;
+  if (k === "photo"){ photoNudge(mv[0] * step, mv[1] * step); scheduleThumbs(); histNote(); }
+  else if (L){ const o = elOv(k); setOv(k, { dx:+((o.dx || 0) + mv[0] * step / L.W).toFixed(5), dy:+((o.dy || 0) + mv[1] * step / L.H).toFixed(5) }); }
+});
+
+/* ---------- undo / redo: snapshots of pages, page edits and style, taken after each change settles ---------- */
+const HIST = { undo:[], redo:[], cur:null, t:0 };
+function histSnap(){
+  const { page, guides, pages, ...rest } = st;
+  return JSON.stringify({ ...rest, pages:st.pages.map(({ id, layout, fields, els, extras, zoom, px, py }) => ({ id, layout, fields, els, extras, zoom, px, py })) });
+}
+function histNote(){ clearTimeout(HIST.t); HIST.t = setTimeout(histCommit, 450); }
+/* close the pending step so a discrete action (click, add, delete) gets its own undo step */
+function histCut(){ if (HIST.cur != null){ clearTimeout(HIST.t); histCommit(); } }
+function histCommit(){
+  if (ED.drag){ histNote(); return; }
+  const s = histSnap();
+  if (HIST.cur == null || s === HIST.cur){ HIST.cur = s; return; }
+  HIST.undo.push(HIST.cur); if (HIST.undo.length > 100) HIST.undo.shift();
+  HIST.redo = []; HIST.cur = s; edToolbar();
+}
+function edUndo(){ if (edBusy()) return; clearTimeout(HIST.t); histCommit(); if (!HIST.undo.length) return; HIST.redo.push(HIST.cur); HIST.cur = HIST.undo.pop(); histApply(HIST.cur); }
+function edRedo(){ if (edBusy()) return; clearTimeout(HIST.t); histCommit(); if (!HIST.redo.length) return; HIST.undo.push(HIST.cur); HIST.cur = HIST.redo.pop(); histApply(HIST.cur); }
+function histApply(json){
+  const s = JSON.parse(json), pages = s.pages, keepId = pg() && pg().id; delete s.pages;
+  Object.assign(st, s);
+  st.pages = pages.map(p => Object.assign(newPage(p.id, p.layout, p.fields, p.els, p.extras), { zoom:p.zoom != null ? p.zoom : 1, px:p.px != null ? p.px : .5, py:p.py != null ? p.py : .5 }));
+  let i = st.pages.findIndex(p => p.id === keepId); if (i < 0) i = Math.min(st.page, st.pages.length - 1);
+  nextPageId = Math.max(nextPageId, ...st.pages.map(p => p.id + 1));
+  syncStyleUI(); chipGroup("ctaList", [["clay","Clay"],["light","Limestone"],["deodar","Deodar"]], "cta");
+  buildSizes(); buildShades(); buildLogoTiles();
+  $("textScale").value = st.textScale; $("textScaleOut").textContent = pct(st.textScale);
+  $("overlayK").value = st.overlayK; $("overlayKOut").textContent = pct(st.overlayK);
+  $("showLogo").checked = st.showLogo; $("logoCtl").hidden = !st.showLogo;
+  st.page = Math.min(st.page, st.pages.length - 1);
+  switchPage(i);
+  edLoadFonts(); fgDirty = true; draw();
+  ED.listSig = ED.panelTag = ""; edPaint(); edToolbar();
+}
+/* fonts chosen for single elements load like any brand font */
+function edLoadFonts(){
+  if (!(window.RS && RS.fonts)) return;
+  const fams = new Set(); st.pages.forEach(p => Object.values(p.els || {}).forEach(o => o && o.font && fams.add(o.font)));
+  fams.forEach(f => RS.fonts.load(f).then(ok => { if (ok){ fgDirty = true; requestRender(); } }).catch(() => {}));
+}
+function edInit(){ edToolbar(); edPaint(); edLoadFonts(); HIST.cur = histSnap(); }
 
 /* =========================================================
    Init
@@ -1734,6 +2278,7 @@ $("resetBtn").addEventListener("click", e => {
   setSound(false);
   syncUI(); syncPos(); updateMediaUI(); updateTime(); renderStrip();
   draw();
+  edInit();
   const faces = [`500 40px "${GIRIKA.FONTS.head}"`,`italic 500 40px "${GIRIKA.FONTS.head}"`,`400 20px "${GIRIKA.FONTS.body}"`,`500 20px "${GIRIKA.FONTS.body}"`,`600 20px "${GIRIKA.FONTS.body}"`,`700 20px "${GIRIKA.FONTS.body}"`];
   Promise.all(faces.map(f => document.fonts.load(f))).catch(() => {}).then(() => document.fonts.ready).then(() => requestRender());
   requestAnimationFrame(tick);
