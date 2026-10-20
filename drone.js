@@ -291,7 +291,19 @@
     const tg = el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:on, onchange:e => { it.d3 = { ...d3(it), on:e.target.checked }; changed(false); renderInspector(); } }), document.createTextNode("Drone 3D: fly over this photo")]);
     body.appendChild(tg);
     if (on){
+      const runFlight = (p0, p1, a0, a1, orb, zm) => {
+        set("pitch0", p0); set("pitch1", p1); set("alt0", a0); set("alt1", a1); set("orbit", orb); if (zm) set("zoom", zm);
+        renderInspector(); seek(it._start + 0.1); play(it._start + 0.1);
+        setTimeout(() => { if (playing) pause(); }, 2500);
+      };
       body.append(
+        el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap;margin:8px 0" }, [
+          el("span", { class:"lbl", text:"1-Click 3D Flights (Pure JS, No AI):", style:"width:100%;margin-bottom:2px" }),
+          btn("🦅 High Flyover", () => runFlight(42, 68, 50, 190, 15, 1.15), "chip"),
+          btn("🔄 360° Orbit", () => runFlight(65, 78, 90, 90, 45, 1.25), "chip"),
+          btn("🚀 FPV Dive", () => runFlight(35, 82, 220, 45, -20, 1.1), "chip"),
+          btn("🏗️ Crane Rise", () => runFlight(85, 45, 30, 250, 0, 1.05), "chip")
+        ]),
         fChips("Look", `${s.pitch0}-${s.pitch1}`, [["42-70","Tilt down"],["70-90","Top down"],["85-35","Reveal horizon"],["55-55","Steady"]], v => { const [a, b] = v.split("-").map(Number); set("pitch0", a); set("pitch1", b); renderInspector(); }),
         fSlider("Start height (ft)", s.alt0, 20, 300, 5, v => set("alt0", v), v => Math.round(v) + " ft"),
         fSlider("End height (ft)", s.alt1, 20, 400, 5, v => set("alt1", v), v => Math.round(v) + " ft"),

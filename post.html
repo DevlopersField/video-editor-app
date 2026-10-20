@@ -251,6 +251,10 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 .snap{position:absolute}
 .snap.v{top:0;bottom:0;border-left:2px solid #FF4FA3;margin-left:-1px}
 .snap.h{left:0;right:0;border-top:2px solid #FF4FA3;margin-top:-1px}
+.plot-handle{position:absolute;width:18px;height:18px;margin:-9px 0 0 -9px;border-radius:50%;background:#fff;border:3px solid #E63B2E;box-shadow:0 2px 8px rgba(0,0,0,.45);cursor:crosshair;pointer-events:auto;z-index:3;touch-action:none}
+.plot-handle:hover{transform:scale(1.25);border-color:#F5C518}
+.drawbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 18px 10px;padding:10px 12px;border-radius:10px;background:var(--slate);color:var(--lime);font-size:13px;font-weight:600}
+.drawbar span{flex:1;min-width:200px}
 body.recording #selLayer,body.recording .stage-tools{display:none}
 .el-list{display:flex;flex-wrap:wrap;gap:6px}
 .el-list .chip{padding:5px 10px;font-size:12px}
@@ -350,6 +354,7 @@ body.recording .add-wrap{display:none}
     <div class="stage-top">
       <div class="title"><b id="fmtTitle">Instagram Post</b><span id="fmtDims">1080 x 1350</span></div>
       <div class="row" style="gap:14px">
+        <button class="btn sm" id="addPlotBtn" type="button" title="Highlight a plot with front, width, length and area">📐 Plot</button>
         <div class="add-wrap">
           <button class="btn primary" id="addBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="addPop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>
           <div class="add-pop" id="addPop" hidden role="menu" aria-label="Add to the post"></div>
@@ -359,6 +364,13 @@ body.recording .add-wrap{display:none}
       </div>
     </div>
     <div class="stage-tools" id="stageTools" role="toolbar" aria-label="Edit the selected element"></div>
+    <div class="drawbar" id="drawBarPost" hidden>
+      <span id="drawMsgPost">Click each corner of the plot</span>
+      <div class="row">
+        <button class="btn sm primary" id="drawDonePost" type="button">Finish</button>
+        <button class="btn sm" id="drawCancelPost" type="button">Cancel</button>
+      </div>
+    </div>
     <div class="canvas-area" id="canvasArea">
       <div class="holder" id="holder">
         <canvas id="cv" role="img" aria-label="Post preview"></canvas>
@@ -480,7 +492,7 @@ body.recording .add-wrap{display:none}
     <div class="group">
       <h2>Logo</h2>
       <label class="toggle"><input type="checkbox" id="showLogo" checked> Show logo</label>
-      <div id="logoCtl" class="pro-only" style="margin-top:12px">
+      <div id="logoCtl" style="margin-top:12px">
         <div class="field"><span class="lbl" id="logoKindLbl">Logo type</span><div class="ltiles three" id="logoKindList" role="radiogroup" aria-labelledby="logoKindLbl"></div></div>
         <div class="field"><span class="lbl" id="logoToneLbl">Logo version</span><div class="ltiles" id="logoToneList" role="radiogroup" aria-labelledby="logoToneLbl"></div></div>
       </div>
@@ -501,6 +513,7 @@ body.recording .add-wrap{display:none}
       <div class="progress" id="prog"><i></i></div>
       <p class="hint" id="exportHint"></p>
       <button class="btn block" id="resetBtn" style="margin-top:16px">Reset this page's text and colours</button>
+      <a href="video.html" id="openVidBtn" class="btn block" style="margin-top:10px;text-align:center;text-decoration:none">🎬 Open in Video Editor</a>
     </div>
   </aside>
 </div>
@@ -699,32 +712,38 @@ const LOGO_PATHS = {}; ["arch","sun","girika","homes"].forEach(k => LOGO_PATHS[k
 /* Stacked lockup, same construction as the brand book: wordmark = 1.75 x mark width, gap = 12% of mark height */
 const STK = (() => { const M = [47,59,1063,1290], Wb = [1306,284,2115,913], k = M[2] * 1.75 / Wb[2], ww = Wb[2] * k, wh = Wb[3] * k, T = Math.max(M[2], ww), gap = M[3] * .12; return { M, Wb, k, ww, T, gap, H: M[3] + gap + wh }; })();
 const logoAspect = kind => GIRIKA.IMG ? GIRIKA.imgAspect(kind) : GIRIKA.TEXTLOGO ? GIRIKA.textAspect(kind) : kind === "mark" ? 1290 / 1063 : kind === "stacked" ? STK.H / STK.T : 1290 / 3374;
-function drawLogo(c, kind, tone, x, y, width){
+function drawLogo(c, kind, tone, x, y, width, customColor){
   if (GIRIKA.IMG) return GIRIKA.drawImageLogo(c, kind, tone, x, y, width);
   if (GIRIKA.TEXTLOGO) return GIRIKA.drawTextLogo(c, kind, tone, x, y, width);
+  const ov = elOv("logo");
+  const useTone = (ov && ov.tone) || logoTone(tone);
+  const color = customColor || (ov && ov.color);
   if (kind === "stacked"){
-    const cols = LOGO_TONES[tone] || LOGO_TONES.light, s = width / STK.T;
+    const cols = LOGO_TONES[useTone] || LOGO_TONES.light, s = width / STK.T;
     c.save(); c.translate(x, y); c.scale(s, s);
-    c.save(); c.translate((STK.T - STK.M[2]) / 2 - STK.M[0], -STK.M[1]); ["arch","sun"].forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); }); c.restore();
+    c.save(); c.translate((STK.T - STK.M[2]) / 2 - STK.M[0], -STK.M[1]);
+    ["arch","sun"].forEach(k => { c.fillStyle = color || cols[k]; c.fill(LOGO_PATHS[k]); });
+    c.restore();
     c.translate((STK.T - STK.ww) / 2, STK.M[3] + STK.gap); c.scale(STK.k, STK.k); c.translate(-STK.Wb[0], -STK.Wb[1]);
-    ["girika","homes"].forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); });
+    ["girika","homes"].forEach(k => { c.fillStyle = color || cols[k]; c.fill(LOGO_PATHS[k]); });
     c.restore();
     return width * logoAspect("stacked");
   }
   const vb = kind === "mark" ? [47,59,1063,1290] : [47,59,3374,1290];
-  const cols = LOGO_TONES[tone] || LOGO_TONES.light, s = width / vb[2];
+  const cols = LOGO_TONES[useTone] || LOGO_TONES.light, s = width / vb[2];
   c.save(); c.translate(x - vb[0]*s, y - vb[1]*s); c.scale(s, s);
-  (kind === "mark" ? ["arch","sun"] : ["arch","sun","girika","homes"]).forEach(k => { c.fillStyle = cols[k]; c.fill(LOGO_PATHS[k]); });
+  (kind === "mark" ? ["arch","sun"] : ["arch","sun","girika","homes"]).forEach(k => { c.fillStyle = color || cols[k]; c.fill(LOGO_PATHS[k]); });
   c.restore();
   return vb[3] * s;
 }
 
 function logoDims(w){
-  if (st.logoKind === "mark") return { kind:"mark", w:w * 1063 / 3374 * 1.35 };
-  if (st.logoKind === "stacked") return { kind:"stacked", w:w * .56 };
+  const ov = elOv("logo"), kind = (ov && ov.kind) || st.logoKind;
+  if (kind === "mark") return { kind:"mark", w:w * 1063 / 3374 * 1.35 };
+  if (kind === "stacked") return { kind:"stacked", w:w * .56 };
   return { kind:"lockup", w };
 }
-const logoTone = def => st.logoTone === "auto" ? def : st.logoTone;
+const logoTone = def => { if (st.logoTone && st.logoTone !== "auto") return st.logoTone; return def || "light"; };
 const col = (role, def) => (st.colors[role] && st.colors[role] !== "auto") ? st.colors[role] : def;
 function ridgePath(c, pts, vw, vh, x, y, w, h, closeTo){
   c.beginPath();
@@ -853,12 +872,315 @@ function tagEl(key, item, info){
   return item;
 }
 function elFlush(){ EL.list.filter(r => r.paint).sort((a, b) => (a.z - b.z) || (a.order - b.order)).forEach(r => r.paint()); }
+
+/* ---------- plot highlight on posts: boundary, area and perimeter dimensions ---------- */
+const PLOT_COLORS = { red:["#E63B2E", "230,59,46"], clay:[C.clayLt || "#C98B6E", "201,139,110"], lime:[C.lime || "#F4F1EC", "244,241,236"], sage:[C.sage || "#A9B896", "169,184,150"], yellow:["#F5C518", "245,197,24"] };
+const AREA_UNITS = [["sqyd","sq yd (gaj)"],["sqft","sq ft"],["sqm","sq m"]];
+const LABEL_BG = { red:"#E63B2E", yellow:"#F5C518", white:"#FFFFFF", dark:"#1C2128", green:"#556348", clay:"#C98B6E" };
+
+function plotArea(pl){
+  if (pl.areaText && pl.areaText.trim()) return pl.areaText.trim();
+  const f = parseFloat(String(pl.front || "").replace(/,/g, ""));
+  const w = parseFloat(String(pl.w || "").replace(/,/g, ""));
+  const l = parseFloat(String(pl.l || "").replace(/,/g, ""));
+  let widthVal = 0;
+  if (f > 0 && w > 0) widthVal = (f + w) / 2;
+  else if (f > 0) widthVal = f;
+  else if (w > 0) widthVal = w;
+  if (!(widthVal > 0 && l > 0)) return "";
+  const sqft = pl.unit === "m" ? widthVal * l * 10.7639 : widthVal * l;
+  const val = pl.areaUnit === "sqyd" ? sqft / 9 : pl.areaUnit === "sqm" ? sqft * .092903 : sqft;
+  const label = (AREA_UNITS.find(a => a[0] === pl.areaUnit) || AREA_UNITS[0])[1];
+  return `${Math.round(val).toLocaleString("en-IN")} ${label}`;
+}
+
+function bigLabel(c, text, x, y, u, fs, a, sc, bg, style = "pill", font = "bold", txtOver){
+  if (!text || a <= 0) return null;
+  const W = cv.width, H = cv.height; c.save();
+  c.font = font === "serif" ? `500 ${fs * 1.05}px ${SERIF}` : `800 ${fs}px ${SANS}`;
+  const tw = c.measureText(text).width, w = tw + fs * (style === "text" ? .2 : 1.1), h = fs * (style === "text" ? 1.2 : 1.5);
+  const cx = clampN(x, w / 2 + 12 * u, W - w / 2 - 12 * u), cy = clampN(y, h / 2 + 12 * u, H - h / 2 - 12 * u);
+  c.globalAlpha = a; c.translate(cx, cy); if (style === "stamp") c.rotate(-.07); c.scale(sc, sc);
+  const light = GIRIKA.lum(bg) > .4;
+  if (style === "box" || style === "outline"){
+    c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 18 * u; c.shadowOffsetY = 4 * u;
+    c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, 12 * u);
+    if (style === "box"){ c.fillStyle = bg; c.fill(); } else { c.fillStyle = "rgba(20,24,30,.55)"; c.fill(); c.shadowColor = "transparent"; c.strokeStyle = bg; c.lineWidth = 6 * u; c.stroke(); }
+    c.shadowColor = "transparent";
+  }
+  if (style === "pill" || style === "stamp"){
+    c.shadowColor = "rgba(0,0,0,.5)"; c.shadowBlur = 24 * u; c.shadowOffsetY = 6 * u; c.fillStyle = bg;
+    c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, style === "stamp" ? 14 * u : h / 2); c.fill(); c.shadowColor = "transparent";
+    c.strokeStyle = light ? "rgba(28,33,40,.85)" : "rgba(255,255,255,.92)"; c.lineWidth = 4 * u; c.stroke();
+    if (style === "stamp"){ c.lineWidth = 2.5 * u; c.beginPath(); c.roundRect(-w / 2 + 9 * u, -h / 2 + 9 * u, w - 18 * u, h - 18 * u, 8 * u); c.stroke(); }
+  } else if (style === "glass" || style === "tag"){
+    c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 20 * u; c.fillStyle = "rgba(20,24,30,.82)";
+    c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, 14 * u); c.fill(); c.shadowColor = "transparent";
+    c.fillStyle = bg; if (style === "tag") c.fillRect(-w / 2, -h / 2, 12 * u, h); else c.fillRect(-w / 2 + 14 * u, h / 2 - 7 * u, w - 28 * u, 5 * u);
+  }
+  c.textAlign = "center"; c.textBaseline = "middle";
+  const onBox = style === "pill" || style === "stamp" || style === "box", txtCol = txtOver || (onBox ? (light ? C.ink : "#FFFFFF") : style === "text" ? bg : "#FFFFFF");
+  const tx = style === "tag" ? 6 * u : 0;
+  if (style === "text" || (onBox && !light)){ c.lineWidth = fs * (style === "text" ? .2 : .12); c.lineJoin = "round"; c.strokeStyle = style === "text" && light ? "rgba(20,24,30,.9)" : style === "text" ? "rgba(255,255,255,.95)" : "rgba(28,33,40,.55)"; c.strokeText(text, tx, fs * .04); }
+  c.fillStyle = txtCol; c.fillText(text, tx, fs * .04); c.restore();
+  return { x:cx - w / 2 * sc, y:cy - h / 2 * sc, w:w * sc, h:h * sc, cx, cy };
+}
+
+function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
+  if (!text || a <= 0) return;
+  const size = (big ? 32 : 26) * u; c.font = `700 ${size}px ${SANS}`;
+  const w = c.measureText(text).width + 30 * u, h = size + 20 * u;
+  c.save(); c.globalAlpha = a; c.translate(x, y); c.scale(sc, sc);
+  c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 14 * u; c.fillStyle = bg;
+  c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, h / 2); c.fill(); c.shadowColor = "transparent";
+  c.fillStyle = fg; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, 0, size * .04);
+  c.restore();
+}
+
+function drawPlotPost(c, pl, L){
+  const u = L.u, ov = elOv("x" + pl.id);
+  const dx = (ov && ov.dx) ? ov.dx * L.W : 0, dy = (ov && ov.dy) ? ov.dy * L.H : 0;
+  const pts = (pl.pts || []).map(([a, b]) => [a * L.W + dx, b * L.H + dy]);
+  if (pts.length < 2) return;
+  const [col, rgb] = PLOT_COLORS[pl.color] || PLOT_COLORS.red;
+  const closed = pts.length >= 3;
+  const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
+
+  // 1. Interior fill
+  const fillKey = pl.fill === undefined ? (pl.color || "red") : pl.fill;
+  if (closed && fillKey !== "none"){
+    const frgb = (PLOT_COLORS[fillKey] || PLOT_COLORS.red)[1], k = pl.fillK ?? 0.35;
+    c.save();
+    c.fillStyle = `rgba(${frgb},${k})`;
+    c.beginPath();
+    pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py));
+    c.closePath();
+    c.fill();
+    c.restore();
+  }
+
+  // 2. Glowing perimeter outline
+  c.save();
+  c.strokeStyle = col;
+  c.lineWidth = 6 * u;
+  c.lineJoin = "round";
+  c.lineCap = "round";
+  c.shadowColor = `rgba(${rgb},0.85)`;
+  c.shadowBlur = 14 * u;
+  c.beginPath();
+  pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py));
+  if (closed) c.closePath();
+  c.stroke();
+  c.restore();
+
+  // 3. Corner dots & badges
+  const isEditing = ED.sel === "x" + pl.id;
+  pts.forEach(([px, py], i) => {
+    c.fillStyle = "#FFFFFF";
+    c.beginPath();
+    c.arc(px, py, (isEditing ? 12 : 8) * u, 0, Math.PI * 2);
+    c.fill();
+    c.strokeStyle = col;
+    c.lineWidth = (isEditing ? 3.5 : 2) * u;
+    c.stroke();
+
+    // Corner badge (C1, C2, C3, C4)
+    if (isEditing || pl.showCorners !== false){
+      const rad = 13 * u;
+      const ox = (px >= cx ? 1 : -1) * (rad + 10 * u);
+      const oy = (py >= cy ? 1 : -1) * (rad + 10 * u);
+      c.save();
+      c.fillStyle = "rgba(28,33,40,0.92)";
+      c.strokeStyle = "#FFFFFF";
+      c.lineWidth = 1.5 * u;
+      c.shadowColor = "rgba(0,0,0,0.45)";
+      c.shadowBlur = 6 * u;
+      c.beginPath();
+      c.arc(px + ox, py + oy, rad, 0, Math.PI * 2);
+      c.fill();
+      c.stroke();
+      c.fillStyle = "#FFFFFF";
+      c.font = `700 ${13 * u}px ${SANS}`;
+      c.textAlign = "center";
+      c.textBaseline = "middle";
+      c.fillText(`C${i + 1}`, px + ox, py + oy);
+      c.restore();
+    }
+  });
+
+  if (!closed) return;
+
+  // 4. Perimeter side length badges
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+  const unit = pl.unit === "m" ? "m" : "ft";
+  const sides = [];
+  if (pl.front){
+    sides.push({ ei:0, val:pl.front, role:"front" });
+    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
+    if (pl.w){
+      const wei = segs.length > 2 ? 2 : 0;
+      sides.push({ ei:wei, val:pl.w, role:"width" });
+    }
+    if (pl.l && segs.length > 3){
+      sides.push({ ei:3, val:pl.l, role:"length" });
+    }
+  } else {
+    if (pl.w) sides.push({ ei:0, val:pl.w, role:"width" });
+    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
+    if (pl.w && segs.length > 2) sides.push({ ei:2, val:pl.w, role:"width" });
+    if (pl.l && segs.length > 3) sides.push({ ei:3, val:pl.l, role:"length" });
+  }
+  pl._srects = [];
+  sides.forEach(({ ei, val, role }, k) => {
+    if (!val || !segs[ei]) return;
+    const [a, b] = segs[ei], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = Math.hypot(mx - cx, my - cy) || 1;
+    let txt = String(val).trim();
+    if (!/[a-z]/i.test(txt)) txt = `${txt} ${unit}`;
+    if (role === "front" && !/front/i.test(txt)) txt = `Front: ${txt}`;
+    else if (role === "width" && !/width/i.test(txt)) txt = `Width: ${txt}`;
+    else if (role === "length" && !/length|depth/i.test(txt)) txt = `Length: ${txt}`;
+    c.font = `700 ${26 * u}px ${SANS}`;
+    const sw = c.measureText(txt).width + 30 * u, sh = 46 * u;
+    const inset = Math.min(60 * u, d * 0.45);
+    let sx = mx - (mx - cx) / d * inset, sy = my - (my - cy) / d * inset;
+    if (pl.side && pl.side[k]){ sx = pl.side[k][0] * L.W; sy = pl.side[k][1] * L.H; }
+    sx = clampN(sx, sw / 2 + 10 * u, L.W - sw / 2 - 10 * u);
+    sy = clampN(sy, sh / 2 + 10 * u, L.H - sh / 2 - 10 * u);
+    pl._srects[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
+    labelPill(c, txt, sx, sy, u, 1, 1, pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff");
+  });
+
+  // 5. Area badge & name in center
+  const area = plotArea(pl);
+  let lx = cx, ly = cy + (pl.name ? 32 * u * (pl.labelSize || 1) : 0);
+  if (pl.lx != null && pl.ly != null){ lx = pl.lx * L.W; ly = pl.ly * L.H; }
+  const ls = pl.labelSize || 1, fs = 56 * u * ls;
+  const lbg = pl.labelColor === "custom" && pl.labelHex ? pl.labelHex : LABEL_BG[pl.labelColor] || col;
+
+  if ((pl.lx != null || pl.ly != null) && pl.leader !== false && Math.hypot(lx - cx, ly - cy) > fs * 1.3){
+    c.save();
+    c.strokeStyle = "#FFFFFF";
+    c.lineWidth = 3.5 * u;
+    c.shadowColor = "rgba(0,0,0,.55)";
+    c.shadowBlur = 8 * u;
+    c.lineCap = "round";
+    c.beginPath();
+    c.moveTo(lx, ly);
+    c.lineTo(cx, cy);
+    c.stroke();
+    c.fillStyle = lbg;
+    c.beginPath();
+    c.arc(cx, cy, 9 * u, 0, Math.PI * 2);
+    c.fill();
+    c.stroke();
+    c.restore();
+  }
+
+  const r = area ? bigLabel(c, area, lx, ly, u, fs, 1, 1, lbg, pl.labelStyle || "pill", pl.labelFont || "bold", pl.labelText || undefined) : null;
+  if (pl.name) labelPill(c, pl.name.toUpperCase(), clampN(r ? r.cx : lx, 140 * u, L.W - 140 * u), (r ? r.y : ly) - 32 * u, u, 1, 1, C.slate, C.lime);
+  pl._lrect = r || { x:lx - 70 * u, y:ly - 26 * u, w:140 * u, h:52 * u, cx:lx, cy:ly };
+
+  // Register bounding box
+  const minX = Math.min(...pts.map(p => p[0])), maxX = Math.max(...pts.map(p => p[0]));
+  const minY = Math.min(...pts.map(p => p[1])), maxY = Math.max(...pts.map(p => p[1]));
+  const plotBox = { x:minX - 10 * u, y:minY - 10 * u, w:maxX - minX + 20 * u, h:maxY - minY + 20 * u };
+  tagEl("x" + pl.id, { ...plotBox, gap:0, draw: () => {} }, { kind:"plot", pts, pl });
+}
+
+let plotDrawing = null;
+function startPlotDrawPost(pl){
+  plotDrawing = { pl, pts:[] };
+  const db = $("drawBarPost"); if (db) db.hidden = false;
+  updateDrawBarPost();
+  fgDirty = true;
+  requestRender();
+}
+function updateDrawBarPost(){
+  if (!plotDrawing) return;
+  const n = plotDrawing.pts.length;
+  const msg = $("drawMsgPost"), btn = $("drawDonePost");
+  if (msg) msg.textContent = n < 3 ? `Click each corner of the plot on the photo (${n} placed). Need at least 3.` : `${n} corners placed. Click Finish, or click to add more corners.`;
+  if (btn) btn.disabled = n < 3;
+}
+function cancelPlotDrawPost(){
+  if (plotDrawing && plotDrawing.pl && (!plotDrawing.pl.pts || plotDrawing.pl.pts.length < 3)){
+    plotDrawing.pl.pts = [[0.22, 0.32], [0.78, 0.32], [0.78, 0.68], [0.22, 0.68]];
+  }
+  const pl = plotDrawing ? plotDrawing.pl : null;
+  plotDrawing = null;
+  const db = $("drawBarPost"); if (db) db.hidden = true;
+  fgDirty = true;
+  requestRender();
+  if (pl) edSelect("x" + pl.id);
+}
+function finishPlotDrawPost(){
+  if (!plotDrawing || plotDrawing.pts.length < 3) return;
+  plotDrawing.pl.pts = plotDrawing.pts;
+  const pl = plotDrawing.pl;
+  plotDrawing = null;
+  const db = $("drawBarPost"); if (db) db.hidden = true;
+  fgDirty = true;
+  requestRender();
+  persist();
+  edSelect("x" + pl.id);
+}
+
+function edAddPlot(){
+  const p = pg();
+  const id = nextPageId++;
+  const pl = {
+    id,
+    type: "plot",
+    pts: [],
+    front: "40",
+    w: "40",
+    l: "60",
+    name: "",
+    unit: "ft",
+    areaUnit: "sqyd",
+    areaText: "",
+    color: "red",
+    fill: "red",
+    fillK: 0.35,
+    labelSize: 1,
+    labelStyle: "pill",
+    labelColor: "auto"
+  };
+  p.extras = p.extras || [];
+  p.extras.push(pl);
+  startPlotDrawPost(pl);
+}
+
 /* text boxes the user added on this page */
 function drawExtras(L){
+  if (plotDrawing && plotDrawing.pts && plotDrawing.pts.length){
+    const c = fctx, u = L.u, pts = plotDrawing.pts.map(([a, b]) => [a * L.W, b * L.H]);
+    c.save();
+    c.strokeStyle = "#E63B2E";
+    c.lineWidth = 4 * u;
+    c.beginPath();
+    pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y));
+    c.stroke();
+    pts.forEach(([x, y]) => {
+      c.fillStyle = "#fff";
+      c.beginPath();
+      c.arc(x, y, 9 * u, 0, Math.PI * 2);
+      c.fill();
+      c.strokeStyle = "#E63B2E";
+      c.lineWidth = 3 * u;
+      c.stroke();
+    });
+    c.restore();
+  }
   const p = st.pages[st.page]; if (!p || !p.extras || !p.extras.length) return;
   const lk = layoutKey(), onPhoto = lk === "feature" || lk === "listing", c = fctx, u = L.u, maxW = L.W * .84;
   p.extras.forEach(x => {
     const xt = x.type || "text";
+    if (xt === "plot"){
+      drawPlotPost(c, x, L);
+      return;
+    }
     if (xt !== "text"){ /* emoji, sticker, shape, arrow, badge, image */
       const it = xt === "badge" ? pill(c, x.text || "", u, { key:"x" + x.id, size:28, padX:30, padY:16, ls:.04, weight:700, bg:C.deodar, fg:C.lime, radius:999 }) : extraItem(c, x, "x" + x.id, u);
       if (it) it.draw(x.x * L.W - it.w / 2, x.y * L.H - it.h / 2);
@@ -954,6 +1276,41 @@ function drawArrow(c, kind, x, y, w, h, sw, color, u){
   c.beginPath(); c.moveTo(x1 - hs * Math.cos(ang - .5), y1 - hs * Math.sin(ang - .5)); c.lineTo(x1, y1); c.lineTo(x1 - hs * Math.cos(ang + .5), y1 - hs * Math.sin(ang + .5)); c.stroke();
   c.restore();
 }
+let _ckCv = null, _ckCtx = null;
+function applyChromaKey(src, w, h, keyHex = "#00FF00", tol = 0.36, feather = 0.14){
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_ckCv){ _ckCv = document.createElement("canvas"); _ckCtx = _ckCv.getContext("2d", { willReadFrequently:true }); }
+  if (_ckCv.width !== w || _ckCv.height !== h){ _ckCv.width = w; _ckCv.height = h; }
+  _ckCtx.clearRect(0, 0, w, h);
+  try { _ckCtx.drawImage(src, 0, 0, w, h); } catch(e){ return src; }
+  let imgData = null;
+  try { imgData = _ckCtx.getImageData(0, 0, w, h); } catch(e){ return src; }
+  const d = imgData.data;
+  const hex = (keyHex || "#00FF00").replace("#", "");
+  const kr = parseInt(hex.slice(0, 2), 16) || 0;
+  const kg = parseInt(hex.slice(2, 4), 16) || 255;
+  const kb = parseInt(hex.slice(4, 6), 16) || 0;
+  const isGreen = kg > kr + 35 && kg > kb + 35;
+  const isBlue = kb > kr + 35 && kb > kg + 35;
+  const fthr = Math.max(0.02, feather || 0.14);
+
+  for (let i = 0; i < d.length; i += 4){
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a === 0) continue;
+    let diff = 0;
+    if (isGreen) diff = (g - Math.max(r, b)) / 255;
+    else if (isBlue) diff = (b - Math.max(r, g)) / 255;
+    else { const dr = (r - kr) / 255, dg = (g - kg) / 255, db = (b - kb) / 255; diff = 1 - Math.sqrt(dr * dr + dg * dg + db * db) / 1.732; }
+    if (diff > tol){
+      const k = Math.min(1, Math.max(0, (diff - tol) / fthr));
+      d[i + 3] = Math.round(a * (1 - k));
+      if (isGreen) d[i + 1] = Math.min(g, Math.round((r + b) / 2));
+      else if (isBlue) d[i + 2] = Math.min(b, Math.round((r + g) / 2));
+    }
+  }
+  _ckCtx.putImageData(imgData, 0, 0);
+  return _ckCv;
+}
 function extraItem(c, x, key, u){
   const ov = elOv(key), t = x.type;
   const item = (w, h, kind, fn) => tagEl(key, { w, h, gap:0, draw(bx, by){ fn(bx, by); } }, { kind });
@@ -978,7 +1335,18 @@ function extraItem(c, x, key, u){
   }
   if (t === "image"){
     const im = xImg(x.img), ar = x.ar || (im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 1), w = 380 * u, h = w * ar;
-    return item(w, h, "image", (bx, by) => { if (im && im.complete && im.naturalWidth){ c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.drawImage(im, bx, by, w, h); c.restore(); } });
+    return item(w, h, "image", (bx, by) => {
+      if (im && im.complete && im.naturalWidth){
+        c.save(); c.shadowColor = "rgba(0,0,0,0)";
+        if (ov.chromaKey){
+          const keyed = applyChromaKey(im, w, h, ov.keyColor || "#00FF00", ov.keyTol ?? 0.36, ov.keyFeather ?? 0.14);
+          c.drawImage(keyed, bx, by, w, h);
+        } else {
+          c.drawImage(im, bx, by, w, h);
+        }
+        c.restore();
+      }
+    });
   }
   return null;
 }
@@ -1184,8 +1552,8 @@ function chipsEl(c, list, u, maxW, T, gap){
 }
 function ruleEl(w, h, color, gap, key){ color = elOv(key).color || color; return tagEl(key, { w, h, gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - w)/2 : align === "right" ? x + W - w : x; fctx.fillStyle = color; fctx.fillRect(bx, y, w, h); } }, { kind:"shape" }); }
 function logoEl(c, tone, width, gap){
-  const d = logoDims(width);
-  return tagEl("logo", { w:d.w, h: d.w * logoAspect(d.kind), gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - d.w)/2 : align === "right" ? x + W - d.w : x; drawLogo(c, d.kind, logoTone(tone), bx, y, d.w); } }, { kind:"logo" });
+  const d = logoDims(width), ov = elOv("logo");
+  return tagEl("logo", { w:d.w, h: d.w * logoAspect(d.kind), gap, draw(x, y, W, align){ const bx = align === "center" ? x + (W - d.w)/2 : align === "right" ? x + W - d.w : x; drawLogo(c, d.kind, (ov && ov.tone) || logoTone(tone), bx, y, d.w, ov && ov.color); } }, { kind:"logo" });
 }
 
 function stackH(items){ const a = items.filter(Boolean); return a.reduce((s, it, i) => s + it.h + (i < a.length - 1 ? it.gap : 0), 0); }
@@ -1215,8 +1583,12 @@ const LAYOUT_DRAW = {
     fg(L){
       const { u, box, F, W } = L, c = fctx;
       const ovType = resolveOverlay(L, "feature");
-      const wash = st.overlayColor === "lime" && ["bottom","edges","band","full","left","vignette"].includes(ovType);
-      const P = wash ? { head:C.slate, body:C.ink, eyebrow:C.deodar, hl:C.clay, logo:"light" } : { head:C.lime, body:C.mist, eyebrow:C.sage, hl:C.clayLt, logo:"dark" };
+      const isLimeWash = st.overlayColor === "lime" && ["bottom","edges","band","full","left","vignette"].includes(ovType);
+      const isDeodarWash = st.overlayColor === "deodar" && ["bottom","edges","band","full","left","vignette"].includes(ovType);
+      const wash = isLimeWash;
+      const P = isLimeWash ? { head:C.slate, body:C.ink, eyebrow:C.deodar, hl:C.clay, logo:"light" }
+              : isDeodarWash ? { head:C.lime, body:C.mist, eyebrow:"#D5DCCB", hl:C.lime, logo:"green" }
+              : { head:C.lime, body:C.mist, eyebrow:C.sage, hl:C.clayLt, logo:"dark" };
       if (ovType !== "band") drawOverlay(c, { x:0, y:0, w:L.W, h:L.H }, ovType, st.overlayK);
       const center = st.align === "center" && !L.landscape;
       const maxW = L.landscape ? Math.min(box.w * .62, 980 * u) : box.w;
@@ -1286,7 +1658,10 @@ const LAYOUT_DRAW = {
       const { u, box, F, T } = L, c = fctx;
       drawOverlay(c, { x:0, y:0, w:L.W, h:L.H }, resolveOverlay(L, "listing"), st.overlayK * .75);
       let topH = 0;
-      if (st.showLogo){ const lg = logoEl(c, st.overlayColor === "lime" && resolveOverlay(L, "listing") !== "none" ? "light" : "dark", 220*u, 0), lw = lg.w; topH = lg.h; lg.draw(box.x + box.w - lw, box.y); }
+      const isLimeListing = st.overlayColor === "lime" && resolveOverlay(L, "listing") !== "none";
+      const isDeodarListing = st.overlayColor === "deodar" && resolveOverlay(L, "listing") !== "none";
+      const defLogo = isLimeListing ? "light" : isDeodarListing ? "green" : "dark";
+      if (st.showLogo){ const lg = logoEl(c, defLogo, 220*u, 0), lw = lg.w; topH = lg.h; lg.draw(box.x + box.w - lw, box.y); }
       const badge = badgeEl(c, F.badge, u, C.deodar, C.lime);
       if (badge){ badge.draw(box.x, box.y); topH = Math.max(topH, badge.h); }
       const cardW = L.landscape ? Math.min(box.w * .55, 860*u) : box.w, pad = 46*u, inner = cardW - pad*2;
@@ -1466,7 +1841,20 @@ function buildLayoutList(){
   fmt().layouts.forEach(k => {
     const b = document.createElement("button"); b.className = "chip"; b.type = "button"; b.textContent = LAYOUTS[k].name;
     b.setAttribute("aria-pressed", String(k === layoutKey()));
-    b.addEventListener("click", () => { st.layout = k; syncUI(); requestRender(); persist(); });
+    b.addEventListener("click", () => {
+      const oldLayout = layoutKey();
+      st.layout = k;
+      if (k === "text" || k === "split"){
+        if (st.theme === "lime") st.overlayColor = "lime";
+        else if (st.theme === "deodar") st.overlayColor = "deodar";
+        else if (st.theme === "slate") st.overlayColor = "slate";
+      } else if (oldLayout === "text" && (k === "feature" || k === "listing")){
+        if (st.theme === "lime") st.overlayColor = "lime";
+        else if (st.theme === "deodar") st.overlayColor = "deodar";
+        else st.overlayColor = "ink";
+      }
+      syncUI(); requestRender(); persist();
+    });
     host.appendChild(b);
   });
 }
@@ -1614,7 +2002,15 @@ function buildThemes(){
   Object.entries(THEMES).forEach(([k, t]) => {
     const b = document.createElement("button"); b.className = "swatch"; b.type = "button"; b.style.background = t.bg;
     b.title = t.label; b.setAttribute("aria-label", t.label + " panel"); b.setAttribute("aria-pressed", String(st.theme === k));
-    b.addEventListener("click", () => { st.theme = k; buildThemes(); requestRender(); persist(); });
+    b.addEventListener("click", () => {
+      st.theme = k;
+      if (st.layout === "text" || st.layout === "split"){
+        if (k === "lime") st.overlayColor = "lime";
+        else if (k === "deodar") st.overlayColor = "deodar";
+        else if (k === "slate") st.overlayColor = "slate";
+      }
+      buildThemes(); buildShades(); buildColors(); requestRender(); persist();
+    });
     host.appendChild(b);
   });
 }
@@ -2083,7 +2479,7 @@ const EL_NAMES = { headline:"Headline", body:"Supporting line", eyebrow:"Small l
   number:"Slide number", handle:"Footer left", swipe:"Footer right", tagline:"Tagline", contact:"Contact line", logo:"Logo",
   divider:"Divider", rule:"Accent line", indicator:"Page indicator" };
 const STYLE_KEYS = ["font","weight","color","hl","ls","lh","align","box","boxColor","boxOpacity","shadow","fill","stroke","sw","op","bw","bh"];
-const XNAMES = { text:"Text", emoji:"Emoji", sticker:"Sticker", shape:"Shape", arrow:"Arrow", badge:"Badge", image:"Image" };
+const XNAMES = { text:"Text", emoji:"Emoji", sticker:"Sticker", shape:"Shape", arrow:"Arrow", badge:"Badge", image:"Image", plot:"Plot highlight" };
 const XTEXT = ["text","badge","sticker","emoji"];
 const isExtraKey = k => /^x\d+$/.test(k || "");
 const extraOf = k => isExtraKey(k) ? ((pg().extras || []).find(x => "x" + x.id === k) || null) : null;
@@ -2260,7 +2656,12 @@ function edPaint(){
   const box = (cls, q, inner) => `<div class="${cls}" style="left:${P(q.x, L.W)};top:${P(q.y, L.H)};width:${P(q.w, L.W)};height:${P(q.h, L.H)}">${inner || ""}</div>`;
   let html = "";
   if (ED.hover && ED.hover !== k && !ED.drag){ const h = elRec(ED.hover); if (h && !h.hide) html += box("hov-box", h); }
-  if (r) html += box("sel-box" + (r.photo ? " photo" : "") + (r.hide ? " off" : ""), r, !r.hide && (!r.photo || media.type) ? '<span class="sel-handle" title="Drag to resize"></span>' : "");
+  if (r) html += box("sel-box" + (r.photo ? " photo" : "") + (r.hide ? " off" : ""), r, !r.hide && (!r.photo || media.type) && r.kind !== "plot" ? '<span class="sel-handle" title="Drag to resize"></span>' : "");
+  if (r && r.kind === "plot" && r.pts && !r.hide){
+    r.pts.forEach(([cx, cy], i) => {
+      html += `<div class="plot-handle" data-idx="${i}" style="left:${P(cx, L.W)};top:${P(cy, L.H)}" title="Drag corner to shape plot"></div>`;
+    });
+  }
   if (r && !r.hide && r.wordsFn && ED.wsSel.length && ED.wordUI && ED.wordUI.key === k) r.wordsFn().filter(q => ED.wsSel.includes(q.i)).forEach(q => { html += box("word-sel", q); });
   if (ED.guides){
     if (ED.guides.v != null) html += `<div class="snap v" style="left:${P(ED.guides.v, L.W)}"></div>`;
@@ -2308,6 +2709,11 @@ function edToolbar(){
   } else {
     const o = elOv(k);
     span("st-name", elName(k));
+    if (xType(k) === "plot"){
+      const pl = extraOf(k);
+      b("Redraw", () => startPlotDrawPost(pl), "Redraw corners on photo");
+      sep();
+    }
     b("&minus;", () => edScale(1 / 1.1), "Smaller"); span("st-val", pct(o.s || 1)); b("+", () => edScale(1.1), "Bigger"); sep();
     b("Reset", () => setOv(k, { dx:null, dy:null, s:null, z:null, hide:null, rot:null }), "Back to the template layout", { disabled:!(o.dx || o.dy || o.s || o.z || o.hide || o.rot) });
     b("Front", () => edOrder(1), "Bring to front"); b("Back", () => edOrder(-1), "Send to back");
@@ -2411,6 +2817,17 @@ function edPanel(){
       fi.addEventListener("change", () => { const f = fi.files && fi.files[0]; fi.value = ""; edReadImage(f, (id, ar) => { histCut(); x.img = id; x.ar = ar; fgDirty = true; redo(); }); });
       const f = mk("div", "field"); f.append(lb); host.append(f);
       if (!xImg(x.img)) host.append(mk("p", "hint", "This image is missing. Replace it to show it again."));
+
+      const ckRow = mk("label", "toggle");
+      const ckBox = mk("input"); ckBox.type = "checkbox"; ckBox.checked = !!o.chromaKey;
+      ckBox.addEventListener("change", e => { setOv(k, { chromaKey:e.target.checked }); redo(); });
+      ckRow.append(ckBox, document.createTextNode(" 🟢 Remove green screen (Chroma key)"));
+      host.append(ckRow);
+
+      if (o.chromaKey){
+        slider("Tolerance", "", 0.1, 0.8, 0.02, o.keyTol ?? 0.36, v => Math.round(v * 100) + "%", v => { setOv(k, { keyTol:v }); fgDirty = true; requestRender(); });
+        slider("Feather", "", 0.02, 0.4, 0.01, o.keyFeather ?? 0.14, v => Math.round(v * 100) + "%", v => { setOv(k, { keyFeather:v }); fgDirty = true; requestRender(); });
+      }
     }
     if (!r0){ host.append(mk("p", "hint", "This item is empty. Add some text or an emoji to show it.")); return; }
     slider("Size", "elSize", .2, 4, .01, o.s || 1, pct, v => setOv(k, { s:v }));
@@ -2419,6 +2836,109 @@ function edPanel(){
       if (xt === "shape" || x.kind === "curved") slider("Height", "", .2, 5, .01, o.bh || 1, pct, v => setOv(k, { bh:Math.abs(v - 1) < .005 ? null : v }));
     }
     if (xt === "shape" && x.kind === "line") slider("Length", "", .2, 5, .01, o.bw || 1, pct, v => setOv(k, { bw:Math.abs(v - 1) < .005 ? null : v }));
+    if (xt === "plot"){
+      const pl = extraOf(k);
+      if (!pl) return;
+      const redo = () => { fgDirty = true; requestRender(); persist(); edPanel(); edPaint(); };
+
+      const drawRow = mk("div", "row field");
+      const drawBtn = mk("button", "btn block", "Redraw corners on photo");
+      drawBtn.type = "button";
+      drawBtn.addEventListener("click", () => startPlotDrawPost(pl));
+      drawRow.append(drawBtn);
+      host.append(drawRow);
+
+      const areaInp = mk("input"); areaInp.type = "text"; areaInp.value = pl.areaText || ""; areaInp.placeholder = "e.g. 200 sq yd";
+      areaInp.addEventListener("input", () => { pl.areaText = areaInp.value; fgDirty = true; requestRender(); persist(); updateAreaP(); });
+      field("Size to show (e.g. 250 sq yd)", areaInp);
+
+      const preRow = mk("div", "row field", "");
+      preRow.style.gap = "6px";
+      preRow.style.flexWrap = "wrap";
+      ["100 sq yd", "200 sq yd", "250 sq yd", "1 bigha"].forEach(val => {
+        const pb = mk("button", "btn sm", val);
+        pb.type = "button";
+        pb.addEventListener("click", () => {
+          pl.areaText = val;
+          areaInp.value = val;
+          fgDirty = true;
+          requestRender();
+          persist();
+          updateAreaP();
+        });
+        preRow.append(pb);
+      });
+      host.append(preRow);
+
+      const nameInp = mk("input"); nameInp.type = "text"; nameInp.value = pl.name || "";
+      nameInp.placeholder = "e.g. Plot 14";
+      nameInp.addEventListener("input", () => { pl.name = nameInp.value; fgDirty = true; requestRender(); persist(); });
+      field("Plot name (optional)", nameInp);
+
+      const dimRow = mk("div", "field");
+      dimRow.innerHTML = `<span class="lbl">Side lengths and area (optional)</span><div class="row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+        <div><small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Front</small><input type="text" id="postPlFront" value="${pl.front || ""}" placeholder="30" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)"></div>
+        <div><small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Width</small><input type="text" id="postPlW" value="${pl.w || ""}" placeholder="40" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)"></div>
+        <div><small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Length</small><input type="text" id="postPlL" value="${pl.l || ""}" placeholder="60" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)"></div>
+      </div>`;
+      const updateAreaP = () => {
+        const p = $("postAreaPrev"); if (p){ const a = plotArea(pl); p.textContent = a ? `Total area shown: ${a}` : "Enter front/width and length to show area."; }
+      };
+      dimRow.querySelector("#postPlFront").addEventListener("input", e => { pl.front = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaP(); });
+      dimRow.querySelector("#postPlW").addEventListener("input", e => { pl.w = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaP(); });
+      dimRow.querySelector("#postPlL").addEventListener("input", e => { pl.l = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaP(); });
+      host.append(dimRow);
+
+      chips("Measured in", [["ft","Feet"],["m","Metres"]], pl.unit || "ft", v => { pl.unit = v || "ft"; redo(); });
+      chips("Show area in", [["sqyd","sq yd (gaj)"],["sqft","sq ft"],["sqm","sq m"]], pl.areaUnit || "sqyd", v => { pl.areaUnit = v || "sqyd"; redo(); });
+
+      const prevP = mk("p", "hint", ""); prevP.id = "postAreaPrev";
+      host.append(prevP);
+      updateAreaP();
+
+      if (pl.pts && pl.pts.length){
+        const cRow = mk("div", "field");
+        cRow.innerHTML = `<span class="lbl">Corner markers (${pl.pts.length} corners)</span>
+          <div style="font-size:11px;color:var(--muted);background:var(--soft);padding:8px 10px;border-radius:6px;line-height:1.6">
+            ${pl.pts.map(([a, b], idx) => `<div><b>Corner ${idx + 1} (C${idx + 1}):</b> ${Math.round(a * 100)}% across, ${Math.round(b * 100)}% down</div>`).join("")}
+          </div>`;
+        host.append(cRow);
+      }
+
+      chips("Line colour", [["red","Red"],["yellow","Yellow"],["clay","Clay"],["lime","White"],["sage","Green"]], pl.color || "red", v => { pl.color = v || "red"; redo(); });
+      chips("Fill inside", [["red","Red"],["yellow","Yellow"],["lime","White"],["sage","Green"],["none","No fill"]], pl.fill === undefined ? (pl.color || "red") : pl.fill, v => { pl.fill = v; redo(); });
+      if ((pl.fill ?? "x") !== "none"){
+        slider("Fill strength", "", 0.1, 0.8, 0.01, pl.fillK ?? 0.35, pct, v => { pl.fillK = v; fgDirty = true; requestRender(); persist(); });
+      }
+
+      chips("Area badge style", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], pl.labelStyle || "pill", v => { pl.labelStyle = v || "pill"; redo(); });
+      chips("Area badge colour", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["white","White"],["dark","Dark"],["green","Green"]], pl.labelColor || "auto", v => { pl.labelColor = v === "auto" ? undefined : v; redo(); });
+      slider("Badge size", "", 0.6, 2, 0.01, pl.labelSize || 1, pct, v => { pl.labelSize = v; fgDirty = true; requestRender(); persist(); });
+
+      const rstRow = mk("div", "row field", "");
+      rstRow.style.gap = "8px";
+      const rstBtn = mk("button", "btn sm", "Put badges back"); rstBtn.type = "button";
+      rstBtn.addEventListener("click", () => { delete pl.lx; delete pl.ly; delete pl.side; redo(); });
+      rstRow.append(rstBtn);
+
+      const delBtn = mk("button", "btn sm dark", "Delete plot");
+      delBtn.type = "button";
+      delBtn.style.color = "#FF453A";
+      delBtn.addEventListener("click", () => {
+        const p = pg();
+        if (p && p.extras){
+          p.extras = p.extras.filter(x => x !== pl);
+          edSelect(null);
+          fgDirty = true;
+          requestRender();
+          persist();
+        }
+      });
+      rstRow.append(delBtn);
+
+      host.append(rstRow);
+      return;
+    }
     xCommon();
     if (STYLE_KEYS.some(n => o[n] != null) || o.rot){
       const rb = mk("button", "btn block", "Reset style"); rb.type = "button"; rb.style.marginTop = "4px";
@@ -2461,7 +2981,21 @@ function edPanel(){
     slider("Opacity", "", 0, 1, .01, o.boxOpacity != null ? o.boxOpacity : (kind === "text" ? .85 : 1), pct, v => setOv(k, { boxOpacity:v }), "pro-only");
   }
   if (["text","pill","link"].includes(kind)) chips("Shadow", [["","Auto"],["on","On"],["off","Off"]], o.shadow, v => setOv(k, { shadow:v }), "pro-only");
-  if (kind === "logo") host.append(mk("p", "hint", "Choose the logo type and version under Logo."));
+  if (kind === "logo"){
+    chips("Logo type", [["lockup","Horizontal"],["stacked","Stacked"],["mark","Mark only"]], o.kind || st.logoKind, v => {
+      st.logoKind = v || "lockup";
+      buildLogoTiles();
+      requestRender();
+      persist();
+    });
+    chips("Logo version", [["auto","Auto"],["light","Full colour"],["dark","Reversed (White)"],["green","On green"],["mono-slate","Mono slate"],["mono-white","Mono white"]], o.tone || st.logoTone, v => {
+      st.logoTone = v || "auto";
+      buildLogoTiles();
+      requestRender();
+      persist();
+    });
+    colors("Custom logo colour", o.color, v => setOv(k, { color:v }));
+  }
   if (isExtraKey(k)) xCommon();
   if (STYLE_KEYS.some(n => o[n] != null)){
     const rb = mk("button", "btn block", "Reset style"); rb.type = "button"; rb.style.marginTop = "4px";
@@ -2574,6 +3108,7 @@ function buildAddMenu(){
   const top = mk("div", "add-row"); sec().append(top);
   it(top, "Text", "", () => { edAddExtra({ text:"Your text" }); edFocusText(); });
   it(top, "Badge", "", () => { edAddExtra({ type:"badge", text:"Limited offer" }); edFocusText(); });
+  it(top, "Plot", "📐", () => edAddPlot());
   it(top, "Image", "", () => $("addImgIn").click());
   const sg = mk("div", "add-grid"); sec("Shapes").append(sg);
   [["rect","Rectangle"],["round","Rounded"],["circle","Circle"],["line","Line"]].forEach(([kd, l]) => it(sg, l, SHAPE_ICONS[kd], () => edAddExtra({ type:"shape", kind:kd })));
@@ -2604,6 +3139,9 @@ $("addBtn").addEventListener("click", () => $("addPop").hidden ? openAddMenu() :
 document.addEventListener("pointerdown", e => { if (!$("addPop").hidden && !e.target.closest(".add-wrap")) closeAddMenu(); }, true);
 document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("addPop").hidden){ e.preventDefault(); closeAddMenu(); $("addBtn").focus(); } });
 $("addImgIn").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; edReadImage(f, (id, ar) => edAddExtra({ type:"image", img:id, ar })); });
+const apBtn = $("addPlotBtn"); if (apBtn) apBtn.addEventListener("click", edAddPlot);
+const ddBtn = $("drawDonePost"); if (ddBtn) ddBtn.addEventListener("click", finishPlotDrawPost);
+const dcBtn = $("drawCancelPost"); if (dcBtn) dcBtn.addEventListener("click", cancelPlotDrawPost);
 
 /* keep the panel's text box in step with the Text fields on the left */
 document.addEventListener("input", e => { const t = $("elText"); if (t && e.target && e.target.id === "f-" + ED.sel && t !== e.target) t.value = e.target.value; });
@@ -2611,7 +3149,48 @@ document.addEventListener("input", e => { const t = $("elText"); if (t && e.targ
 /* ---------- pointer, wheel and keyboard ---------- */
 cv.addEventListener("pointerdown", e => {
   if (edBusy() || e.button > 0) return;
-  const [px, py] = canvasPt(e);
+  const [px, py] = canvasPt(e), L = EL.L;
+  if (plotDrawing){
+    if (L){
+      plotDrawing.pts.push([+clampN(px / L.W, 0, 1).toFixed(4), +clampN(py / L.H, 0, 1).toFixed(4)]);
+      updateDrawBarPost();
+      fgDirty = true;
+      requestRender();
+    }
+    return;
+  }
+  const curPlot = extraOf(ED.sel);
+  if (curPlot && curPlot.type === "plot" && curPlot.pts && L){
+    const u = L.u, ov = elOv("x" + curPlot.id);
+    const dx = (ov && ov.dx) ? ov.dx * L.W : 0, dy = (ov && ov.dy) ? ov.dy * L.H : 0;
+    const cornerIdx = curPlot.pts.findIndex(([a, b]) => Math.hypot((a * L.W + dx) - px, (b * L.H + dy) - py) < 28 * u);
+    if (cornerIdx >= 0){
+      histCut();
+      ED.pts.set(e.pointerId, [px, py]);
+      ED.drag = { kind:"plotCorner", plot:curPlot, cornerIdx, dx, dy };
+      try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+      return;
+    }
+    if (curPlot._srects){
+      const sk = curPlot._srects.findIndex(q => q && px >= q.x - 8 * u && px <= q.x + q.w + 8 * u && py >= q.y - 8 * u && py <= q.y + q.h + 8 * u);
+      if (sk >= 0){
+        histCut();
+        const q = curPlot._srects[sk];
+        ED.pts.set(e.pointerId, [px, py]);
+        ED.drag = { kind:"plotSideBadge", plot:curPlot, k:sk, dx:px - q.cx, dy:py - q.cy };
+        try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+        return;
+      }
+    }
+    const r = curPlot._lrect;
+    if (r && px >= r.x - 10 * u && px <= r.x + r.w + 10 * u && py >= r.y - 10 * u && py <= r.y + r.h + 10 * u){
+      histCut();
+      ED.pts.set(e.pointerId, [px, py]);
+      ED.drag = { kind:"plotAreaBadge", plot:curPlot, dx:px - r.cx, dy:py - r.cy };
+      try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+      return;
+    }
+  }
   if (!ED.pts.size) histCut();
   ED.pts.set(e.pointerId, [px, py]);
   try { cv.setPointerCapture(e.pointerId); } catch(err) {}
@@ -2629,6 +3208,20 @@ cv.addEventListener("pointerdown", e => {
   } else edSelect(null);
 });
 $("selLayer").addEventListener("pointerdown", e => {
+  if (e.target.classList.contains("plot-handle") && !edBusy()){
+    e.preventDefault(); e.stopPropagation();
+    const idx = +e.target.dataset.idx;
+    const pl = extraOf(ED.sel);
+    if (pl && pl.pts && pl.pts[idx]){
+      const [px, py] = canvasPt(e), L = EL.L, ov = elOv("x" + pl.id);
+      const dx = (ov && ov.dx) ? ov.dx * L.W : 0, dy = (ov && ov.dy) ? ov.dy * L.H : 0;
+      histCut();
+      ED.pts.set(e.pointerId, [px, py]);
+      ED.drag = { kind:"plotCorner", plot:pl, cornerIdx:idx, dx, dy };
+      try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+      return;
+    }
+  }
   if (!e.target.classList.contains("sel-handle") || edBusy()) return;
   e.preventDefault(); e.stopPropagation();
   const k = ED.sel, r = k === "photo" ? EL.mbox : elRec(k); if (!r) return;
@@ -2650,6 +3243,33 @@ cv.addEventListener("pointermove", e => {
   ED.pts.set(e.pointerId, [px, py]);
   if (ED.pinch && ED.pts.size === 2){ const [[ax, ay], [bx, by]] = [...ED.pts.values()]; edSetSize(ED.pinch.v * Math.hypot(ax - bx, ay - by) / ED.pinch.d); return; }
   const D = ED.drag, L = EL.L; if (!D || !L) return;
+  if (D.kind === "plotCorner"){
+    if (D.plot){
+      const curX = (px - D.dx) / L.W, curY = (py - D.dy) / L.H;
+      D.plot.pts[D.cornerIdx] = [+clampN(curX, 0, 1).toFixed(4), +clampN(curY, 0, 1).toFixed(4)];
+      fgDirty = true;
+      requestRender();
+    }
+    return;
+  }
+  if (D.kind === "plotSideBadge"){
+    if (D.plot){
+      D.plot.side = D.plot.side || [];
+      D.plot.side[D.k] = [+clampN((px - D.dx) / L.W, 0, 1).toFixed(4), +clampN((py - D.dy) / L.H, 0, 1).toFixed(4)];
+      fgDirty = true;
+      requestRender();
+    }
+    return;
+  }
+  if (D.kind === "plotAreaBadge"){
+    if (D.plot){
+      D.plot.lx = +clampN((px - D.dx) / L.W, 0, 1).toFixed(4);
+      D.plot.ly = +clampN((py - D.dy) / L.H, 0, 1).toFixed(4);
+      fgDirty = true;
+      requestRender();
+    }
+    return;
+  }
   if (D.kind === "move"){
     let dx = D.dx0 + (px - D.x) / L.W, dy = D.dy0 + (py - D.y) / L.H;
     const snap = 8 * screenK(), ncx = D.cx + (px - D.x), ncy = D.cy + (py - D.y), g = {};
@@ -2670,7 +3290,9 @@ function edUp(e){
   ED.pts.delete(e.pointerId); if (ED.pts.size < 2) ED.pinch = null;
   const D = ED.drag; if (!D) return;
   ED.drag = null; ED.guides = null;
-  if (D.kind === "pan"){ scheduleThumbs(); histNote(); } else { requestRender(); persist(); }
+  if (D.kind === "pan"){ scheduleThumbs(); histNote(); }
+  else if (D.kind === "plotCorner" || D.kind === "plotSideBadge" || D.kind === "plotAreaBadge"){ scheduleThumbs(); histNote(); persist(); }
+  else { requestRender(); persist(); }
   edPaint(); edPanelSyncLater();
 }
 let edPanelT = 0;
@@ -2797,6 +3419,21 @@ function edInit(){ edToolbar(); edPaint(); edLoadFonts(); HIST.cur = histSnap();
   let m0 = "simple"; try { m0 = localStorage.getItem(MODE_KEY) || "simple"; } catch(e) {} quiet = true; setUiMode(m0); quiet = false;
   if (!EMBED) return;
   document.documentElement.classList.add("embedded");
+  const openVid = $("openVidBtn");
+  if (openVid){
+    openVid.addEventListener("click", e => {
+      e.preventDefault();
+      parent.postMessage({ girika:"nav", to:"video" }, "*");
+    });
+  }
+  document.querySelectorAll(".bar .nav a").forEach(a => {
+    a.addEventListener("click", e => {
+      e.preventDefault();
+      const href = a.getAttribute("href") || "";
+      const to = href.includes("post") ? "post" : href.includes("video") ? "video" : "home";
+      parent.postMessage({ girika:"nav", to }, "*");
+    });
+  });
   const thumbURL = c => { try { return c.toDataURL("image/jpeg", .82); } catch(e) { return ""; } };
   window.addEventListener("message", e => {
     const m = e.data; if (!m || !m.girika) return;

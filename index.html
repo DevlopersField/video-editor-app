@@ -455,6 +455,7 @@ window.addEventListener("message", e => {
     buildCats(); buildGrid();
   }
   if (m.girika === "mode") setMode(m.mode, app);
+  if (m.girika === "nav" && m.to) show(m.to);
 });
 
 /* =========================================================

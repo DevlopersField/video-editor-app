@@ -172,6 +172,7 @@ html.embedded .start{display:none}
 .btn.sm{padding:6px 10px;font-size:12px}
 .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
 .field{margin-bottom:12px}
 .field label,.lbl{display:block;font-weight:600;font-size:12px;color:var(--heading);margin-bottom:5px}
 .field input[type=text],.field input[type=number],.field textarea,.field select,.inp{width:100%;border:1px solid var(--line);border-radius:9px;padding:8px 10px;background:var(--surface);font-size:14px}
@@ -312,6 +313,10 @@ body.busy #projectGroup{pointer-events:none;opacity:.55}
 .blk:hover .hdl,.blk.sel .hdl{opacity:1}
 .blk.drag-move{cursor:grab}
 .snapline{position:absolute;top:0;bottom:0;width:0;border-left:2px dashed #C98B6E;z-index:6;pointer-events:none}
+.snapline.beat{border-left:2px solid #F59E0B;box-shadow:0 0 10px rgba(245,158,11,.85)}
+.ruler i.beat-pip{position:absolute;top:auto;bottom:2px;width:5px;height:5px;border-radius:50%;background:#FBBF24;box-shadow:0 0 6px rgba(245,158,11,.9);transform:translateX(-50%);pointer-events:none;border-left:none;padding:0}
+.blk.mus .beat-mark{position:absolute;top:0;bottom:0;width:1px;background:rgba(251,191,36,.45);z-index:2;pointer-events:none}
+.tbtn.beat-snap[aria-pressed="true"]{background:rgba(251,191,36,.18);border-color:#F59E0B;color:#B45309}
 @media (max-width:1300px){.tl-hint{display:none}}
 .kfd{position:absolute;top:3px;width:10px;height:10px;background:#F4F1EC;border:2px solid #9A5B40;transform:rotate(45deg);z-index:3;pointer-events:none;font-style:normal}
 .blk.dragging{opacity:.6;z-index:6;box-shadow:0 8px 20px rgba(0,0,0,.25)}
@@ -539,6 +544,10 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       <label class="toggle"><input type="checkbox" id="introOn"> Brand intro</label>
       <label class="toggle"><input type="checkbox" id="outroOn"> Brand outro</label>
       <label class="toggle"><input type="checkbox" id="wmOn"> Small logo on clips</label>
+      <label class="toggle"><input type="checkbox" id="progBarOn"> 📊 Reel progress bar (Veed style)</label>
+      <div id="progBarPanel" style="margin:4px 0 10px;padding:8px;background:var(--soft);border-radius:8px" hidden></div>
+      <label class="toggle"><input type="checkbox" id="audiogramOn"> 🎵 Dynamic audiogram (Adobe / Veed)</label>
+      <div id="audiogramPanel" style="margin:4px 0 10px;padding:8px;background:var(--soft);border-radius:8px" hidden></div>
       <div id="wmPanel" style="margin:4px 0 12px"></div>
       <div class="row" style="margin-top:4px"><button class="btn sm" id="editIntro">Edit intro</button><button class="btn sm" id="editOutro">Edit outro</button></div>
     </div>
@@ -729,6 +738,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
         <span class="tsep" aria-hidden="true"></span>
         <button type="button" class="tbtn" id="tlText" title="Add text at the playhead"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2M12 4v16M9 20h6"/></svg>Text</button>
         <button type="button" class="tbtn" id="tlSnap" aria-pressed="true" title="Snap to the playhead and clip edges"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3v8a6 6 0 0 0 12 0V3"/><path d="M6 7h4M14 7h4"/></svg>Snap</button>
+        <button type="button" class="tbtn beat-snap" id="tlBeatSnap" aria-pressed="false" title="Snap cuts and clips magnetically to music beats"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>Beat Snap</button>
       </div>
       <span class="hint tl-hint">Drag clips to reorder, drag edges to trim. Drag anything on the tracks to move it.</span>
       <div class="tl-zoom">
@@ -1305,7 +1315,7 @@ const P = {
   format:"9x16", guides:true, clips:[], overlays:[], captions:[], vo:null, music:null,
   intro:{ on:true, title:"Forest-view plots near *Sahastradhara Road*", sub:"Dehradun", dur:2.6, theme:"slate", transition:"fade", photoDim:.72 },
   outro:{ on:true, cta:"Book a free site visit", phoneLabel:"Call or WhatsApp", phone:"90585 37664", phone2:"", location:"Dehradun, Uttarakhand", web:"girikahomes.com", handle:"@girikahomes", dur:3.6, theme:"slate", photoDim:.72 },
-  watermark:true,
+  watermark:true, progressBar:false, progBar:{ pos:"bottom", color:"gradient", height:7, customColor:"#CCFF00" }, audiogram:{ on:false, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 },
   logo:{ wmKind:"lockup", wmTone:"dark", wmPos:"tr", wmSize:1, wmOpacity:.95, introKind:"stacked", introTone:"auto", introSize:1, outroKind:"lockup", outroTone:"auto", outroSize:1 },
   cap:{ v:2, style:"bold", pos:"lower", size:1.3, bg:"slate", accent:"clayLt", case:"normal", anim:"word", words:"short", enter:"none", enterDur:.3, exit:"none", exitDur:.25, font:"", presetId:"", custom:{ ...capDef() } }, lang:"en-IN", autoCaps:true, micId:"", voiceClean:true, voSrc:"mic", muteVideo:false, hearWhileRec:false,
   musicVol:.35, duckLevel:.22, voVol:1, td:.6, pps:50,
@@ -1318,7 +1328,7 @@ GIRIKA.fill(P.intro); GIRIKA.fill(P.outro);
 if (GIRIKA.IMG || GIRIKA.TEXTLOGO){ P.logo.wmKind = GIRIKA.IMG ? "lockup" : "mark"; P.logo.introKind = "lockup"; P.logo.outroKind = "lockup"; }
 try {
   const s = JSON.parse(localStorage.getItem(STORE) || "null");
-  if (s){ ["format","guides","watermark","lang","micId","voiceClean","voSrc","muteVideo","autoCaps","hearWhileRec","musicVol","duckLevel","voVol","pps"].forEach(k => { if (k in s) P[k] = s[k]; });
+  if (s){ ["format","guides","watermark","progressBar","progBar","audiogram","lang","micId","voiceClean","voSrc","muteVideo","autoCaps","hearWhileRec","musicVol","duckLevel","voVol","pps"].forEach(k => { if (k in s) P[k] = s[k]; });
     if (s.exp) Object.assign(P.exp, s.exp); if (s.hl) Object.assign(P.hl, s.hl);
     if (s.intro) Object.assign(P.intro, s.intro); if (s.outro) Object.assign(P.outro, s.outro); if (s.cap) Object.assign(P.cap, capUpgrade(s.cap)); if (s.logo) Object.assign(P.logo, s.logo); }
   /* captions from the earlier version */
@@ -1328,8 +1338,8 @@ try {
 let saveT = 0;
 function persist(){
   clearTimeout(saveT);
-  saveT = setTimeout(() => { try { const { format, guides, watermark, lang, micId, voiceClean, voSrc, muteVideo, autoCaps, hearWhileRec, musicVol, duckLevel, voVol, pps, intro, outro, cap, logo, exp, hl } = P;
-    localStorage.setItem(STORE, JSON.stringify({ format, guides, watermark, lang, micId, voiceClean, voSrc, muteVideo, autoCaps, hearWhileRec, musicVol, duckLevel, voVol, pps, intro, outro, cap, logo, exp, hl })); } catch(e) {} }, 400);
+  saveT = setTimeout(() => { try { const { format, guides, watermark, progressBar, progBar, audiogram, lang, micId, voiceClean, voSrc, muteVideo, autoCaps, hearWhileRec, musicVol, duckLevel, voVol, pps, intro, outro, cap, logo, exp, hl } = P;
+    localStorage.setItem(STORE, JSON.stringify({ format, guides, watermark, progressBar, progBar, audiogram, lang, micId, voiceClean, voSrc, muteVideo, autoCaps, hearWhileRec, musicVol, duckLevel, voVol, pps, intro, outro, cap, logo, exp, hl })); } catch(e) {} }, 400);
 }
 const F = () => FORMATS[P.format];
 
@@ -1447,9 +1457,14 @@ function wsClean(m){
     const i = +k, v = m[k]; if (!(i >= 0) || i !== Math.floor(i) || !v || typeof v !== "object") continue;
     const s = {};
     if (typeof v.c === "string" && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v.c)) s.c = hex6(v.c);
-    if (+v.s && Math.abs(+v.s - 1) > .001) s.s = clamp(+v.s, .6, 2);
+    if (+v.s && Math.abs(+v.s - 1) > .001) s.s = clamp(+v.s, .5, 3.5);
     if (typeof v.f === "string" && v.f.trim()) s.f = v.f.trim().slice(0, 60);
     if (typeof v.b === "boolean") s.b = v.b; if (typeof v.i === "boolean") s.i = v.i; if (typeof v.hl === "boolean") s.hl = v.hl;
+    if (typeof v.upper === "boolean") s.upper = v.upper;
+    if (typeof v.stroke === "boolean") s.stroke = v.stroke;
+    if (typeof v.glow === "boolean") s.glow = v.glow;
+    if (typeof v.dx === "number" && Math.abs(v.dx) > 0.0001) s.dx = +v.dx.toFixed(4);
+    if (typeof v.dy === "number" && Math.abs(v.dy) > 0.0001) s.dy = +v.dy.toFixed(4);
     if (typeof v.bg === "string" && /^#[0-9a-f]{3}([0-9a-f]{3})?$/i.test(v.bg)) s.bg = hex6(v.bg);
     if (typeof v.emoji === "string" && v.emoji.trim()) s.emoji = v.emoji.trim().slice(0, 16);
     if (v.hide === true) s.hide = true;
@@ -1467,14 +1482,15 @@ function wsFont(font, st){
   return `${it ? "italic " : ""}${w} ${(+m[3] * (st.s || 1)).toFixed(2)}px ${st.f ? capFam(st.f, m[4]) : m[4]}`;
 }
 const wsFontPx = font => { const m = WS_FONT_RE.exec(font); return m ? +m[3] : 40; };
-/* parseWords output + a style map: adds wi (word index) and st, applies highlight, emoji and hide */
+/* parseWords output + a style map: adds wi (word index) and st, applies highlight, emoji, uppercase and hide */
 function wsApply(words, ws){
   if (!ws || typeof ws !== "object") return words;
   const out = [];
   words.forEach((w, i) => {
     const st = wsOf(ws, i); if (!st){ out.push({ ...w, wi:i }); return; }
     if (st.hide) return;
-    out.push({ ...w, wi:i, st, hl:st.hl != null ? st.hl : w.hl, t:st.emoji ? w.t + " " + st.emoji : w.t });
+    const rawT = (st.upper ? w.t.toUpperCase() : w.t);
+    out.push({ ...w, wi:i, st, hl:st.hl != null ? st.hl : w.hl, t:st.emoji ? rawT + " " + st.emoji : rawT, nl:w.nl });
   });
   return out;
 }
@@ -1591,6 +1607,41 @@ function invPt(X, px, py){
   if (X.rot){ const cx = X.W / 2, cy = X.H / 2, c = Math.cos(-X.rot), s = Math.sin(-X.rot), dx = px - cx, dy = py - cy; px = cx + dx * c - dy * s; py = cy + dx * s + dy * c; }
   return [(px - X.x) / X.dw, (py - X.y) / X.dh];
 }
+let _ckCv = null, _ckCtx = null;
+function applyChromaKey(src, w, h, keyHex = "#00FF00", tol = 0.36, feather = 0.14){
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_ckCv){ _ckCv = document.createElement("canvas"); _ckCtx = _ckCv.getContext("2d", { willReadFrequently:true }); }
+  if (_ckCv.width !== w || _ckCv.height !== h){ _ckCv.width = w; _ckCv.height = h; }
+  _ckCtx.clearRect(0, 0, w, h);
+  try { _ckCtx.drawImage(src, 0, 0, w, h); } catch(e){ return src; }
+  let imgData = null;
+  try { imgData = _ckCtx.getImageData(0, 0, w, h); } catch(e){ return src; }
+  const d = imgData.data;
+  const hex = (keyHex || "#00FF00").replace("#", "");
+  const kr = parseInt(hex.slice(0, 2), 16) || 0;
+  const kg = parseInt(hex.slice(2, 4), 16) || 255;
+  const kb = parseInt(hex.slice(4, 6), 16) || 0;
+  const isGreen = kg > kr + 35 && kg > kb + 35;
+  const isBlue = kb > kr + 35 && kb > kg + 35;
+  const fthr = Math.max(0.02, feather || 0.14);
+
+  for (let i = 0; i < d.length; i += 4){
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a === 0) continue;
+    let diff = 0;
+    if (isGreen) diff = (g - Math.max(r, b)) / 255;
+    else if (isBlue) diff = (b - Math.max(r, g)) / 255;
+    else { const dr = (r - kr) / 255, dg = (g - kg) / 255, db = (b - kb) / 255; diff = 1 - Math.sqrt(dr * dr + dg * dg + db * db) / 1.732; }
+    if (diff > tol){
+      const k = Math.min(1, Math.max(0, (diff - tol) / fthr));
+      d[i + 3] = Math.round(a * (1 - k));
+      if (isGreen) d[i + 1] = Math.min(g, Math.round((r + b) / 2));
+      else if (isBlue) d[i + 2] = Math.min(b, Math.round((r + g) / 2));
+    }
+  }
+  _ckCtx.putImageData(imgData, 0, 0);
+  return _ckCv;
+}
 function drawClip(c, clip, local){
   const { W, H } = geo(), p = clip.dur ? local / clip.dur : 0;
   if (clip.kind === "image" || clip.kind === "video"){
@@ -1601,7 +1652,13 @@ function drawClip(c, clip, local){
       if (X){
         cc.save(); const flt = clipFilter(clip); if (flt) cc.filter = flt;
         if (X.rot){ cc.translate(W / 2, H / 2); cc.rotate(X.rot); cc.translate(-W / 2, -H / 2); }
-        cc.drawImage(X.src, X.x, X.y, X.dw, X.dh); cc.restore(); cc.filter = "none";
+        if (clip.chromaKey){
+          const keyed = applyChromaKey(X.src, X.dw, X.dh, clip.keyColor || "#00FF00", clip.keyTol ?? 0.36, clip.keyFeather ?? 0.14);
+          cc.drawImage(keyed, X.x, X.y, X.dw, X.dh);
+        } else {
+          cc.drawImage(X.src, X.x, X.y, X.dw, X.dh);
+        }
+        cc.restore(); cc.filter = "none";
         lookAfter(cc, clip.look);
         gradeAfter(cc, clip);
         if (!framed) (clip.plots || []).forEach(pl => drawPlot(cc, X, pl, local, clip));
@@ -1622,9 +1679,15 @@ const PLOT_COLORS = { red:["#E63B2E", "230,59,46"], clay:[C.clayLt, "201,139,110
 const AREA_UNITS = [["sqft","sq ft"],["sqyd","sq yd (gaj)"],["sqm","sq m"]];
 function plotArea(pl){
   if (pl.areaText && pl.areaText.trim()) return pl.areaText.trim();
-  const w = parseFloat(String(pl.w).replace(/,/g, "")), l = parseFloat(String(pl.l).replace(/,/g, ""));
-  if (!(w > 0 && l > 0)) return "";
-  const sqft = pl.unit === "m" ? w * l * 10.7639 : w * l;
+  const f = parseFloat(String(pl.front || "").replace(/,/g, ""));
+  const w = parseFloat(String(pl.w || "").replace(/,/g, ""));
+  const l = parseFloat(String(pl.l || "").replace(/,/g, ""));
+  let widthVal = 0;
+  if (f > 0 && w > 0) widthVal = (f + w) / 2;
+  else if (f > 0) widthVal = f;
+  else if (w > 0) widthVal = w;
+  if (!(widthVal > 0 && l > 0)) return "";
+  const sqft = pl.unit === "m" ? widthVal * l * 10.7639 : widthVal * l;
   const val = pl.areaUnit === "sqyd" ? sqft / 9 : pl.areaUnit === "sqm" ? sqft * .092903 : sqft;
   const label = (AREA_UNITS.find(a => a[0] === pl.areaUnit) || AREA_UNITS[0])[1];
   return `${Math.round(val).toLocaleString("en-IN")} ${label}`;
@@ -1714,21 +1777,37 @@ function drawPlot(c, X, pl, local, clip){
     if (editing){ c.strokeStyle = col; c.lineWidth = 4 * u; c.stroke(); } });
   c.globalAlpha = out;
   if (!closed){ c.restore(); return; }
-  /* side lengths on the first two edges, pushed outward from the centre */
+  /* side lengths on the edges, pushed outward from the centre */
   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const unit = pl.unit === "m" ? "m" : "ft";
   const sideQ = [];
-  [[0, pl.w], [1, pl.l]].forEach(([ei, val], k) => {
+  pl._srects = [];
+  const sides = [];
+  if (pl.front){
+    sides.push({ ei:0, val:pl.front, role:"front" });
+    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
+    if (pl.w){
+      const wei = segs.length > 2 ? 2 : 0;
+      sides.push({ ei:wei, val:pl.w, role:"width" });
+    }
+  } else {
+    if (pl.w) sides.push({ ei:0, val:pl.w, role:"width" });
+    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
+  }
+  sides.forEach(({ ei, val, role }, k) => {
     if (!val || !segs[ei]) return;
     const [a, b] = segs[ei], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = Math.hypot(mx - cx, my - cy) || 1;
-    const p = clamp((T - .55 - k * .15) / .35), txt = /[a-z]/i.test(val) ? val : `${val} ${unit}`;
+    const p = clamp((T - .55 - k * .15) / .35);
+    let txt = String(val).trim();
+    if (!/[a-z]/i.test(txt)) txt = `${txt} ${unit}`;
+    if (role === "front" && !/front/i.test(txt)) txt = `Front: ${txt}`;
     /* inside the outline by default (never cut off by the frame); dragged spot moves with the camera */
     c.font = `700 ${28 * u}px ${SANS}`; const sw = c.measureText(txt).width + 32 * u, sh = 50 * u, { W:CW, H:CH } = geo();
     const inset = Math.min(70 * u, d * .45);
     let sx = mx - (mx - cx) / d * inset, sy = my - (my - cy) / d * inset;
     if (pl.side && pl.side[k]) [sx, sy] = mapPt(X, pl.side[k][0], pl.side[k][1]);
     sx = clamp(sx, sw / 2 + 12 * u, CW - sw / 2 - 12 * u); sy = clamp(sy, sh / 2 + 12 * u, CH - sh / 2 - 12 * u);
-    (pl._srects = pl._srects || [])[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
+    pl._srects[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
     sideQ.push(() => labelPill(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff"));
   });
   /* name and the size you typed (or the calculated area) in the centre */
@@ -1918,11 +1997,17 @@ function drawOverlay(c, o, t){
   if (a <= 0) return;
   const r = overlayRect(o), sc = .96 + .04 * ease(fadeIn), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
   c.save(); c.globalAlpha = a; c.translate(cx, cy); c.scale(sc, sc); c.translate(-cx, -cy);
+  if (o.blendMode && o.blendMode !== "source-over") c.globalCompositeOperation = o.blendMode;
   const rad = o.shape === "circle" ? r.w / 2 : o.shape === "rounded" ? 24 * u : 0;
   if (o.border){ c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 30 * u; c.shadowOffsetY = 10 * u; c.fillStyle = "#fff";
     c.beginPath(); c.roundRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u, rad ? rad + 8 * u : 0); c.fill(); c.shadowColor = "transparent"; }
   c.beginPath(); c.roundRect(r.x, r.y, r.w, r.h, rad); c.clip();
-  cover(c, o.el, o.el.naturalWidth, o.el.naturalHeight, r.x, r.y, r.w, r.h);
+  if (o.chromaKey){
+    const keyed = applyChromaKey(o.el, r.w, r.h, o.keyColor || "#00FF00", o.keyTol ?? 0.36, o.keyFeather ?? 0.14);
+    c.drawImage(keyed, r.x, r.y, r.w, r.h);
+  } else {
+    cover(c, o.el, o.el.naturalWidth, o.el.naturalHeight, r.x, r.y, r.w, r.h);
+  }
   c.restore();
   if (selected && selected.type === "overlay" && selected.item === o && !exporting){
     c.save(); c.strokeStyle = C.clayLt; c.setLineDash([12 * u, 8 * u]); c.lineWidth = 4 * u; c.strokeRect(r.x - 14 * u, r.y - 14 * u, r.w + 28 * u, r.h + 28 * u); c.restore();
@@ -2015,6 +2100,23 @@ const capMix = (a, b, p) => { const x = parseInt(hex6(a).slice(1), 16), y = pars
   return "#" + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1).toUpperCase(); };
 const CAP_FX = {
   /* active word */
+  kinetic:{ name:"Kinetic spring", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .28);
+      const spr = Math.sin(q * Math.PI * 1.5) * Math.exp(-q * 3);
+      const sc = 1 + (0.24 * (1 - q) + 0.12 * spr) * e.amt;
+      const dy = -Math.sin(q * Math.PI) * e.size * .14 * e.amt;
+      return { sc, dy, glow:{ color:e.hlCol(i), blur:e.size * .35 * (1 - q) * e.amt } };
+    }
+  },
+  neonpulse:{ name:"Neon pulse", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .24), pulse = .5 + .5 * Math.cos((e.t - e.ws(i)) * 14);
+      return { sc:1 + .12 * e.amt * (1 - q), color:"#FFFFFF", glow:{ color:e.hlCol(i), blur:e.size * (.45 + .35 * pulse) * e.amt } };
+    }
+  },
   popup:{ name:"Pop up", group:"active", word(e, i){ if (i !== e.k) return null; const b = backOut(e.wq(i, .22)); return { sc:1 + .14 * e.amt * b, dy:-e.size * .12 * e.amt * b }; } },
   bounce:{ name:"Bounce", group:"active", word(e, i){ if (i !== e.k) return null; const q = e.wq(i, .5); return { dy:-Math.abs(Math.sin(q * Math.PI * 2.5)) * e.size * .2 * e.amt * (1 - q) }; } },
   punch:{ name:"Scale punch", group:"active", word(e, i){ if (i !== e.k) return null; const q = e.wq(i, .2); return { sc:1.08 + .32 * e.amt * (1 - easeOutC(q)) }; } },
@@ -2175,11 +2277,15 @@ function capOpts(cap){
 }
 function parseWords(text){
   const out = []; let hl = false;
-  for (const tok of String(text).split(/\s+/)){
-    if (!tok) continue; let t = "", h = null;
-    for (const ch of tok){ if (ch === "*"){ hl = !hl; continue; } if (h === null) h = hl; t += ch; }
-    if (t) out.push({ t, hl:!!h });
-  }
+  const rawLines = String(text || "").split(/\r?\n/);
+  rawLines.forEach((lnStr, lineIdx) => {
+    const toks = lnStr.trim().split(/\s+/).filter(Boolean);
+    toks.forEach((tok, tokIdx) => {
+      let t = "", h = null;
+      for (const ch of tok){ if (ch === "*"){ hl = !hl; continue; } if (h === null) h = hl; t += ch; }
+      if (t) out.push({ t, hl:!!h, nl: lineIdx > 0 && tokIdx === 0 });
+    });
+  });
   return out;
 }
 const CAP_FONT = { bold:[800, "sans", 72, 1.1], linebox:[700, "sans", 54, 1.36], wordbox:[800, "sans", 62, 1.32], classic:[700, "sans", 50, 1.28], lower:[500, "serif", 50, 1.22], cinema:[500, "serif", 58, 1.16] };
@@ -2255,7 +2361,7 @@ function drawCaption(c, cap, t){
   const life0 = Math.min(clamp((t - cap.start) / .1), clamp((cap.end - t) / .1));
   if (life0 <= 0) return;
   const tc = o.custom && o.custom.case !== "normal" ? o.custom.case : o.textCase;
-  const words = wsApply(parseWords(cap.text).map(w => ({ ...w, t:tc === "upper" ? w.t.toUpperCase() : tc === "lower" ? w.t.toLowerCase() : w.t })), cap.ws);
+  const words = wsApply(parseWords(cap.text).map((w, i) => ({ ...w, gi:i, t:tc === "upper" ? w.t.toUpperCase() : tc === "lower" ? w.t.toLowerCase() : w.t })), cap.ws);
   if (c === ctx && !exporting) WS_BOX.set(cap, []);
   if (!words.length) return;
   const nChars = words.reduce((s, w) => s + w.t.length, 0) + words.length - 1;
@@ -2278,14 +2384,23 @@ function drawCaption(c, cap, t){
   const span = Math.max(.2, cap.end - cap.start - .1);
   const k = Math.min(words.length - 1, Math.floor(clamp((t - cap.start) / span) * words.length));
   const maxW = (W - safe.l - safe.r) * (left ? .8 : 1) - 40 * u;
+  const isDetached = w => !!(w.st && (w.st.dx != null || w.st.dy != null));
+  const inlineWords = words.filter(w => !isDetached(w));
+  const detachedWords = words.filter(isDetached);
+  const layoutWords = inlineWords.length ? inlineWords : words;
   let size = base * u * o.size, lines = [], sp = 0;
   for (let i = 0; i < 24; i++){
     c.font = `${fw} ${size}px ${family}`; c.letterSpacing = style === "cinema" ? (.02 * size) + "px" : "0px";
     sp = c.measureText(" ").width; lines = []; let line = [], lw = 0;
     const bf = `${fw} ${size}px ${family}`;
-    words.forEach((w, gi) => { const ww = wsMeasure(c, w, bf); if (line.length && lw + sp + ww > maxW){ lines.push({ words:line, w:lw }); line = []; lw = 0; } lw += line.length ? sp + ww : ww; line.push({ ...w, ww, gi }); });
+    layoutWords.forEach((w, gi) => {
+      const ww = wsMeasure(c, w, bf);
+      if (line.length && (w.nl || lw + sp + ww > maxW)){ lines.push({ words:line, w:lw }); line = []; lw = 0; }
+      lw += line.length ? sp + ww : ww; line.push({ ...w, ww, gi: w.gi ?? gi });
+    });
     lines.push({ words:line, w:lw });
-    if (lines.length <= 3 && Math.max(...lines.map(l => l.w)) <= maxW) break;
+    const explicitLines = layoutWords.filter(w => w.nl).length + 1;
+    if (lines.length <= Math.max(3, explicitLines) && Math.max(...lines.map(l => l.w)) <= maxW) break;
     size *= .93;
   }
   const an = capAnim(cap, t, o, u, size, words.length, nChars), life = life0 * an.a;
@@ -2293,58 +2408,92 @@ function drawCaption(c, cap, t){
   const wfx = capWordFx(an, o, cap, t, span, words.length);
   const lh = size * lhK * wsLhK(cap.ws), padX = (style === "linebox" ? 22 : 30) * u, padY = (style === "lower" ? 22 : 16) * u;
   const boxed = style === "classic" || style === "lower";
-  const blockH = lines.length * lh + (boxed ? padY * 2 : 0), wide = Math.max(...lines.map(l => l.w));
+  const blockH = inlineWords.length ? lines.length * lh + (boxed ? padY * 2 : 0) : lh, wide = inlineWords.length ? Math.max(...lines.map(l => l.w)) : 0;
   const y0 = capY(o.pos, blockH, H, safe, u);
   const cx = safe.l + (W - safe.l - safe.r) / 2, lx0 = safe.l + 10 * u;
+  const cy = y0 + blockH / 2;
   const bg = capBgHex(o.bg), bgText = lightHex(bg) ? C.ink : "#FFFFFF";
   let accent = C[o.accent] || C.clayLt; if (boxed || style === "linebox"){ if (lightHex(bg) && lightHex(accent)) accent = C.clay; }
   const activeOn = o.anim === "word" || o.anim === "reveal" || o.anim === "pop";
   const visible = o.anim === "reveal" ? k + 1 : words.length;
   c.save(); c.globalAlpha = life;
   capBlockFx(c, an, cx, y0 + blockH / 2);
-  /* backgrounds */
-  if (style === "classic"){ c.fillStyle = bg; c.globalAlpha = life * .92; c.beginPath(); c.roundRect(cx - wide / 2 - padX, y0, wide + padX * 2, blockH, 18 * u); c.fill(); c.globalAlpha = life; }
-  if (style === "lower"){
-    const bw = wide + padX * 2 + 12 * u; c.fillStyle = bg; c.globalAlpha = life * .9; c.beginPath(); c.roundRect(lx0, y0, bw, blockH, [4 * u, 14 * u, 14 * u, 4 * u]); c.fill();
-    c.globalAlpha = life; c.fillStyle = C.clayLt; c.fillRect(lx0, y0, 10 * u, blockH);
-  }
-  if (style === "linebox"){
-    lines.forEach((ln, i) => { c.fillStyle = bg; c.beginPath(); c.roundRect(cx - ln.w / 2 - padX, y0 + i * lh, ln.w + padX * 2, lh + 1, 12 * u); c.fill(); });
+  /* backgrounds wrap only the inline words */
+  if (inlineWords.length){
+    if (style === "classic"){ c.fillStyle = bg; c.globalAlpha = life * .92; c.beginPath(); c.roundRect(cx - wide / 2 - padX, y0, wide + padX * 2, blockH, 18 * u); c.fill(); c.globalAlpha = life; }
+    if (style === "lower"){
+      const bw = wide + padX * 2 + 12 * u; c.fillStyle = bg; c.globalAlpha = life * .9; c.beginPath(); c.roundRect(lx0, y0, bw, blockH, [4 * u, 14 * u, 14 * u, 4 * u]); c.fill();
+      c.globalAlpha = life; c.fillStyle = C.clayLt; c.fillRect(lx0, y0, 10 * u, blockH);
+    }
+    if (style === "linebox"){
+      lines.forEach((ln, i) => { c.fillStyle = bg; c.beginPath(); c.roundRect(cx - ln.w / 2 - padX, y0 + i * lh, ln.w + padX * 2, lh + 1, 12 * u); c.fill(); });
+    }
   }
   /* words */
   c.font = `${fw} ${size}px ${family}`; c.letterSpacing = style === "cinema" ? (.02 * size) + "px" : "0px"; c.textBaseline = "middle";
   let ci = 0;
-  lines.forEach((ln, i) => {
-    let x = left ? lx0 + 12 * u + padX : cx - ln.w / 2;
-    const ly = y0 + (boxed ? padY : 0) + (i + .5) * lh;
-    ln.words.forEach(w => {
-      const wt = an.chars === Infinity ? w.t : w.t.slice(0, Math.max(0, an.chars - ci)); ci += w.t.length + 1;
-      if (w.gi < visible && wt){
-        const active = (activeOn && w.gi === k) || w.hl, x1 = x, st = w.st, sz = st && st.s ? size * st.s : size, wc = d => (st && st.c) || d;
-        wsRec(c, cap, w.wi ?? w.gi, x1, ly - sz * .6, w.ww, sz * 1.2);
-        capDrawWord(c, (wfx && wfx(w.gi)) || (st ? { a:1, dy:0, sc:1 } : null), x1, ly, w.ww, () => {
-          if (st){ c.font = wsFont(`${fw} ${size}px ${family}`, st); if (st.bg) wsBgBox(c, st, x1, ly, w.ww, sz); }
-          if (style === "wordbox" && active){
-            c.fillStyle = accent; c.beginPath(); c.roundRect(x1 - 12 * u, ly - sz * .62, w.ww + 24 * u, sz * 1.24, 12 * u); c.fill();
-            c.fillStyle = wc(lightHex(accent) ? C.ink : "#FFFFFF"); c.fillText(wt, x1, ly + sz * .03);
-          } else if (style === "bold"){
-            c.lineWidth = size * .17; c.lineJoin = "round"; c.strokeStyle = "rgba(28,33,40,.96)"; c.strokeText(wt, x1, ly);
-            c.fillStyle = wc(active ? accent : "#FFFFFF"); c.fillText(wt, x1, ly);
-          } else if (style === "wordbox" || style === "cinema"){
-            c.shadowColor = "rgba(0,0,0,.75)"; c.shadowBlur = 16 * u; c.shadowOffsetY = 3 * u;
-            c.fillStyle = wc(active ? accent : "#FFFFFF"); c.fillText(wt, x1, ly); c.shadowColor = "transparent";
-          } else { c.fillStyle = wc(active ? accent : bgText); c.fillText(wt, x1, ly); }
-        });
-      }
-      x += w.ww + sp;
+  if (inlineWords.length){
+    lines.forEach((ln, i) => {
+      let x = left ? lx0 + 12 * u + padX : cx - ln.w / 2;
+      const ly = y0 + (boxed ? padY : 0) + (i + .5) * lh;
+      ln.words.forEach(w => {
+        const wt = an.chars === Infinity ? w.t : w.t.slice(0, Math.max(0, an.chars - ci)); ci += w.t.length + 1;
+        if (w.gi < visible && wt){
+          const active = (activeOn && w.gi === k) || w.hl, st = w.st, sz = st && st.s ? size * st.s : size, wc = d => (st && st.c) || d;
+          const x1 = x, wy = ly;
+          wsRec(c, cap, w.wi ?? w.gi, x1, wy - sz * .6, w.ww, sz * 1.2);
+          capDrawWord(c, (wfx && wfx(w.gi)) || (st ? { a:1, dy:0, sc:1 } : null), x1, wy, w.ww, () => {
+            if (st){ c.font = wsFont(`${fw} ${size}px ${family}`, st); if (st.bg) wsBgBox(c, st, x1, wy, w.ww, sz); }
+            if (st && st.stroke){
+              c.save(); c.lineWidth = Math.max(3 * u, sz * 0.16); c.strokeStyle = "rgba(10,12,18,0.95)"; c.lineJoin = "round"; c.strokeText(wt, x1, wy); c.restore();
+            }
+            if (style === "wordbox" && active){
+              c.fillStyle = accent; c.beginPath(); c.roundRect(x1 - 12 * u, wy - sz * .62, w.ww + 24 * u, sz * 1.24, 12 * u); c.fill();
+              c.fillStyle = wc(lightHex(accent) ? C.ink : "#FFFFFF"); c.fillText(wt, x1, wy + sz * .03);
+            } else if (style === "bold"){
+              c.lineWidth = size * .17; c.lineJoin = "round"; c.strokeStyle = "rgba(28,33,40,.96)"; c.strokeText(wt, x1, wy);
+              c.fillStyle = wc(active ? accent : "#FFFFFF"); c.fillText(wt, x1, wy);
+            } else if (style === "wordbox" || style === "cinema"){
+              c.shadowColor = "rgba(0,0,0,.75)"; c.shadowBlur = 16 * u; c.shadowOffsetY = 3 * u;
+              c.fillStyle = wc(active ? accent : "#FFFFFF"); c.fillText(wt, x1, wy); c.shadowColor = "transparent";
+            } else { c.fillStyle = wc(active ? accent : bgText); c.fillText(wt, x1, wy); }
+          });
+        }
+        x += w.ww + sp;
+      });
     });
-  });
+  }
+  if (detachedWords.length){
+    const bf = `${fw} ${size}px ${family}`;
+    detachedWords.forEach(w => {
+      const wt = w.t, gi = w.gi, st = w.st;
+      const ww = wsMeasure(c, w, bf);
+      const x1 = cx + (st.dx || 0) * W - ww / 2;
+      const wy = cy + (st.dy || 0) * H;
+      const active = (activeOn && gi === k) || w.hl, sz = st && st.s ? size * st.s : size, wc = d => (st && st.c) || d;
+      wsRec(c, cap, w.wi ?? gi, x1, wy - sz * .6, ww, sz * 1.2);
+      capDrawWord(c, (wfx && wfx(gi)) || (st ? { a:1, dy:0, sc:1 } : null), x1, wy, ww, () => {
+        if (st){ c.font = wsFont(`${fw} ${size}px ${family}`, st); if (st.bg) wsBgBox(c, st, x1, wy, ww, sz); }
+        if (st && st.stroke){
+          c.save(); c.lineWidth = Math.max(3 * u, sz * 0.16); c.strokeStyle = "rgba(10,12,18,0.95)"; c.lineJoin = "round"; c.strokeText(wt, x1, wy); c.restore();
+        }
+        if (style === "bold"){
+          c.lineWidth = size * .17; c.lineJoin = "round"; c.strokeStyle = "rgba(28,33,40,.96)"; c.strokeText(wt, x1, wy);
+          c.fillStyle = wc(active ? accent : "#FFFFFF"); c.fillText(wt, x1, wy);
+        } else {
+          c.fillStyle = wc(active ? accent : bgText); c.fillText(wt, x1, wy);
+        }
+      });
+    });
+  }
   c.restore(); c.letterSpacing = "0px";
 }
 /* fit words into lines (cached: export draws every frame, the layout only changes with text and style) */
 function capLayout(c, words, S, fontAt, size0, areaW, u){
   const big = S.hlMode === "bigger" ? 1.18 : 1, bgMode = S.bg;
-  const key = [fontAt(100), S.spacing, S.padX, bgMode, big, Math.round(areaW), S.maxLines, size0.toFixed(3), u.toFixed(5), words.map(w => (w.hl ? "*" : "") + w.t + (w.st ? JSON.stringify(w.st) : "")).join("\u0001")].join("|");
+  const explicitLines = words.filter(w => w.nl).length + 1;
+  const maxLinesAllowed = Math.max(S.maxLines || 2, explicitLines);
+  const key = [fontAt(100), S.spacing, S.padX, bgMode, big, Math.round(areaW), maxLinesAllowed, size0.toFixed(3), u.toFixed(5), words.map(w => (w.hl ? "*" : "") + (w.nl ? "\n" : "") + w.t + (w.st ? JSON.stringify(w.st) : "")).join("\u0001")].join("|");
   let LY = CAP_MEASURE.get(key); if (LY) return LY;
   let size = size0, lines = [], sp = 0, px = 0, maxW = areaW;
   for (let i = 0; i < 30; i++){
@@ -2352,9 +2501,17 @@ function capLayout(c, words, S, fontAt, size0, areaW, u){
     c.font = fontAt(size); c.letterSpacing = (S.spacing * size) + "px";
     sp = c.measureText(" ").width + (big > 1 ? size * .1 : 0) + (bgMode === "word" ? px * 2 : 0); lines = []; let line = [], lw = 0;
     const bf = fontAt(size);
-    words.forEach((w, gi) => { const ww = wsMeasure(c, w, bf); if (line.length && lw + sp + ww > maxW){ lines.push({ words:line, w:lw }); line = []; lw = 0; } lw += line.length ? sp + ww : ww; line.push({ ...w, ww, gi }); });
+    words.forEach((w, gi) => {
+      const ww = wsMeasure(c, w, bf);
+      if (line.length && (w.nl || lw + sp + ww > maxW)){
+        lines.push({ words:line, w:lw });
+        line = []; lw = 0;
+      }
+      lw += line.length ? sp + ww : ww;
+      line.push({ ...w, ww, gi: w.gi ?? gi });
+    });
     lines.push({ words:line, w:lw });
-    if (lines.length <= S.maxLines && Math.max(...lines.map(l => l.w)) <= maxW) break;
+    if (lines.length <= maxLinesAllowed && Math.max(...lines.map(l => l.w)) <= maxW) break;
     if (size < 14 * u) break;
     size *= .93;
   }
@@ -2422,19 +2579,31 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   const visible = o.anim === "reveal" || S.upcoming === "hide" ? k + 1 : nW;
   const mode = S.hlMode, bgMode = S.bg, rad = S.radius * u;
   const fullW = W - safe.l - safe.r, areaW = fullW * S.maxWidth;
-  const LY = capLayout(c, words, S, fontAt, 68 * u * o.size, areaW, u), { size, lines, sp, px, big } = LY;
+  const cx = safe.l + fullW / 2;
+  const isDetached = w => !!(w.st && (w.st.dx != null || w.st.dy != null));
+  const inlineWords = words.filter(w => !isDetached(w));
+  const detachedWords = words.filter(isDetached);
+  const layoutWords = inlineWords.length ? inlineWords : words;
+  const LY = capLayout(c, layoutWords, S, fontAt, 68 * u * o.size, areaW, u), { size, lines, sp, px, big } = LY;
   const an = capAnim(cap, t, o, u, size, nW, nChars), life = life0 * an.a;
   if (life <= 0) return;
   const wfx = capWordFx(an, o, cap, t, span, nW);
   const FX = S.fx ? CAP_FX[S.fx] || null : null;
   /* letter spacing animation: extra px per letter, eased to 0 */
   const ex = S.track > 0 ? S.track * size * (1 - easeOutC(clamp((t - cap.start) / Math.min(.9, Math.max(.15, (cap.end - cap.start) * .6))))) : 0;
-  const lh = size * S.lineHeight * wsLhK(cap.ws), py = S.padY * size, n = lines.length, padH = bgMode === "none" ? 0 : px;
-  const rowH = bgMode === "line" ? lh + py * 2 : lh, gapL = bgMode === "line" ? size * .1 : 0, bp = bgMode === "block" ? py : 0;
+  const baseLh = size * S.lineHeight;
+  const py = S.padY * size, n = inlineWords.length ? lines.length : 0, padH = bgMode === "none" ? 0 : px;
+  const rowHeights = lines.map(ln => {
+    const maxS = Math.max(1, ...ln.words.map(w => (w.st && !w.st.hide && +w.st.s) || 1));
+    const thisLh = baseLh * (1 + (maxS - 1) * 0.7);
+    return bgMode === "line" ? thisLh + py * 2 : thisLh;
+  });
+  const gapL = bgMode === "line" ? size * .1 : 0, bp = bgMode === "block" ? py : 0;
   const lineW = ex ? lines.map(ln => ln.w + ex * ln.words.reduce((s, w) => s + w.t.length + 1, -1)) : lines.map(ln => ln.w);
-  const blockH = n * rowH + (n - 1) * gapL + bp * 2, wide = Math.max(...lineW);
-  const y0 = capY(o.pos, blockH, H, safe, u);
-  const aL = safe.l + 10 * u, aR = W - safe.r - 10 * u, cx = safe.l + fullW / 2;
+  const blockH = inlineWords.length ? rowHeights.reduce((a, b) => a + b, 0) + (n - 1) * gapL + bp * 2 : 0, wide = inlineWords.length ? Math.max(...lineW) : 0;
+  const y0 = capY(o.pos, blockH || baseLh, H, safe, u);
+  const cy = y0 + (blockH || baseLh) / 2;
+  const aL = safe.l + 10 * u, aR = W - safe.r - 10 * u;
   const lineX = w => S.align === "left" ? aL + padH : S.align === "right" ? aR - padH - w : cx - w / 2;
   const bx = S.align === "left" ? aL : S.align === "right" ? aR - wide - padH * 2 : cx - wide / 2 - padH, bw = wide + padH * 2;
   const seed = (+cap.id || 0) * 31;
@@ -2442,21 +2611,40 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   const hlCol = gi => { if (!pal) return S.hl; const w = wds[gi]; return pal[((w && w.rank >= 0) ? w.rank : gi) % 3]; };
   /* positions (cheap arithmetic, used by effects and the draw loop) */
   const pos = new Array(nW), rows = [], wds = new Array(nW); let nL = 0;
-  lines.forEach((ln, i) => {
-    let x = lineX(lineW[i]); const ly = y0 + bp + i * (rowH + gapL) + rowH / 2;
-    rows.push({ x:lineX(lineW[i]), y:ly - rowH / 2, w:lineW[i], h:rowH });
-    ln.words.forEach(w => { const ww = w.ww + ex * w.t.length; pos[w.gi] = { x, ly, ww, li:i, l0:nL, vis:0 }; wds[w.gi] = w; nL += FX && FX.letter ? capLetters(w.t).length : w.t.length; x += ww + sp + ex; });
-  });
+  let curRowY = y0 + bp;
+  if (inlineWords.length){
+    lines.forEach((ln, i) => {
+      const rH = rowHeights[i];
+      let x = lineX(lineW[i]); const ly = curRowY + rH / 2;
+      rows.push({ x:lineX(lineW[i]), y:curRowY, w:lineW[i], h:rH });
+      ln.words.forEach(w => { const ww = w.ww + ex * w.t.length, gi = w.gi != null ? w.gi : 0; pos[gi] = { x, ly, ww, li:i, l0:nL, vis:0, detached:false }; wds[gi] = w; nL += FX && FX.letter ? capLetters(w.t).length : w.t.length; x += ww + sp + ex; });
+      curRowY += rH + gapL;
+    });
+  }
+  if (detachedWords.length){
+    const bf = fontAt(size);
+    detachedWords.forEach(w => {
+      const ww = wsMeasure(c, w, bf);
+      const x = cx + (w.st.dx || 0) * W - ww / 2;
+      const ly = cy + (w.st.dy || 0) * H;
+      const gi = w.gi != null ? w.gi : 0;
+      pos[gi] = { x, ly, ww, li:0, l0:nL, vis:0, detached:true };
+      wds[gi] = w;
+      nL += FX && FX.letter ? capLetters(w.t).length : w.t.length;
+    });
+  }
   const wd = span / nW, ws = i => cap.start + i * wd;
-  const e = { c, t, u, size, k, n:nW, cap, S, amt:S.fxAmt, wd, ws, tIn:t - cap.start, L:Math.max(.05, cap.end - cap.start), pos, rows, wds, rowH, bx, bw, rad, px, hlCol, nL,
+  const e = { c, t, u, size, k, n:nW, cap, S, amt:S.fxAmt, wd, ws, tIn:t - cap.start, L:Math.max(.05, cap.end - cap.start), pos, rows, wds, rowH:rowHeights[0] || size * S.lineHeight, bx, bw, rad, px, hlCol, nL,
     wq:(i, d) => clamp((t - ws(i)) / Math.max(.04, Math.min(d, wd * .95))),
     iq:(i, d) => clamp((t - ws(i) + .04) / Math.max(.05, Math.min(d, wd * 1.2))) };
   c.save(); c.globalAlpha = life;
   capBlockFx(c, an, bx + bw / 2, y0 + blockH / 2);
   if (FX && FX.block) FX.block(e);
   const bgA = S.bgOpacity, shape = S.bgShape;
-  if (bgMode === "block" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; capShape(c, shape, bx, y0, bw, blockH, rad, seed, u); c.globalAlpha = life; }
-  if (bgMode === "line" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; lines.forEach((ln, i) => capShape(c, shape, lineX(lineW[i]) - px, y0 + i * (rowH + gapL), lineW[i] + px * 2, rowH, rad, seed + i * 5, u)); c.globalAlpha = life; }
+  if (inlineWords.length > 0){
+    if (bgMode === "block" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; capShape(c, shape, bx, y0, bw, blockH, rad, seed, u); c.globalAlpha = life; }
+    if (bgMode === "line" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; lines.forEach((ln, i) => capShape(c, shape, lineX(lineW[i]) - px, rows[i].y, lineW[i] + px * 2, rows[i].h, rad, seed + i * 5, u)); c.globalAlpha = life; }
+  }
   c.font = fontAt(size); c.letterSpacing = (S.spacing * size + ex) + "px"; c.textBaseline = "middle"; c.textAlign = "left";
   const shadowOn = S.shadow && (S.shadowBlur > 0 || S.shadowY > 0), sh = on => { if (on && shadowOn){ c.shadowColor = hexA(S.shadowColor, .6); c.shadowBlur = S.shadowBlur * u; c.shadowOffsetY = S.shadowY * u; } else { c.shadowColor = "transparent"; c.shadowBlur = 0; c.shadowOffsetY = 0; } };
   /* one gradient per frame for the whole block */
@@ -2482,45 +2670,57 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   };
   if (FX && FX.pre) FX.pre(e);
   let ci = 0;
-  lines.forEach(ln => {
-    ln.words.forEach(w => {
-      const gi = w.gi, P0 = pos[gi], x1 = P0.x, ly = P0.ly, ww = P0.ww;
-      let wt = an.chars === Infinity ? w.t : w.t.slice(0, Math.max(0, an.chars - ci)); ci += w.t.length + 1;
-      if (gi < visible && wt){
-        const hl = mode !== "none" && ((activeOn && gi === k && !(FX && FX.noHl)) || w.hl);
-        const upcoming = S.upcoming === "dim" && gi > k && !(o.anim === "reveal");
-        let fx = wfx && wfx(gi); if (upcoming) fx = { a:(fx ? fx.a : 1) * clamp(+S.dim || .45, .05, 1), dy:fx ? fx.dy : 0, sc:fx ? fx.sc : 1 };
-        const ef = FX && FX.word ? FX.word(e, gi) : null; if (ef) fx = capMerge(fx, ef);
-        if (S.tilt > 0) fx = capMerge(fx, { rot:(capRand(seed + gi * 7.13 + 1) - .5) * 2 * S.tilt * Math.PI / 180 });
-        const st = w.st, sz = st && st.s ? size * st.s : size; if (st && !fx) fx = {};
-        if (!G) wsRec(c, cap, w.wi ?? gi, x1, ly - sz * .6, ww, sz * 1.2);
-        if (ef && ef.chars != null && ef.chars < 1){ const gs = capGraphemes(wt); wt = gs.slice(0, Math.ceil(gs.length * ef.chars)).join(""); if (!wt) return; P0.vis = c.measureText(wt).width; } else P0.vis = ww;
-        const wcol = hl ? hlCol(gi) : null;
-        capFxWord(c, fx, x1, ly, ww, () => {
-          if (st) c.font = wsFont(fontAt(size), st);
-          if (hl && big > 1){ const mx = x1 + ww / 2; c.translate(mx, ly); c.scale(big, big); c.translate(-mx, -ly); }
-          if (bgMode === "word" && bgA > 0){ sh(false); c.save(); c.globalAlpha *= bgA; c.fillStyle = S.bgColor; capShape(c, shape, x1 - px, ly - sz * .5 - py, ww + px * 2, sz + py * 2, rad, seed + gi * 3, u); c.restore(); }
-          if (st && st.bg){ sh(false); wsBgBox(c, st, x1, ly, ww, sz); }
-          if (hl && mode === "box"){
-            sh(true); c.fillStyle = wcol; c.beginPath(); c.roundRect(x1 - sz * .16, ly - sz * .62, ww + sz * .32, sz * 1.24, Math.min(rad || 10 * u, sz * .5)); c.fill(); sh(false);
-            c.fillStyle = (st && st.c) || (lightHex(wcol) ? C.ink : "#FFFFFF"); c.fillText(wt, x1, ly + sz * .03); return;
+  words.forEach((w, idx) => {
+    const gi = w.gi != null ? w.gi : (w.wi != null ? w.wi : idx), P0 = pos[gi], st = w.st;
+    if (!P0) return;
+    const x1 = P0.x;
+    const ly = P0.ly;
+    const ww = P0.ww;
+    let wt = an.chars === Infinity ? w.t : w.t.slice(0, Math.max(0, an.chars - ci)); ci += w.t.length + 1;
+    if (gi < visible && wt){
+      const hl = mode !== "none" && ((activeOn && gi === k && !(FX && FX.noHl)) || w.hl);
+      const upcoming = S.upcoming === "dim" && gi > k && !(o.anim === "reveal");
+      let fx = wfx && wfx(gi); if (upcoming) fx = { a:(fx ? fx.a : 1) * clamp(+S.dim || .45, .05, 1), dy:fx ? fx.dy : 0, sc:fx ? fx.sc : 1 };
+      const ef = FX && FX.word ? FX.word(e, gi) : null; if (ef) fx = capMerge(fx, ef);
+      if (S.tilt > 0) fx = capMerge(fx, { rot:(capRand(seed + gi * 7.13 + 1) - .5) * 2 * S.tilt * Math.PI / 180 });
+      const st = w.st, sz = st && st.s ? size * st.s : size; if (st && !fx) fx = {};
+      if (!G) wsRec(c, cap, w.wi ?? gi, x1, ly - sz * .6, ww, sz * 1.2);
+      if (ef && ef.chars != null && ef.chars < 1){ const gs = capGraphemes(wt); wt = gs.slice(0, Math.ceil(gs.length * ef.chars)).join(""); if (!wt) return; P0.vis = c.measureText(wt).width; } else P0.vis = ww;
+      const wcol = hl ? hlCol(gi) : null;
+      capFxWord(c, fx, x1, ly, ww, () => {
+        if (st) c.font = wsFont(fontAt(size), st);
+        if (hl && big > 1){ const mx = x1 + ww / 2; c.translate(mx, ly); c.scale(big, big); c.translate(-mx, -ly); }
+        if (bgMode === "word" && bgA > 0){ sh(false); c.save(); c.globalAlpha *= bgA; c.fillStyle = S.bgColor; capShape(c, shape, x1 - px, ly - sz * .5 - py, ww + px * 2, sz + py * 2, rad, seed + gi * 3, u); c.restore(); }
+        if (st && st.bg){ sh(false); wsBgBox(c, st, x1, ly, ww, sz); }
+        if (st && st.stroke){
+          c.save();
+          c.lineWidth = Math.max(3 * u, sz * 0.16);
+          c.strokeStyle = "rgba(10,12,18,0.95)";
+          c.lineJoin = "round";
+          c.miterLimit = 2;
+          c.strokeText(wt, x1, ly);
+          c.restore();
+        }
+        if (hl && mode === "box"){
+          sh(true); c.fillStyle = wcol; c.beginPath(); c.roundRect(x1 - sz * .16, ly - sz * .62, ww + sz * .32, sz * 1.24, Math.min(rad || 10 * u, sz * .5)); c.fill(); sh(false);
+          c.fillStyle = (st && st.c) || (lightHex(wcol) ? C.ink : "#FFFFFF"); c.fillText(wt, x1, ly + sz * .03); return;
+        }
+        if (hl && mode === "marker"){ sh(false); c.save(); c.globalAlpha *= .92; c.fillStyle = wcol; capShape(c, "marker", x1 - sz * .04, ly - sz * .62, ww + sz * .08, sz * 1.24, 0, seed + gi * 11, u); c.restore(); }
+        const wordGlow = (st && st.glow) ? { color: st.c || "#CCFF00", blur: 24 * u } : null;
+        const base = fx && fx.color ? fx.color : st && st.c ? st.c : hl && mode !== "underline" && mode !== "marker" ? wcol : textFill, glow = (fx && fx.glow) || wordGlow;
+        const fillOnly = !!(fx && fx.fillOnly);
+        const draw = (f, only) => paint(wt, x1, ly, f || base, only || fillOnly ? "fill" : "all", only ? null : glow);
+        if (FX && FX.letter && wt === w.t){
+          const li = capLetterInfo(c, LY, w, (S.spacing * size) + "px"), m = li.parts.length;
+          for (let pass = 0; pass < 2; pass++) for (let j = 0; j < m; j++){
+            const lx = x1 + li.xs[j] + ex * j, ls = FX.letter(e, gi, j, m, P0.l0 + j);
+            capFxWord(c, ls, lx, ly, li.ws[j], () => paint(li.parts[j], lx, ly, base, pass ? "fill" : "under", pass ? glow : null));
           }
-          if (hl && mode === "marker"){ sh(false); c.save(); c.globalAlpha *= .92; c.fillStyle = wcol; capShape(c, "marker", x1 - sz * .04, ly - sz * .62, ww + sz * .08, sz * 1.24, 0, seed + gi * 11, u); c.restore(); }
-          const base = fx && fx.color ? fx.color : st && st.c ? st.c : hl && mode !== "underline" && mode !== "marker" ? wcol : textFill, glow = fx && fx.glow;
-          const fillOnly = !!(fx && fx.fillOnly);
-          const draw = (f, only) => paint(wt, x1, ly, f || base, only || fillOnly ? "fill" : "all", only ? null : glow);
-          if (FX && FX.letter && wt === w.t){
-            const li = capLetterInfo(c, LY, w, (S.spacing * size) + "px"), m = li.parts.length;
-            for (let pass = 0; pass < 2; pass++) for (let j = 0; j < m; j++){
-              const lx = x1 + li.xs[j] + ex * j, ls = FX.letter(e, gi, j, m, P0.l0 + j);
-              capFxWord(c, ls, lx, ly, li.ws[j], () => paint(li.parts[j], lx, ly, base, pass ? "fill" : "under", pass ? glow : null));
-            }
-          } else if (FX && FX.paint) FX.paint(e, gi, draw, x1, ly, ww);
-          else draw();
-          if (hl && mode === "underline"){ const th = Math.max(3 * u, sz * .075); c.fillStyle = wcol; c.beginPath(); c.roundRect(x1, ly + sz * .44, c.measureText(wt).width, th, th / 2); c.fill(); }
-        });
-      }
-    });
+        } else if (FX && FX.paint) FX.paint(e, gi, draw, x1, ly, ww);
+        else draw();
+        if (hl && mode === "underline"){ const th = Math.max(3 * u, sz * .075); c.fillStyle = wcol; c.beginPath(); c.roundRect(x1, ly + sz * .44, c.measureText(wt).width, th, th / 2); c.fill(); }
+      });
+    }
   });
   if (FX && FX.post) FX.post(e);
   c.restore(); c.letterSpacing = "0px"; c.textAlign = "left";
@@ -2911,18 +3111,42 @@ function newScene(type){
 }
 
 /* ---------- looks: colour grade + film grain + cinema bars ---------- */
-const LOOKS = [["none","None"],["aerial","Drone: clear aerial"],["teal","Drone: teal and orange"],["golden","Drone: golden hour"],["clean","Property: bright and clean"],["moody","Moody evening"],["film","Film"],["cinema","Cinema bars"],["warm","Warm"],["cool","Cool"],["vivid","Vivid"],["bw","Black and white"]];
-const LOOK_FILTER = { film:"sepia(.14) saturate(.92) contrast(1.08) brightness(1.02)", cinema:"sepia(.1) saturate(.95) contrast(1.1)", warm:"sepia(.2) saturate(1.15) contrast(1.04)", cool:"saturate(.95) hue-rotate(-10deg) contrast(1.06) brightness(1.02)", vivid:"saturate(1.35) contrast(1.08)", bw:"grayscale(1) contrast(1.12)", aerial:"contrast(1.14) saturate(1.18) brightness(1.02)", teal:"contrast(1.12) saturate(1.1)", golden:"sepia(.22) saturate(1.2) contrast(1.06) brightness(1.04)", clean:"brightness(1.08) contrast(1.04) saturate(1.08)", moody:"contrast(1.16) saturate(.82) brightness(.92)" };
+const LOOKS = [
+  ["none","None"],["aerial","Drone: clear aerial"],["teal","Drone: teal and orange"],["golden","Drone: golden hour"],
+  ["clean","Property: bright and clean"],["moody","Moody evening"],["film","Film"],["cinema","Cinema bars"],
+  ["warm","Warm"],["cool","Cool"],["vivid","Vivid"],["bw","Black and white"],
+  ["blockbuster","🎬 Pro: Blockbuster Teal & Orange"],["vintage2383","🎞️ Pro: Kodak 2383 Film"],
+  ["cyberpunk","⚡ Pro: Cyberpunk Neon"],["noir","🖤 Pro: High-Contrast Noir"]
+];
+const LOOK_FILTER = {
+  film:"sepia(.14) saturate(.92) contrast(1.08) brightness(1.02)",
+  cinema:"sepia(.1) saturate(.95) contrast(1.1)",
+  warm:"sepia(.2) saturate(1.15) contrast(1.04)",
+  cool:"saturate(.95) hue-rotate(-10deg) contrast(1.06) brightness(1.02)",
+  vivid:"saturate(1.35) contrast(1.08)",
+  bw:"grayscale(1) contrast(1.12)",
+  aerial:"contrast(1.14) saturate(1.18) brightness(1.02)",
+  teal:"contrast(1.12) saturate(1.1)",
+  golden:"sepia(.22) saturate(1.2) contrast(1.06) brightness(1.04)",
+  clean:"brightness(1.08) contrast(1.04) saturate(1.08)",
+  moody:"contrast(1.16) saturate(.82) brightness(.92)",
+  blockbuster:"contrast(1.22) saturate(1.28) hue-rotate(-10deg) brightness(1.03)",
+  vintage2383:"sepia(.26) contrast(1.16) saturate(1.14) brightness(1.04)",
+  cyberpunk:"contrast(1.28) saturate(1.5) hue-rotate(24deg) brightness(.97)",
+  noir:"grayscale(1) contrast(1.38) brightness(.95)"
+};
 const GRAIN = (() => { const c = document.createElement("canvas"); c.width = c.height = 256; const x = c.getContext("2d"), d = x.createImageData(256, 256);
   for (let i = 0; i < d.data.length; i += 4){ const v = Math.random() * 255; d.data[i] = d.data[i + 1] = d.data[i + 2] = v; d.data[i + 3] = 255; } x.putImageData(d, 0, 0); return c; })();
 function lookAfter(c, look){
-  if (look !== "film" && look !== "cinema") return;
+  if (look !== "film" && look !== "cinema" && look !== "blockbuster" && look !== "vintage2383" && look !== "noir" && look !== "cyberpunk") return;
   const { W, H } = geo();
-  c.save(); c.globalAlpha = .07; c.globalCompositeOperation = "overlay";
+  c.save(); c.globalAlpha = look === "noir" ? .11 : look === "vintage2383" ? .09 : .07; c.globalCompositeOperation = "overlay";
   const pat = c.createPattern(GRAIN, "repeat"); c.translate(Math.random() * 256, Math.random() * 256); c.fillStyle = pat; c.fillRect(-256, -256, W + 512, H + 512); c.restore();
   const g = c.createRadialGradient(W / 2, H / 2, Math.min(W, H) * .35, W / 2, H / 2, Math.hypot(W, H) / 2);
-  g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,.42)"); c.fillStyle = g; c.fillRect(0, 0, W, H);
-  if (look === "cinema"){ const b = H > W ? H * .07 : H * .11; c.fillStyle = "#000"; c.fillRect(0, 0, W, b); c.fillRect(0, H - b, W, b); }
+  g.addColorStop(0, "rgba(0,0,0,0)");
+  g.addColorStop(1, look === "blockbuster" ? "rgba(4,22,34,.45)" : look === "cyberpunk" ? "rgba(22,4,34,.38)" : "rgba(0,0,0,.44)");
+  c.fillStyle = g; c.fillRect(0, 0, W, H);
+  if (look === "cinema" || look === "blockbuster"){ const b = H > W ? H * .068 : H * .105; c.fillStyle = "#000"; c.fillRect(0, 0, W, b); c.fillRect(0, H - b, W, b); }
 }
 
 /* ---------- frames: show a clip as a floating card or inside a phone ---------- */
@@ -2987,6 +3211,85 @@ GIRIKA.fill(REEL_TEMPLATES); Object.values(SCENES).forEach(d => GIRIKA.fill(d.fi
 
 /* main frame renderer */
 let selected = null, exporting = false;
+/* =========================================================
+   Adobe Podcast & Veed Dynamic Audiogram Waveform Visualizer
+   100% pure Canvas & Web Audio math (no AI, offline, export parity)
+   ========================================================= */
+function drawAudiogram(c, t){
+  if (!P.audiogram || !P.audiogram.on) return;
+  const { W, H, u } = geo();
+  const cfg = P.audiogram;
+  const style = cfg.style || "bars";
+  const numBars = cfg.bars || 36;
+  const maxH = (cfg.height || 64) * u;
+  const spanW = W * 0.76;
+  const barW = Math.max(3 * u, spanW / numBars - 3 * u);
+  const startX = (W - (barW + 3 * u) * numBars) / 2;
+  const pbH = P.progressBar ? 12 * u : 0;
+  const baseY = cfg.pos === "top" ? 140 * u : cfg.pos === "middle" ? H * 0.5 : H - 110 * u - pbH;
+
+  const sampleAmp = dt => {
+    let sum = 0, cnt = 0;
+    if (P.vo && P.vo.buffer){
+      const d = P.vo.buffer.getChannelData(0), sr = P.vo.buffer.sampleRate;
+      const lt = t + dt - P.vo.start;
+      if (lt >= 0 && lt < P.vo.buffer.duration){
+        const s = Math.floor(lt * sr), e = Math.min(d.length, s + 384);
+        for (let i = s; i < e; i += 8){ sum += d[i] * d[i]; cnt++; }
+      }
+    }
+    if (P.music && P.music.buffer){
+      const d = P.music.buffer.getChannelData(0), sr = P.music.buffer.sampleRate;
+      const lt = (P.music.offset + t + dt) % P.music.buffer.duration;
+      const s = Math.floor(lt * sr), e = Math.min(d.length, s + 384);
+      for (let i = s; i < e; i += 16){ sum += d[i] * d[i] * (P.musicVol * 0.45); cnt++; }
+    }
+    return cnt > 0 ? Math.sqrt(sum / cnt) : 0;
+  };
+
+  const col = cfg.color === "cyan" ? "#00E5FF" : cfg.color === "white" ? "#FFFFFF" : cfg.color === "accent" ? C.clayLt : "#CCFF00";
+  c.save();
+  c.fillStyle = col; c.strokeStyle = col;
+  c.shadowColor = col; c.shadowBlur = 8 * u;
+
+  if (style === "wave"){
+    c.lineWidth = 4 * u; c.beginPath();
+    for (let i = 0; i < numBars; i++){
+      const x = startX + i * (barW + 3 * u) + barW / 2;
+      const dt = (i - numBars / 2) * 0.02;
+      const amp = sampleAmp(dt);
+      const wave = Math.sin(i * 0.45 + t * 5.5) * amp * maxH * 1.6;
+      const y = baseY + wave;
+      if (i === 0) c.moveTo(x, y); else c.lineTo(x, y);
+    }
+    c.stroke();
+  } else if (style === "mirror"){
+    for (let i = 0; i < numBars; i++){
+      const x = startX + i * (barW + 3 * u);
+      const dt = (i - numBars / 2) * 0.02;
+      const amp = sampleAmp(dt);
+      const h = Math.max(4 * u, Math.min(maxH, amp * maxH * 3.6 * (0.55 + 0.45 * Math.sin(i * 0.5 + t * 4))));
+      c.beginPath(); c.roundRect(x, baseY - h / 2, barW, h, 3 * u); c.fill();
+    }
+  } else if (style === "dots"){
+    for (let i = 0; i < numBars; i++){
+      const x = startX + i * (barW + 3 * u) + barW / 2;
+      const dt = (i - numBars / 2) * 0.02;
+      const amp = sampleAmp(dt);
+      const rad = Math.max(3 * u, Math.min(maxH * 0.35, amp * maxH * 0.95 + 2 * u));
+      c.beginPath(); c.arc(x, baseY, rad, 0, Math.PI * 2); c.fill();
+    }
+  } else { // default "bars"
+    for (let i = 0; i < numBars; i++){
+      const x = startX + i * (barW + 3 * u);
+      const dt = (i - numBars / 2) * 0.02;
+      const amp = sampleAmp(dt);
+      const h = Math.max(4 * u, Math.min(maxH, amp * maxH * 3.6 * (0.55 + 0.45 * Math.sin(i * 0.45 + t * 3.5))));
+      c.beginPath(); c.roundRect(x, baseY - h, barW, h, 3 * u); c.fill();
+    }
+  }
+  c.restore();
+}
 function renderFrame(t){
   const { W, H } = geo();
   if (cv.width !== W || cv.height !== H){ cv.width = W; cv.height = H; fitCanvas(); }
@@ -3015,6 +3318,76 @@ function renderFrame(t){
   if (P.watermark && !onBrand && cur.kind !== "intro" && cur.kind !== "outro") drawWatermark(ctx);
   P.captions.forEach(cp => { if (t >= cp.start && t <= cp.end) drawCaptionAt(ctx, cp, t); });
   drawDrawing(ctx);
+  drawAudiogram(ctx, t);
+  drawProgressBar(ctx, t);
+}
+function drawProgressBar(c, t){
+  if (!P.progressBar || !(TOTAL > 0)) return;
+  const { W, H, u } = geo();
+  const cfg = P.progBar || (P.progBar = { pos:"bottom", color:"gradient", height:7, customColor:"#CCFF00" });
+  const pos = cfg.pos || "bottom";
+  const thick = Math.max(3, Math.round((cfg.height || 7) * u));
+  const prog = clamp(t / TOTAL, 0, 1);
+  const isVert = pos === "left" || pos === "right";
+
+  c.save();
+  c.fillStyle = "rgba(0,0,0,0.45)";
+
+  let bx = 0, by = 0, bw = 0, bh = 0;
+  let fx = 0, fy = 0, fw = 0, fh = 0;
+
+  if (pos === "top"){
+    bx = 0; by = 0; bw = W; bh = thick;
+    fx = 0; fy = 0; fw = W * prog; fh = thick;
+  } else if (pos === "left"){
+    bx = 0; by = 0; bw = thick; bh = H;
+    fx = 0; fy = 0; fw = thick; fh = H * prog;
+  } else if (pos === "right"){
+    bx = W - thick; by = 0; bw = thick; bh = H;
+    fx = W - thick; fy = 0; fw = thick; fh = H * prog;
+  } else { // default "bottom"
+    bx = 0; by = H - thick; bw = W; bh = thick;
+    fx = 0; fy = H - thick; fw = W * prog; fh = thick;
+  }
+
+  c.fillRect(bx, by, bw, bh);
+
+  if (prog > 0){
+    let fillStyle, glowColor;
+    const col = cfg.color || "gradient";
+    if (col === "gradient"){
+      const g = isVert
+        ? c.createLinearGradient(0, fy, 0, fy + Math.max(1, fh))
+        : c.createLinearGradient(fx, 0, fx + Math.max(1, fw), 0);
+      g.addColorStop(0, "#CCFF00");
+      g.addColorStop(1, "#00E5FF");
+      fillStyle = g;
+      glowColor = "#CCFF00";
+    } else if (col === "lime"){
+      fillStyle = glowColor = "#CCFF00";
+    } else if (col === "cyan"){
+      fillStyle = glowColor = "#00E5FF";
+    } else if (col === "white"){
+      fillStyle = glowColor = "#FFFFFF";
+    } else if (col === "clay" || col === "accent"){
+      fillStyle = glowColor = C.clayLt || "#E85D3B";
+    } else if (col === "gold"){
+      fillStyle = glowColor = "#FFD700";
+    } else if (col === "red"){
+      fillStyle = glowColor = "#FF3B30";
+    } else if (col === "deodar"){
+      fillStyle = glowColor = "#2E7D32";
+    } else if (col === "custom"){
+      fillStyle = glowColor = cfg.customColor || "#CCFF00";
+    } else {
+      fillStyle = glowColor = col;
+    }
+    c.fillStyle = fillStyle;
+    c.shadowColor = glowColor;
+    c.shadowBlur = 8 * u;
+    c.fillRect(fx, fy, fw, fh);
+  }
+  c.restore();
 }
 function drawEmpty(){
   const { W, H, u } = geo(); brandBg(ctx, THEMES.slate);
@@ -3055,9 +3428,13 @@ function syncVideos(t, hard){
 }
 function scheduleDucking(t0){
   duck.gain.cancelScheduledValues(0); duck.gain.setValueAtTime(1, AC.currentTime);
-  if (!P.vo || !P.vo.segs) return;
-  for (const [s, e] of P.vo.segs){
-    const a = P.vo.start + s - .15, b = P.vo.start + e + .25;
+  const duckIntervals = [];
+  if (P.vo && P.vo.segs && P.vo.segs.length){
+    for (const [s, e] of P.vo.segs) duckIntervals.push([P.vo.start + s - .15, P.vo.start + e + .25]);
+  } else if (P.captions && P.captions.length){
+    for (const cp of P.captions) duckIntervals.push([cp.start - .12, cp.end + .2]);
+  }
+  for (const [a, b] of duckIntervals){
     if (b < t0) continue;
     const ta = startCtx + Math.max(0, a - t0), tb = startCtx + Math.max(0, b - t0);
     duck.gain.setTargetAtTime(P.duckLevel, ta, .08);
@@ -3087,6 +3464,7 @@ async function play(from, opts = {}){
   if (!SEQ.length) return;
   await AC.resume().catch(() => {});
   if (from >= TOTAL - .05) from = 0;
+  if (from === 0){ const sc = $("tlScroll"); if (sc) sc.scrollLeft = 0; }
   stopSources();
   syncVideos(from, true);
   startT = from; startCtx = AC.currentTime + .08; playing = true;
@@ -3105,6 +3483,16 @@ function pause(){
 }
 function seek(t){
   t = clamp(t, 0, TOTAL);
+  const sc = $("tlScroll");
+  if (sc){
+    if (t === 0) sc.scrollLeft = 0;
+    else {
+      const x = t * P.pps;
+      if (x < sc.scrollLeft || x > sc.scrollLeft + sc.clientWidth - 40){
+        sc.scrollLeft = Math.max(0, x - sc.clientWidth / 3);
+      }
+    }
+  }
   if (playing){ play(t); return; }
   playT = t; syncVideos(t, true); renderFrame(t); updatePlayhead(); updateTransport();
 }
@@ -3193,16 +3581,116 @@ function waveform(buffer, w = 600, h = 40){
   return c;
 }
 /* =========================================================
+   Smart silence detection & dead-air jump-cutting (Adobe Premiere / ElevenLabs style, 100% offline pure JS)
+   ========================================================= */
+function autoMuteSilence(minGap = 0.32){
+  if (!P.vo || !P.vo.segs || P.vo.segs.length <= 1) return { count:0, totalSec:0 };
+  const segs = P.vo.segs, vo = P.vo;
+  if (!vo.mutes) vo.mutes = [];
+  let count = 0, totalSec = 0;
+  for (let i = 0; i < segs.length - 1; i++){
+    const gapStart = +(vo.start + segs[i][1] + 0.04).toFixed(2);
+    const gapEnd = +(vo.start + segs[i + 1][0] - 0.04).toFixed(2);
+    if (gapEnd - gapStart >= minGap){
+      const overlap = vo.mutes.some(([a, b]) => Math.max(a, gapStart) < Math.min(b, gapEnd));
+      if (!overlap){
+        vo.mutes.push([gapStart, gapEnd]);
+        count++;
+        totalSec += (gapEnd - gapStart);
+      }
+    }
+  }
+  vo.mutes.sort((a, b) => a[0] - b[0]);
+  return { count, totalSec:+totalSec.toFixed(1) };
+}
+
+async function jumpCutSilence(minGap = 0.35){
+  if (!P.vo || !P.vo.buffer || !P.vo.segs || P.vo.segs.length <= 1) return null;
+  const vo = P.vo, segs = vo.segs, buf = vo.raw || vo.buffer, sr = buf.sampleRate, d = buf.getChannelData(0);
+  const pad = 0.06;
+  const spans = segs.map(([s, e]) => [Math.max(0, s - pad), Math.min(buf.duration, e + pad)]);
+  const merged = [];
+  spans.forEach(sp => {
+    if (!merged.length) merged.push(sp);
+    else {
+      const prev = merged[merged.length - 1];
+      if (sp[0] <= prev[1] + 0.08) prev[1] = Math.max(prev[1], sp[1]);
+      else merged.push(sp);
+    }
+  });
+  if (merged.length <= 1) return null;
+
+  let totalSamples = 0;
+  merged.forEach(([s, e]) => { totalSamples += Math.floor((e - s) * sr); });
+  if (totalSamples <= sr * 0.4) return null;
+
+  const newBuf = AC.createBuffer(1, totalSamples, sr), outD = newBuf.getChannelData(0);
+  const fade = Math.floor(sr * 0.02);
+  let writeIdx = 0;
+  const timeMap = [];
+
+  merged.forEach(([s, e]) => {
+    const sIdx = Math.floor(s * sr), eIdx = Math.min(d.length, Math.floor(e * sr));
+    const spanLen = eIdx - sIdx;
+    const newStartT = writeIdx / sr;
+    timeMap.push({ oldStart:s, oldEnd:e, newStart:newStartT, dur:(e - s) });
+    for (let k = 0; k < spanLen; k++){
+      let smp = d[sIdx + k] || 0;
+      if (k < fade) smp *= (k / fade);
+      else if (k > spanLen - fade) smp *= ((spanLen - k) / fade);
+      outD[writeIdx + k] = smp;
+    }
+    writeIdx += spanLen;
+  });
+
+  const savedSec = +(buf.duration - newBuf.duration).toFixed(1);
+
+  if (P.captions && P.captions.length){
+    P.captions.forEach(cp => {
+      const oldMid = (cp.start + cp.end) / 2 - vo.start;
+      let best = timeMap[0], minD = 9999;
+      timeMap.forEach(m => {
+        const dist = Math.abs(oldMid - (m.oldStart + m.oldEnd) / 2);
+        if (dist < minD){ minD = dist; best = m; }
+      });
+      if (best){
+        const offInSpan = clamp(oldMid - best.oldStart, 0, best.dur);
+        const dur = cp.end - cp.start;
+        const newMid = vo.start + best.newStart + offInSpan;
+        cp.start = Math.max(0, +(newMid - dur / 2).toFixed(2));
+        cp.end = +(cp.start + dur).toFixed(2);
+      }
+    });
+  }
+
+  vo.raw = newBuf;
+  vo.buffer = newBuf;
+  vo.mutes = [];
+  vo.segs = speechSegments(newBuf);
+  vo.wave = waveform(newBuf);
+  await applyVoiceFx();
+  changed(true);
+  return { gapsCut:merged.length - 1, savedSec };
+}
+
+/* =========================================================
    Voice studio: offline processing of the voiceover
    pitch (without changing speed) -> noise reduction -> EQ -> compression -> loudness
    ========================================================= */
 const VOICE_PRESETS = {
-  natural:  { name:"Natural",            pitch:0,  warmth:1, clarity:2, air:1, bold:.35, gate:.3, level:true, denoise:"strong" },
-  radio:    { name:"Warm & bold (radio)", pitch:-1, warmth:4, clarity:3, air:2, bold:.8,  gate:.45, level:true, denoise:"strong" },
-  crisp:    { name:"Crisp & clear",       pitch:0,  warmth:-1, clarity:5, air:3, bold:.55, gate:.45, level:true, denoise:"strong" },
-  deep:     { name:"Deep voice",          pitch:-3, warmth:5, clarity:2, air:0, bold:.6,  gate:.35, level:true, denoise:"strong" },
-  bright:   { name:"Bright & energetic",  pitch:1,  warmth:0, clarity:4, air:3, bold:.7,  gate:.4, level:true, denoise:"strong" },
-  raw:      { name:"Original (no effects)", pitch:0, warmth:0, clarity:0, air:0, bold:0, gate:0, level:false, denoise:"off" }
+  elevenlabs:{ name:"💎 ElevenLabs Studio Master", pitch:0, warmth:4.5, clarity:4.8, air:3.6, bold:.88, gate:.42, level:true, denoise:"strong", studioPolish:true },
+  podcast:  { name:"🎙️ Studio Podcast",   pitch:0,  warmth:3.5, clarity:3.5, air:2.5, bold:.75, gate:.4,  level:true, denoise:"strong", reverb:.12 },
+  radio:    { name:"📻 Warm & Bold",     pitch:-1, warmth:4,   clarity:3,   air:2,   bold:.8,  gate:.45, level:true, denoise:"strong" },
+  crisp:    { name:"✨ Crisp & Clear",    pitch:0,  warmth:-1,  clarity:5.5, air:3.5, bold:.55, gate:.45, level:true, denoise:"strong" },
+  telephone:{ name:"📞 Phone / Walkie",  pitch:0,  warmth:-4,  clarity:6,   air:-3,  bold:.8,  gate:.5,  level:true, denoise:"strong", phone:true },
+  reverb:   { name:"🏛️ Cinematic Space", pitch:0,  warmth:2,   clarity:3,   air:3,   bold:.4,  gate:.3,  level:true, denoise:"strong", reverb:.32 },
+  deep:     { name:"🦁 Deep Voice",      pitch:-3, warmth:5,   clarity:2,   air:0,   bold:.6,  gate:.35, level:true, denoise:"strong" },
+  monster:  { name:"👹 Monster / Villain",pitch:-5, warmth:6,  clarity:1,   air:-2,  bold:.85, gate:.4,  level:true, denoise:"strong" },
+  helium:   { name:"🐿️ Helium High",     pitch:4,  warmth:-2,  clarity:4,   air:3,   bold:.4,  gate:.3,  level:true, denoise:"strong" },
+  robot:    { name:"🤖 Cyber Robot",     pitch:0,  warmth:1,   clarity:4,   air:2,   bold:.65, gate:.45, level:true, denoise:"strong", robot:true },
+  natural:  { name:"🌱 Natural Clean",   pitch:0,  warmth:1,   clarity:2,   air:1,   bold:.35, gate:.3,  level:true, denoise:"strong" },
+  clean:    { name:"🔇 Max Denoise",     pitch:0,  warmth:1,   clarity:2,   air:1,   bold:.4,  gate:.65, level:true, denoise:"max" },
+  raw:      { name:"Original (No FX)",   pitch:0,  warmth:0,   clarity:0,   air:0,   bold:0,   gate:0,   level:false, denoise:"off" }
 };
 function hann(N){ const w = new Float32Array(N); for (let i = 0; i < N; i++) w[i] = .5 - .5 * Math.cos(2 * Math.PI * i / (N - 1)); return w; }
 /* WSOLA time stretch: changes length, keeps pitch */
@@ -3304,34 +3792,77 @@ async function rnnDenoise(x, sr, level){
   res.set(back.subarray(0, Math.min(back.length, x.length)));
   return res;
 }
+function makeReverbImpulse(ctx, dur = 1.0, decay = 2.4){
+  const sr = ctx.sampleRate, len = Math.floor(sr * dur), b = ctx.createBuffer(1, len, sr), d = b.getChannelData(0);
+  for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, decay);
+  return b;
+}
+/* pure DSP noise cancellation: multi-band filtering + adaptive speech gating (no AI required) */
+function dspDenoise(x, sr, level){
+  if (!level || level === "off") return x;
+  const kAtt = level === "light" ? 0.35 : level === "strong" ? 0.75 : 0.96;
+  return noiseGate(x, sr, kAtt);
+}
 async function processVoice(raw, fx){
   const sr = raw.sampleRate, ch = raw.numberOfChannels;
   let x = new Float32Array(raw.length);
   for (let c = 0; c < ch; c++){ const d = raw.getChannelData(c); for (let i = 0; i < d.length; i++) x[i] += d[i] / ch; }
   if (fx && fx.denoise && fx.denoise !== "off"){
-    try { x = await rnnDenoise(x, sr, fx.denoise); } catch(e){ toast("Noise removal could not start in this browser."); }
+    x = dspDenoise(x, sr, fx.denoise);
   }
-  if (!fx || fx.preset === "raw" && !fx.pitch){ const b = AC.createBuffer(1, x.length, sr); b.copyToChannel(x, 0); return b; }
+  if (!fx || (fx.preset === "raw" && !fx.pitch && !fx.phone && !fx.robot && !fx.reverb && (!fx.denoise || fx.denoise === "off") && !fx.studioPolish)){ const b = AC.createBuffer(1, x.length, sr); b.copyToChannel(x, 0); return b; }
+  if (fx.robot){
+    for (let i = 0; i < x.length; i++) x[i] *= Math.sin(2 * Math.PI * 55 * (i / sr));
+  }
   x = pitchShift(x, fx.pitch);
   x = noiseGate(x, sr, fx.gate);
   const off = new OfflineAudioContext(1, x.length, sr), src = off.createBufferSource(), b0 = off.createBuffer(1, x.length, sr);
   b0.copyToChannel(x, 0); src.buffer = b0;
-  const hp = off.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = 85; hp.Q.value = .7;
-  const warm = off.createBiquadFilter(); warm.type = "lowshelf"; warm.frequency.value = 180; warm.gain.value = fx.warmth;
+  const hpFreq = fx.phone ? 450 : fx.denoise === "max" ? 100 : fx.denoise === "strong" ? 90 : 80;
+  const hp = off.createBiquadFilter(); hp.type = "highpass"; hp.frequency.value = hpFreq; hp.Q.value = fx.phone ? 1.4 : .7;
+  const notch50 = off.createBiquadFilter(); notch50.type = "notch"; notch50.frequency.value = 50; notch50.Q.value = 6;
+  const notch60 = off.createBiquadFilter(); notch60.type = "notch"; notch60.frequency.value = 60; notch60.Q.value = 6;
+  const deHiss = off.createBiquadFilter(); deHiss.type = "highshelf"; deHiss.frequency.value = 11000;
+  deHiss.gain.value = fx.denoise === "max" ? -6 : fx.denoise === "strong" ? -3 : 0;
+  const warm = off.createBiquadFilter(); warm.type = "lowshelf"; warm.frequency.value = 180; warm.gain.value = fx.phone ? -6 : fx.warmth;
   const mud = off.createBiquadFilter(); mud.type = "peaking"; mud.frequency.value = 350; mud.Q.value = 1.1; mud.gain.value = -Math.max(0, fx.clarity) * .4;
-  const pres = off.createBiquadFilter(); pres.type = "peaking"; pres.frequency.value = 3200; pres.Q.value = .9; pres.gain.value = fx.clarity;
-  const air = off.createBiquadFilter(); air.type = "highshelf"; air.frequency.value = 9000; air.gain.value = fx.air;
+  const pres = off.createBiquadFilter(); pres.type = "peaking"; pres.frequency.value = fx.phone ? 1800 : 3200; pres.Q.value = fx.phone ? 2.2 : .9; pres.gain.value = fx.phone ? 6 : fx.clarity;
+  const air = off.createBiquadFilter(); air.type = fx.phone ? "lowpass" : "highshelf"; air.frequency.value = fx.phone ? 3400 : 9000; air.gain.value = fx.phone ? 0 : fx.air;
   const comp = off.createDynamicsCompressor();
   comp.threshold.value = -12 - 24 * fx.bold; comp.ratio.value = 1.5 + 4.5 * fx.bold; comp.knee.value = 8; comp.attack.value = .006; comp.release.value = .16;
   const make = off.createGain(); make.gain.value = 1 + 1.6 * fx.bold;
-  src.connect(hp).connect(warm).connect(mud).connect(pres).connect(air).connect(comp).connect(make).connect(off.destination);
+  src.connect(hp).connect(notch50).connect(notch60).connect(deHiss).connect(warm).connect(mud).connect(pres).connect(air);
+  let chainLast = air;
+  if (fx.studioPolish){
+    const deEss = off.createBiquadFilter(); deEss.type = "peaking"; deEss.frequency.value = 6400; deEss.Q.value = 3.2; deEss.gain.value = -5.5;
+    const airSheen = off.createBiquadFilter(); airSheen.type = "highshelf"; airSheen.frequency.value = 11500; airSheen.gain.value = 4.2;
+    const sat = off.createWaveShaper();
+    const sc = new Float32Array(2048);
+    for (let i = 0; i < 2048; i++){ const v = (i * 2) / 2048 - 1; sc[i] = Math.tanh(1.8 * v) / Math.tanh(1.8); }
+    sat.curve = sc;
+    chainLast.connect(deEss).connect(airSheen).connect(sat);
+    chainLast = sat;
+  }
+  chainLast.connect(comp).connect(make);
+  if (fx.reverb && fx.reverb > 0){
+    const rev = off.createConvolver(); rev.buffer = makeReverbImpulse(off, 1.1, 2.5);
+    const dryG = off.createGain(); dryG.gain.value = Math.max(0, 1 - fx.reverb * 0.4);
+    const wetG = off.createGain(); wetG.gain.value = fx.reverb * 0.7;
+    const revOut = off.createGain();
+    make.connect(dryG).connect(revOut);
+    make.connect(rev).connect(wetG).connect(revOut);
+    revOut.connect(off.destination);
+  } else {
+    make.connect(off.destination);
+  }
   src.start();
   const out = await off.startRendering(), y = out.getChannelData(0);
-  if (fx.level){ /* bring speech to a steady broadcast level, keep peaks under -1 dB */
+  if (fx.level || fx.studioPolish){ /* bring speech to a steady broadcast level, keep peaks under -1 dB */
     let peak = 0, s = 0, n = 0; const blk = Math.floor(sr * .05);
     for (let i = 0; i < y.length; i++) peak = Math.max(peak, Math.abs(y[i]));
     for (let i = 0; i < y.length; i += blk){ let b = 0, e = Math.min(y.length, i + blk); for (let k = i; k < e; k++) b += y[k] * y[k]; const r = Math.sqrt(b / (e - i)); if (r > .01){ s += r * r; n++; } }
-    const rms = n ? Math.sqrt(s / n) : 0, gain = rms ? Math.min(.14 / rms, .89 / (peak || 1)) : 1;
+    const targetRMS = fx.studioPolish ? .16 : .14;
+    const rms = n ? Math.sqrt(s / n) : 0, gain = rms ? Math.min(targetRMS / rms, .89 / (peak || 1)) : 1;
     for (let i = 0; i < y.length; i++) y[i] *= gain;
   }
   return out;
@@ -3642,6 +4173,23 @@ function renderTimeline(){
   const ruler = $("ruler"); ruler.innerHTML = "";
   const step = pps >= 80 ? 1 : pps >= 30 ? 2 : pps >= 15 ? 5 : 10;
   for (let s = 0; s * pps < width; s += step){ const i = document.createElement("i"); i.style.left = s * pps + "px"; i.textContent = s + "s"; ruler.appendChild(i); }
+  if (typeof beatSnapOn !== "undefined" && beatSnapOn && typeof getMusicBeats === "function"){
+    const b = getMusicBeats();
+    if (b && b.period > 0){
+      const off = (P.music.offset || 0) % b.period;
+      const count = Math.ceil(TOTAL / b.period) + 2;
+      for (let k = 0; k < count; k++){
+        const bt = off + k * b.period;
+        if (bt >= 0 && bt <= TOTAL + 1){
+          const pip = document.createElement("i");
+          pip.className = "beat-pip";
+          pip.style.left = (bt * pps) + "px";
+          pip.title = `Beat ${k + 1} (${bt.toFixed(2)}s)`;
+          ruler.appendChild(pip);
+        }
+      }
+    }
+  }
   const sel = it => (selected && selected.item === it) || (typeof msHas === "function" && msHas(it));
   const tc = $("trClips"); tc.innerHTML = "";
   SEQ.forEach(c => { const b = blk("clip", c._start * pps, c.dur * pps - 2, `${clipLabel(c)} · ${c.dur.toFixed(1)}s${speedTag(c)}`, () => { if (b.dataset.moved) return; select("clip", c); seek(c._start + .05); }, sel(c), c.thumb); if (P.clips.includes(c)) enableClipDrag(b, c); (c.kf || []).forEach(k => { if (k.t < 0 || k.t > c.dur) return; const d = document.createElement("i"); d.className = "kfd"; d.style.left = (k.t * pps - 5) + "px"; d.title = `Keyframe ${k.t.toFixed(2)} s`; b.appendChild(d); }); addHandles(b, clipDragSpec(c)); tc.appendChild(b); });
@@ -3656,7 +4204,26 @@ function renderTimeline(){
   const tv = $("trVo"); tv.innerHTML = "";
   if (P.vo){ const b = blk("vo", P.vo.start * pps, P.vo.buffer.duration * pps, P.vo.name, () => select("vo", P.vo), sel(P.vo), P.vo.wave); addHandles(b, { body:(dt, s) => { P.vo.start = Math.max(0, snapT(s.start + dt)); }, begin:() => ({ start:P.vo.start }) }); tv.appendChild(b); }
   const tm = $("trMus"); tm.innerHTML = "";
-  if (P.music) tm.appendChild(blk("mus", 0, TOTAL * pps, P.music.name, () => select("music", P.music), sel(P.music)));
+  if (P.music){
+    const mb = blk("mus", 0, TOTAL * pps, P.music.name, () => select("music", P.music), sel(P.music));
+    if (typeof beatSnapOn !== "undefined" && beatSnapOn && typeof getMusicBeats === "function"){
+      const b = getMusicBeats();
+      if (b && b.period > 0){
+        const off = (P.music.offset || 0) % b.period;
+        const count = Math.ceil(TOTAL / b.period) + 2;
+        for (let k = 0; k < count; k++){
+          const bt = off + k * b.period;
+          if (bt >= 0 && bt <= TOTAL){
+            const bMark = document.createElement("i");
+            bMark.className = "beat-mark";
+            bMark.style.left = (bt * pps) + "px";
+            mb.appendChild(bMark);
+          }
+        }
+      }
+    }
+    tm.appendChild(mb);
+  }
   updatePlayhead();
 }
 /* drag a clip block left or right to reorder */
@@ -3679,7 +4246,11 @@ function enableClipDrag(b, c){
 function updatePlayhead(){
   const t = now(); $("playhead").style.left = (t * P.pps) + "px";
   $("timeLbl").textContent = `${fmtT(t)} / ${fmtT(TOTAL)}`;
-  if (playing){ const sc = $("tlScroll"), x = t * P.pps; if (x > sc.scrollLeft + sc.clientWidth - 60) sc.scrollLeft = x - 120; }
+  const sc = $("tlScroll"), x = t * P.pps;
+  if (playing && sc){
+    if (x > sc.scrollLeft + sc.clientWidth - 60) sc.scrollLeft = x - 120;
+    else if (x < sc.scrollLeft) sc.scrollLeft = Math.max(0, x - 40);
+  }
 }
 let scrubbing = false;
 $("tlInner").addEventListener("pointerdown", e => {
@@ -3702,6 +4273,7 @@ function fNum(label, value, on, step = .1, min = 0, max = 999){ const id = "i" +
 function fSelect(label, value, options, on){ const id = "i" + uid++; const s = el("select", { id }); options.forEach(([v, l]) => s.appendChild(new Option(l, v))); s.value = value; s.addEventListener("change", () => on(s.value)); return el("div", { class:"field" }, [el("label", { for:id, text:label }), s]); }
 function fChips(label, value, options, on){ const wrap = el("div", { class:"chips" }); options.forEach(([v, l]) => { const b = el("button", { type:"button", class:"chip", "aria-pressed":String(v === value), text:l }); b.addEventListener("click", () => { on(v); [...wrap.children].forEach(x => x.setAttribute("aria-pressed", String(x === b))); }); wrap.appendChild(b); }); return el("div", { class:"field" }, [el("span", { class:"lbl", text:label }), wrap]); }
 function fSlider(label, value, min, max, step, on, fmt = v => Math.round(v * 100) + "%"){ const inp = el("input", { type:"range", min, max, step, "aria-label":label }); inp.value = value; const out = el("output", { text:fmt(value) }); inp.addEventListener("input", () => { out.textContent = fmt(+inp.value); on(+inp.value); }); return el("div", { class:"slider" }, [el("span", { text:label }), inp, out]); }
+function fColorPicker(val, on){ const inp = el("input", { type:"color", value:val || "#00ff00", style:"width:38px;height:26px;padding:0;border:1px solid var(--line);border-radius:4px;cursor:pointer" }); inp.addEventListener("input", () => on(inp.value)); return inp; }
 const btn = (text, on, cls = "btn sm") => el("button", { type:"button", class:cls, text, onclick:on });
 const changed = (full = true) => { commit(); layoutSeq(); if (full) renderTimeline(); if (!playing){ playT = clamp(playT, 0, TOTAL); syncVideos(playT, true); renderFrame(playT); } updateLen(); };
 function fileBtn(label, accept, on){ const l = el("label", { class:"btn sm upload", text:label }); const i = el("input", { type:"file", accept }); i.addEventListener("change", () => { if (i.files[0]) on(i.files[0]); i.value = ""; }); l.appendChild(i); return l; }
@@ -3762,7 +4334,17 @@ function renderInspector(){
       box.append(fNum("Duration (s)", it.dur, v => { it.dur = clamp(v, .8, 20); changed(); }, .1, .8, 20),
         fSelect("Camera move", it.motion, MOTIONS, v => { it.motion = v; changed(false); }),
         el("p", { class:"hint", text:"Drone moves work best on aerial or wide photos. Give them 5 to 8 seconds." }),
-        el("div", { class:"row field" }, [fileBtn("Replace photo", "image/*", async f => { const img = await loadImage(f); it.el = img; it.thumb = thumbOf(img, img.naturalWidth, img.naturalHeight); changed(); }),
+        el("div", { class:"row field", style:"gap:6px;flex-wrap:wrap" }, [
+          btn(it.d3 && it.d3.on ? "🚁 Drone 3D: Active" : "🚁 3D Drone Flight (No AI)", () => {
+            const on = !(it.d3 && it.d3.on);
+            it.d3 = { on, pitch0:42, pitch1:70, alt0:50, alt1:170, orbit:20, zoom:1.15, hud:true, label:((it.name || "AERIAL").replace(/\.[^.]+$/, "")).toUpperCase() };
+            it.dur = Math.max(5, it.dur || 5);
+            changed(); renderInspector();
+            seek(it._start + 0.1); play(it._start + 0.1);
+            setTimeout(() => { if (playing) pause(); }, 2500);
+            toast(on ? "🚁 3D Drone Flight activated! 100% pure JS raycasting math." : "Drone flight turned off.");
+          }, it.d3 && it.d3.on ? "btn sm" : "btn sm dark"),
+          fileBtn("Replace photo", "image/*", async f => { const img = await loadImage(f); it.el = img; it.thumb = thumbOf(img, img.naturalWidth, img.naturalHeight); changed(); }),
           fileBtn("Turn into before / after", "image/*", async f => { const after = await loadImage(f); toCompare(it, after); })]),
         el("p", { class:"hint", text:"Before / after: this photo becomes 'before', the one you choose becomes 'after'." }));
     }
@@ -3863,12 +4445,16 @@ function renderInspector(){
       toggleRow("Moving dashes around the outline", pl.motion !== false, v => { pl.motion = v; changed(false); }),
       fNum("Appears after (s into clip)", pl.at || 0, v => { pl.at = clamp(v, 0, Math.max(0, clip.dur - .5)); changed(); }, .1, 0, 60),
       el("div", {}, [el("h2", { text:"Side lengths and area (optional)", style:"margin-top:10px" }),
-        el("div", { class:"grid2" }, [fText("Width", pl.w, v => { pl.w = v; changed(false); renderInspectorArea(); }), fText("Length", pl.l, v => { pl.l = v; changed(false); renderInspectorArea(); })]),
+        el("div", { class:"grid3" }, [
+          fText("Front side", pl.front, v => { pl.front = v; changed(false); renderInspectorArea(); }),
+          fText("Width", pl.w, v => { pl.w = v; changed(false); renderInspectorArea(); }),
+          fText("Length / Depth", pl.l, v => { pl.l = v; changed(false); renderInspectorArea(); })
+        ]),
         el("div", { class:"grid2" }, [plotColorField("Side badge colour", pl.sideBg || "#1C2128", v => { pl.sideBg = v || undefined; changed(false); }, true), plotColorField("Side text", pl.sideFg || "#FFFFFF", v => { pl.sideFg = v || undefined; changed(false); }, true)]),
-        el("p", { class:"hint", text:"Width and length badges sit inside the outline. Select the plot, then drag a badge to move it." }),
+        el("p", { class:"hint", text:"Front, width, and length badges sit inside the outline. Select the plot, then drag any badge to move it." }),
         fChips("Measured in", pl.unit, [["ft","Feet"],["m","Metres"]], v => { pl.unit = v; changed(false); renderInspectorArea(); }),
         fChips("Show area in", pl.areaUnit, AREA_UNITS, v => { pl.areaUnit = v; changed(false); renderInspectorArea(); }),
-        el("p", { class:"hint", id:"areaPreview", text:"" }), el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from width and length." })]),
+        el("p", { class:"hint", id:"areaPreview", text:"" }), el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from front/width and length." })]),
       el("div", { class:"row" }, [btn("Redraw corners", () => startPlotDraw(clip, pl)), btn("Back to clip", () => select("clip", clip)), btn("Delete", () => deleteSelected())]));
     renderInspectorArea();
     return;
@@ -3882,15 +4468,40 @@ function renderInspector(){
       fSlider("Size", o.w, .15, .95, .01, v => { o.w = v; changed(false); }),
       fChips("Shape", o.shape, [["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }),
       el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]),
+      el("h2", { text:"Chroma key & blend mode (Adobe style)", style:"margin-top:10px" }),
+      el("label", { class:"toggle" }, [
+        Object.assign(el("input", { type:"checkbox" }), {
+          checked:!!o.chromaKey,
+          onchange:e => { o.chromaKey = e.target.checked; changed(false); renderInspector(); }
+        }),
+        document.createTextNode("🟢 Chroma key (remove green screen)")
+      ]),
+      o.chromaKey ? el("div", { class:"field", style:"margin-top:6px;padding:8px;background:var(--soft);border-radius:8px" }, [
+        el("div", { class:"row", style:"align-items:center;gap:8px" }, [
+          el("span", { class:"lbl", text:"Key color" }),
+          fColorPicker(o.keyColor || "#00FF00", c => { o.keyColor = c; changed(false); })
+        ]),
+        fSlider("Tolerance", o.keyTol ?? 0.36, 0.1, 0.8, 0.02, v => { o.keyTol = v; changed(false); }),
+        fSlider("Feather", o.keyFeather ?? 0.14, 0.02, 0.4, 0.01, v => { o.keyFeather = v; changed(false); })
+      ]) : "",
+      fSelect("Blend mode", o.blendMode || "source-over", [
+        ["source-over","Normal"],
+        ["screen","Screen (Light leaks / Fire / Glow)"],
+        ["multiply","Multiply (Paper / Textures)"],
+        ["overlay","Overlay (Vibrant contrast)"],
+        ["lighten","Lighten"],
+        ["color-dodge","Color Dodge"],
+        ["difference","Difference"]
+      ], v => { o.blendMode = v; changed(false); }),
       el("p", { class:"hint", text:"Drag the image on the preview to place it exactly." }),
       el("div", { class:"row", style:"margin-top:8px" }, [fileBtn("Replace image", "image/*", async f => { o.el = await loadImage(f); changed(false); }), btn("Delete", () => deleteSelected())]));
     return;
   }
   if (type === "caption"){
     const cp = it;
-    const capSty = wordStyler("cap:" + cp.id, () => cp.text, () => cp.ws, m => { if (m) cp.ws = m; else delete cp.ws; changed(false); }, { font:(capOpts(cp).custom || {}).font || P.cap.font || GIRIKA.FONTS.body, hint:"Click a word to change its colour, size, font or add an emoji. Shift-click picks a range. With the caption selected, you can also click a word on the preview." });
+    const capSty = wordStyler("cap:" + cp.id, () => cp.text, () => cp.ws, m => { if (m) cp.ws = m; else delete cp.ws; changed(false); }, { font:(capOpts(cp).custom || {}).font || P.cap.font || GIRIKA.FONTS.body, hint:"Click a word to change its colour, size, font or add an emoji. Shift-click picks a range. With the caption selected, you can also click a word on the preview.", setText: v => { const m = wsRemap(cp.text, v, cp.ws); if (m) cp.ws = m; else delete cp.ws; cp.text = v; changed(); renderCaptionList(); renderInspector(); } });
     box.append(el("p", { class:"insp-title", text:"Caption" }),
-      fText("Text (use *stars* to highlight)", cp.text, v => { const m = wsRemap(cp.text, v, cp.ws); if (m) cp.ws = m; else delete cp.ws; cp.text = v; changed(); renderCaptionList(); capSty.paint(); }, true),
+      fText("Text (use *stars* to highlight, Enter for lines)", cp.text, v => { const m = wsRemap(cp.text, v, cp.ws); if (m) cp.ws = m; else delete cp.ws; cp.text = v; changed(); renderCaptionList(); capSty.paint(); }, true),
       capSty,
       el("div", { class:"grid2" }, [fNum("From (s)", cp.start, v => { cp.start = clamp(v, 0, cp.end - .2); changed(); renderInspector(); renderCaptionList(); }), fNum("Until (s)", cp.end, v => { cp.end = Math.max(cp.start + .2, v); changed(); renderInspector(); renderCaptionList(); })]),
       el("div", { class:"row field" }, [btn("Start here", () => { cp.start = clamp(now(), 0, cp.end - .2); changed(); renderInspector(); renderCaptionList(); }), btn("End here", () => { cp.end = Math.max(cp.start + .2, now()); changed(); renderInspector(); renderCaptionList(); }), btn("Delete", () => deleteSelected())]),
@@ -3899,6 +4510,7 @@ function renderInspector(){
       fSelect("Style", (cp.o && cp.o.style) || "", capStyleOptions(cp), v => {
         const o2 = { ...(cp.o || {}), style:v || undefined };
         if (v.startsWith("saved:")){ const sv = capSaved(v.slice(6)); o2.custom = capProps(sv ? sv.props : P.cap.custom); csUseFont(o2.custom.font); }
+        else if (v === "custom"){ o2.custom = capProps((cp.o && cp.o.custom) || P.cap.custom); csUseFont(o2.custom.font); }
         else delete o2.custom;
         delete o2.presetId; cp.o = o2; csLastSel = undefined; changed(false); renderInspector(); renderCapExtras(); }),
       cp.o && capIsCustom(cp.o.style) ? el("div", { class:"row field" }, [btn("Edit this look", () => { csScope = "one"; csLastSel = cp.id; csOpenDock(); })]) : "",
@@ -3924,8 +4536,27 @@ function renderInspector(){
       fSlider("Clarity", fx.clarity, -4, 8, .5, v => setFx("clarity", v), db),
       fSlider("Air", fx.air, -4, 6, .5, v => setFx("air", v), db),
       fSlider("Boldness", fx.bold, 0, 1, .01, v => setFx("bold", v)),
-      fChips("Remove background noise (AI)", fx.denoise || "off", [["off","Off"],["light","Light"],["strong","Strong"],["max","Maximum"]], v => setFx("denoise", v)),
-      el("p", { class:"hint", text:"Removes steady noise (fan, AC, hum, hiss, traffic) and quietens the gaps between phrases. Strong suits most recordings. Short loud sounds like a dog bark or a knock can stay: mute them below." }),
+      fSlider("Reverb / Space", fx.reverb || 0, 0, .8, .02, v => setFx("reverb", v), v => Math.round(v * 100) + "%"),
+      el("div", { class:"row field", style:"gap:6px;align-items:center" }, [
+        el("span", { class:"lbl", text:"Effects" }),
+        btn("📞 Phone", () => setFx("phone", !fx.phone), fx.phone ? "chip on" : "chip"),
+        btn("🤖 Cyber Robot", () => setFx("robot", !fx.robot), fx.robot ? "chip on" : "chip")]),
+      fChips("Noise cancellation (DSP)", fx.denoise || "off", [["off","Off"],["light","Light"],["strong","Studio (Recommended)"],["max","Maximum"]], v => setFx("denoise", v)),
+      el("p", { class:"hint", text:"100% offline studio DSP filter: eliminates AC hum, fans, desk thumps, and room hiss without any AI or cloud." }),
+      el("h2", { text:"Smart dead-air & silence (Adobe / ElevenLabs)", style:"margin-top:10px" }),
+      el("div", { class:"row field", style:"gap:6px" }, [
+        btn("⚡ Auto-Cut Dead Air (Jump-Cut)", async () => {
+          const res = await jumpCutSilence();
+          if (res) toast(`✂️ Cut ${res.gapsCut} silence gaps, saved ${res.savedSec}s of dead air!`);
+          else toast("No long pauses (>0.35s) found in voiceover.");
+        }, "btn sm primary"),
+        btn("🔇 Auto-Mute Pauses", () => {
+          const res = autoMuteSilence();
+          if (res && res.count) { applyVoiceFx(); toast(`🔇 Muted ${res.count} silence gaps (${res.totalSec}s).`); renderInspector(); }
+          else toast("No new silence gaps found.");
+        }, "btn sm")
+      ]),
+      el("p", { class:"hint", text:"Auto-Cut strips pauses and compacts speech for viral fast-paced reels. Auto-Mute silences room noise and breaths between words." }),
       el("h2", { text:"Mute a section", style:"margin-top:10px" }),
       el("p", { class:"hint", text:"For a bark, knock or cough between words: play to it, then mark where it starts and ends." }),
       el("div", { class:"row field" }, [
@@ -3993,7 +4624,123 @@ function renderWmPanel(){
     fSlider("Size", L.wmSize, .5, 2, .01, v => { L.wmSize = v; persist(); if (!playing) renderFrame(playT); }),
     fSlider("Opacity", L.wmOpacity, .3, 1, .01, v => { L.wmOpacity = v; persist(); if (!playing) renderFrame(playT); }));
 }
-function renderInspectorArea(){ const p = $("areaPreview"); if (p && selected && selected.type === "plot"){ const a = plotArea(selected.item); p.textContent = a ? `Total area shown: ${a}` : "Enter width and length to show the total area."; } }
+function renderProgBarPanel(){
+  const p = $("progBarPanel"), on = !!P.progressBar;
+  if (!p) return;
+  p.hidden = !on;
+  const cb = $("progBarOn"); if (cb) cb.checked = on;
+  if (!on){ p.innerHTML = ""; return; }
+  const cfg = P.progBar || (P.progBar = { pos:"bottom", color:"gradient", height:7, customColor:"#CCFF00" });
+  const positions = [["bottom","Bottom"],["top","Top"],["left","Left"],["right","Right"]];
+  const colors = [
+    ["gradient","Lime-Cyan"],
+    ["lime","Lime"],
+    ["cyan","Cyan"],
+    ["clay","Clay"],
+    ["white","White"],
+    ["gold","Gold"],
+    ["red","Red"],
+    ["deodar","Deodar"],
+    ["custom","Custom"]
+  ];
+
+  p.innerHTML = `
+    <span class="lbl">Position</span>
+    <div class="chips" id="pbPosList"></div>
+    <span class="lbl" style="margin-top:8px">Colour</span>
+    <div class="chips" id="pbColorList"></div>
+    <div id="pbCustomRow" style="margin-top:8px;display:${cfg.color === "custom" ? "flex" : "none"};align-items:center;gap:8px">
+      <input type="color" id="pbColorPicker" value="${cfg.customColor || "#CCFF00"}" style="width:36px;height:28px;padding:0;border:none;border-radius:4px;cursor:pointer;background:none">
+      <input type="text" id="pbColorText" value="${cfg.customColor || "#CCFF00"}" placeholder="#CCFF00" style="flex:1;padding:4px 8px;font-size:12px;border:1px solid var(--line);border-radius:4px;background:var(--surface)">
+    </div>
+    <div class="slider" style="margin-top:8px"><span>Thickness</span><input type="range" id="pbHeight" min="3" max="24" step="1" value="${cfg.height || 7}"><output id="pbHeightOut">${cfg.height || 7}px</output></div>
+  `;
+
+  const fillChips = (id, cur, list, onSel) => {
+    const wrap = $(id); if (!wrap) return; wrap.innerHTML = "";
+    list.forEach(([v, l]) => {
+      const b = el("button", { type:"button", class:"chip", "aria-pressed":String(v === cur), text:l });
+      b.addEventListener("click", () => {
+        onSel(v);
+        fillChips(id, v, list, onSel);
+        persist();
+        if (!playing) renderFrame(playT);
+      });
+      wrap.appendChild(b);
+    });
+  };
+
+  fillChips("pbPosList", cfg.pos || "bottom", positions, v => { cfg.pos = v; });
+  fillChips("pbColorList", cfg.color || "gradient", colors, v => {
+    cfg.color = v;
+    const crow = $("pbCustomRow");
+    if (crow) crow.style.display = v === "custom" ? "flex" : "none";
+  });
+
+  const cp = $("pbColorPicker"), ct = $("pbColorText");
+  if (cp && ct){
+    cp.oninput = () => {
+      cfg.customColor = cp.value;
+      ct.value = cp.value;
+      persist();
+      if (!playing) renderFrame(playT);
+    };
+    ct.oninput = () => {
+      cfg.customColor = ct.value;
+      if (/^#[0-9a-fA-F]{6}$/.test(ct.value)) cp.value = ct.value;
+      persist();
+      if (!playing) renderFrame(playT);
+    };
+  }
+
+  const hInp = $("pbHeight"), hOut = $("pbHeightOut");
+  if (hInp){
+    hInp.oninput = () => {
+      cfg.height = +hInp.value;
+      if (hOut) hOut.textContent = cfg.height + "px";
+      persist();
+      if (!playing) renderFrame(playT);
+    };
+  }
+}
+function renderAudiogramPanel(){
+  const p = $("audiogramPanel"), on = !!(P.audiogram && P.audiogram.on);
+  if (!p) return;
+  p.hidden = !on;
+  const cb = $("audiogramOn"); if (cb) cb.checked = on;
+  if (!on){ p.innerHTML = ""; return; }
+  const cfg = P.audiogram || (P.audiogram = { on:true, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 });
+  const styles = [["bars","Bars"],["mirror","Mirror"],["wave","Wave"],["dots","Dots"]];
+  const colors = [["lime","Lime"],["cyan","Cyan"],["white","White"],["accent","Brand"]];
+  const positions = [["bottom","Bottom"],["top","Top"],["middle","Middle"]];
+
+  p.innerHTML = `
+    <span class="lbl">Style</span>
+    <div class="chips" id="audioStyleList"></div>
+    <span class="lbl" style="margin-top:8px">Colour</span>
+    <div class="chips" id="audioColorList"></div>
+    <span class="lbl" style="margin-top:8px">Position</span>
+    <div class="chips" id="audioPosList"></div>
+    <div class="slider" style="margin-top:8px"><span>Height</span><input type="range" id="audioHeight" min="24" max="140" step="4" value="${cfg.height || 64}"><output id="audioHeightOut">${cfg.height || 64}px</output></div>
+  `;
+  const fillChips = (id, cur, list, onSel) => {
+    const wrap = $(id); if (!wrap) return; wrap.innerHTML = "";
+    list.forEach(([v, l]) => {
+      const b = el("button", { type:"button", class:"chip", "aria-pressed":String(v === cur), text:l });
+      b.addEventListener("click", () => { onSel(v); fillChips(id, v, list, onSel); persist(); if (!playing) renderFrame(playT); });
+      wrap.appendChild(b);
+    });
+  };
+  fillChips("audioStyleList", cfg.style || "bars", styles, v => { cfg.style = v; });
+  fillChips("audioColorList", cfg.color || "lime", colors, v => { cfg.color = v; });
+  fillChips("audioPosList", cfg.pos || "bottom", positions, v => { cfg.pos = v; });
+
+  const hInp = $("audioHeight"), hOut = $("audioHeightOut");
+  if (hInp){
+    hInp.oninput = () => { cfg.height = +hInp.value; if (hOut) hOut.textContent = cfg.height + "px"; persist(); if (!playing) renderFrame(playT); };
+  }
+}
+function renderInspectorArea(){ const p = $("areaPreview"); if (p && selected && selected.type === "plot"){ const a = plotArea(selected.item); p.textContent = a ? `Total area shown: ${a}` : "Enter front/width and length to show the total area."; } }
 function deleteSelected(){
   if (!selected) return;
   const { type, item } = selected;
@@ -4074,13 +4821,85 @@ function wordStyler(key, getText, getWs, setWs, opts){
     const cur = { ...(wsOf(ws, WSE.sel[0]) || {}) }, pal = csPalette();
     const n = WSE.sel.length;
     host.append(el("p", { class:"hint", style:"margin:0 0 4px", text:n === 1 ? `Styling "${words[WSE.sel[0]].t}"` : `Styling ${n} words` }));
+    /* pro presets: 1-click viral styles */
+    const heroRow = el("div", { class:"chips", style:"flex-wrap:wrap;gap:4px;margin-bottom:6px" });
+    const presets = [
+      { name:"⚡ Hero Pop", patch:{ c:"#CCFF00", s:2.2, b:true, upper:true, stroke:true } },
+      { name:"✨ Editorial", patch:{ c:"#FFFFFF", s:1.45, f:"Instrument Serif", i:true }, font:"Instrument Serif" },
+      { name:"🔥 Fire Red", patch:{ c:"#FF3B30", s:2.0, b:true, upper:true, stroke:true } },
+      { name:"💎 Cyan Pop", patch:{ c:"#00F0FF", s:2.0, b:true, upper:true, stroke:true } },
+      { name:"⭐ Gold Glow", patch:{ c:"#FFD700", s:1.6, b:true, glow:true } }
+    ];
+    presets.forEach(pr => {
+      const b = el("button", { type:"button", class:"chip", text:pr.name, style:"font-weight:600;font-size:11px;padding:3px 8px" });
+      b.addEventListener("click", () => {
+        if (pr.font && typeof csUseFont === "function") csUseFont(pr.font);
+        apply(pr.patch);
+      });
+      heroRow.appendChild(b);
+    });
+    host.append(row("Pro Presets", [heroRow]));
+    /* line break toggle helper */
+    if (opts.setText && WSE.sel.length === 1){
+      const isNL = words[WSE.sel[0]].nl;
+      const breakBtn = btn(isNL ? "Remove line break" : "↵ Start new line here", () => {
+        const raw = getText() || "";
+        const lines = raw.split(/\r?\n/);
+        let wordIdx = 0, targetLine = -1, targetWordInLine = -1;
+        for (let li = 0; li < lines.length; li++){
+          const toks = lines[li].trim().split(/\s+/).filter(Boolean);
+          for (let ti = 0; ti < toks.length; ti++){
+            if (wordIdx === WSE.sel[0]){ targetLine = li; targetWordInLine = ti; break; }
+            wordIdx++;
+          }
+          if (targetLine >= 0) break;
+        }
+        if (targetLine >= 0){
+          if (isNL){
+            if (targetLine > 0){
+              lines[targetLine - 1] = lines[targetLine - 1] + " " + lines[targetLine];
+              lines.splice(targetLine, 1);
+            }
+          } else {
+            const toks = lines[targetLine].trim().split(/\s+/).filter(Boolean);
+            const before = toks.slice(0, targetWordInLine).join(" ");
+            const after = toks.slice(targetWordInLine).join(" ");
+            if (before) lines.splice(targetLine, 1, before, after);
+          }
+          opts.setText(lines.join("\n"));
+        }
+      });
+      host.append(row("Line Break", [breakBtn]));
+    }
+    /* position: free drag & quick spots */
+    const posRow = el("div", { class:"chips", style:"gap:4px;flex-wrap:wrap" });
+    const isMoved = cur.dx != null || cur.dy != null;
+    [["Inline", 0, 0, true], ["Top Left", -.28, -.32], ["Top Center", 0, -.32], ["Top Right", .28, -.32], ["Bottom Left", -.28, .28], ["Bottom Right", .28, .28]].forEach(([lbl, ox, oy, isReset]) => {
+      const b = el("button", { type:"button", class:"chip", text:lbl, "aria-pressed":String(isReset ? !isMoved : Math.abs((cur.dx || 0) - ox) < .05 && Math.abs((cur.dy || 0) - oy) < .05) });
+      b.addEventListener("click", () => {
+        if (isReset) apply({ dx:undefined, dy:undefined });
+        else apply({ dx:ox, dy:oy });
+      });
+      posRow.appendChild(b);
+    });
+    host.append(row("Position", [posRow]));
+    if (isMoved){
+      host.append(el("p", { class:"hint", style:"margin:0 0 6px", text:"Word moved. Drag directly on the preview to place anywhere, or click Inline to reset." }));
+    }
     /* colour */
     const inp = el("input", { type:"color", "aria-label":"Word colour: any colour", title:"Any colour" }); inp.value = (cur.c || "#FFFFFF").toLowerCase();
     inp.addEventListener("input", () => apply({ c:inp.value }, true)); inp.addEventListener("change", () => paint());
     host.append(row("Colour", [el("div", { class:"cs-colors" }, [...pal.map(([h, nm]) => { const b = el("button", { type:"button", class:"cs-sw", title:nm, "aria-label":`Colour: ${nm}`, "aria-pressed":String(cur.c === h), style:`background:${h}` }); b.addEventListener("click", () => apply({ c:h })); return b; }), inp]),
       cur.c ? btn("Same", () => apply({ c:undefined })) : null]));
     /* size */
-    host.append(fSlider("Size", cur.s || 1, .6, 2, .05, v => apply({ s:Math.abs(v - 1) < .01 ? undefined : v }, true), v => Math.round(v * 100) + "%"));
+    const szChips = el("div", { class:"chips", style:"gap:4px" });
+    [[1,"1x"],[1.4,"1.4x"],[1.8,"1.8x"],[2.2,"2.2x"],[2.8,"2.8x"]].forEach(([v, l]) => {
+      const b = el("button", { type:"button", class:"chip", "aria-pressed":String(Math.abs((cur.s || 1) - v) < 0.15), text:l });
+      b.addEventListener("click", () => apply({ s: v === 1 ? undefined : v }));
+      szChips.appendChild(b);
+    });
+    host.append(row("Size", [szChips]));
+    host.append(fSlider("Scale", cur.s || 1, .5, 3.5, .05, v => apply({ s:Math.abs(v - 1) < .01 ? undefined : v }, true), v => Math.round(v * 100) + "%"));
     /* font */
     let fontEl = null;
     if (window.RS && RS.fonts && RS.fonts.picker){
@@ -4088,11 +4907,14 @@ function wordStyler(key, getText, getWs, setWs, opts){
       fontEl = el("div", { class:"cs-fontrow" }, [pk, cur.f ? btn("Same", () => apply({ f:undefined })) : el("span", { class:"hint", style:"margin:0", text:"Same as the rest" })]);
     }
     if (fontEl) host.append(row("Font", [fontEl]));
-    /* weight, italic, highlight, hide */
+    /* weight, italic, upper, outline, glow, highlight, hide */
     host.append(row("Style", [
       tog("Bold", cur.b === true, () => apply({ b:cur.b === true ? undefined : true })),
       tog("Thin", cur.b === false, () => apply({ b:cur.b === false ? undefined : false })),
       tog("Italic", cur.i === true, () => apply({ i:cur.i === true ? undefined : true })),
+      tog("UPPER", cur.upper === true, () => apply({ upper:cur.upper === true ? undefined : true })),
+      tog("Outline", cur.stroke === true, () => apply({ stroke:cur.stroke === true ? undefined : true })),
+      tog("Glow", cur.glow === true, () => apply({ glow:cur.glow === true ? undefined : true })),
       tog("Highlight", cur.hl === true || (cur.hl == null && words[WSE.sel[0]].hl), () => { const on = cur.hl === true || (cur.hl == null && words[WSE.sel[0]].hl); apply({ hl:!on }); }),
       tog("Hide", !!cur.hide, () => apply({ hide:cur.hide ? undefined : true }))]));
     /* box behind the word */
@@ -4143,7 +4965,7 @@ function finishDraw(){
   const { clip, pts, existing } = drawing;
   let pl = existing;
   if (pl) pl.pts = pts;
-  else { pl = { id:uid++, pts, name:"", w:"", l:"", unit:"ft", areaUnit:"sqyd", areaText:"", color:"red", at:.3, dur:2, motion:true }; (clip.plots = clip.plots || []).push(pl); }
+  else { pl = { id:uid++, pts, name:"", front:"", w:"", l:"", unit:"ft", areaUnit:"sqyd", areaText:"", color:"red", at:.3, dur:2, motion:true }; (clip.plots = clip.plots || []).push(pl); }
   drawing = null; $("drawBar").hidden = true;
   changed(); select("plot", pl, clip);
 }
@@ -4172,7 +4994,17 @@ cv.addEventListener("pointermove", e => {
   if (proPointerMove(e)) return;
   if (dragV){ const [px, py] = canvasPt(e), X = clipXform(dragV.clip, now() - dragV.clip._start); if (X){ dragV.pl.pts[dragV.idx] = invPt(X, px, py); renderFrame(playT); } return; }
   if (stagePointerMove(e)) return;
-  if (!dragO) return;
+  if (!dragO){
+    if (SE.drag && SE.drag.kind === "word") cv.style.cursor = "grabbing";
+    else if (!playing && selected && selected.type === "caption"){
+      const [px, py] = canvasPt(e), { u } = geo(), cp = selected.item;
+      const hw = (WS_BOX.get(cp) || []).find(q => px >= q.x - 6 * u && px <= q.x + q.w + 6 * u && py >= q.y - 6 * u && py <= q.y + q.h + 6 * u);
+      cv.style.cursor = hw ? "grab" : "";
+    } else if (!SE.drag && !dragV){
+      cv.style.cursor = "";
+    }
+    return;
+  }
   const r = cv.getBoundingClientRect(), k = dragO.k, x = (e.clientX - r.left) * k, y = (e.clientY - r.top) * k, { W, H } = geo();
   dragO.o.x = clamp(dragO.ox + (x - dragO.x) / W, .02, .98); dragO.o.y = clamp(dragO.oy + (y - dragO.y) / H, .02, .98);
   seSnapOverlay(dragO.o);
@@ -4281,14 +5113,44 @@ function stagePointerDown(e, px, py){
   const t = now(), { u, W, H } = geo(), pad = 14 * u;
   if (SE.pts.size === 2 && seTarget()){ const [[ax, ay], [bx, by]] = [...SE.pts.values()]; SE.pinch = { d:Math.hypot(ax - bx, ay - by), v:seTarget().get() }; SE.drag = null; return; }
   if (stageHandleDown(e, px, py)) return;
+  const makeWordDragSpec = (cp, wi, px, py, hw) => {
+    const st0 = (cp.ws && cp.ws[wi]) || {};
+    const isDetached = st0.dx != null || st0.dy != null;
+    const { W, H, safe } = geo();
+    const o = capOffset(cp);
+    const cx = safe.l + (W - safe.l - safe.r) / 2 + (o.dx || 0) * W;
+    const b = capBox(cp, playT);
+    const cy = (b ? b.y + b.h / 2 : H * .75) + (o.dy || 0) * H;
+    const dx0 = isDetached ? (st0.dx || 0) : (hw.x + hw.w / 2 - cx) / W;
+    const dy0 = isDetached ? (st0.dy || 0) : (hw.y + hw.h / 2 - cy) / H;
+    return { kind:"word", cp, wi, x:px, y:py, dx0, dy0, isDetached, origPx:px, origPy:py };
+  };
+  /* check if clicked a word of an already selected caption */
+  if (selected && selected.type === "caption"){
+    const cp = selected.item;
+    const hw = (WS_BOX.get(cp) || []).find(q => px >= q.x - 6 * u && px <= q.x + q.w + 6 * u && py >= q.y - 6 * u && py <= q.y + q.h + 6 * u);
+    if (hw){
+      wsPickOnStage(cp, hw.wi, e.shiftKey);
+      SE.drag = makeWordDragSpec(cp, hw.wi, px, py, hw);
+      cv.setPointerCapture(e.pointerId);
+      seToolbar();
+      return;
+    }
+  }
   /* captions, top first */
   for (const cp of capsAt(t).reverse()){
     const b = capBox(cp, t);
-    if (inBox(b, px, py, pad)){
+    const hw = (WS_BOX.get(cp) || []).find(q => px >= q.x - 6 * u && px <= q.x + q.w + 6 * u && py >= q.y - 6 * u && py <= q.y + q.h + 6 * u);
+    if (hw || inBox(b, px, py, pad)){
       if (!(selected && selected.item === cp)) select("caption", cp);
-      else { const hw = (WS_BOX.get(cp) || []).find(q => px >= q.x - 4 * u && px <= q.x + q.w + 4 * u && py >= q.y - 2 * u && py <= q.y + q.h + 2 * u); if (hw) wsPickOnStage(cp, hw.wi, e.shiftKey); }
-      const o = capOffset(cp);
-      SE.drag = { kind:"caption", cp, x:px, y:py, dx0:o.dx, dy0:o.dy, box:b, one:SE.capScope === "one" }; cv.setPointerCapture(e.pointerId); seToolbar(); return;
+      if (hw){
+        wsPickOnStage(cp, hw.wi, e.shiftKey);
+        SE.drag = makeWordDragSpec(cp, hw.wi, px, py, hw);
+      } else {
+        const o = capOffset(cp);
+        SE.drag = { kind:"caption", cp, x:px, y:py, dx0:o.dx, dy0:o.dy, box:b, one:SE.capScope === "one" };
+      }
+      cv.setPointerCapture(e.pointerId); seToolbar(); return;
     }
   }
   /* watermark logo: drag it anywhere */
@@ -4345,6 +5207,26 @@ function stagePointerMove(e){
   if (D.kind === "scene"){ let a = D.a + (px - D.x) / W; const g = {}; if (Math.abs(a) < SNAP * u / W){ a = 0; g.v = W / 2; } SE.guides = g; D.sc.tx = a; D.sc.ty = D.b + (py - D.y) / H; seLive(); return true; }
   if (D.kind === "wm"){ const L = P.logo; L.wmX = clamp(D.a + (px - D.x) / W, .03, .97); L.wmY = clamp(D.b + (py - D.y) / H, .03, .97); seLive(); return true; }
   if (D.kind === "bgpan"){ D.B.bx = clamp(D.a - (px - D.x) / W * 1.5, 0, 1); D.B.by = clamp(D.b - (py - D.y) / H * 1.5, 0, 1); seLive(); return true; }
+  if (D.kind === "word"){
+    const cur = { ...(D.cp.ws || {}) };
+    const st = { ...(cur[D.wi] || {}) };
+    const moved = Math.hypot(px - (D.origPx || D.x), py - (D.origPy || D.y));
+    if (!D.isDetached && moved < 10 * u){
+      delete st.dx; delete st.dy;
+    } else {
+      let dx = D.dx0 + (px - D.x) / W;
+      let dy = D.dy0 + (py - D.y) / H;
+      if (!D.isDetached && moved < 14 * u){
+        delete st.dx; delete st.dy;
+      } else {
+        st.dx = +dx.toFixed(4);
+        st.dy = +dy.toFixed(4);
+      }
+    }
+    if (Object.keys(st).length) cur[D.wi] = st; else delete cur[D.wi];
+    D.cp.ws = wsClean(cur);
+    seLive(); return true;
+  }
   if (D.kind === "caption"){
     let dx = D.dx0 + (px - D.x) / W, dy = D.dy0 + (py - D.y) / H;
     const b = D.box, ncx = b.x + b.w / 2 + (dx - D.dx0) * W, ncy = b.y + b.h / 2 + (dy - D.dy0) * H, g = {};
@@ -4359,7 +5241,7 @@ function stagePointerMove(e){
 function stagePointerUp(e){
   if (e) SE.pts.delete(e.pointerId);
   if (SE.pts.size < 2) SE.pinch = null;
-  if (SE.drag){ SE.drag = null; SE.guides = null; changed(false); persist(); if (!playing) renderFrame(playT); renderInspector(); seToolbar(); }
+  if (SE.drag){ cv.style.cursor = ""; SE.drag = null; SE.guides = null; changed(false); persist(); if (!playing) renderFrame(playT); renderInspector(); seToolbar(); }
 }
 /* overlay drag: snap to centre lines too */
 function seSnapOverlay(o){
@@ -4528,7 +5410,7 @@ function updateLen(){
 const HIST = { stack:[], idx:-1, t:0, lock:false };
 const SKIP = new Set(["el","gain","poster","thumb","buffer","wave","a","b","_start","_td","segs","imgs","raw","_map","_rect","_trect","_lrect"]);
 function snapshot(){
-  return { clips:P.clips.map(cloneClipData), overlays:P.overlays.map(o => ({ ...o, ws:wsCopy(o.ws) })), captions:P.captions.map(c => ({ ...c, o:c.o ? JSON.parse(JSON.stringify(c.o)) : c.o, ws:wsCopy(c.ws) })), intro:{ ...P.intro, titleWs:wsCopy(P.intro.titleWs) }, outro:{ ...P.outro }, logo:{ ...P.logo }, cap:JSON.parse(JSON.stringify(P.cap)), watermark:P.watermark, music2:P.music ? { fadeIn:P.music.fadeIn, fadeOut:P.music.fadeOut } : null, vo:P.vo ? { ...P.vo } : null, music:P.music ? { ...P.music } : null };
+  return { clips:P.clips.map(cloneClipData), overlays:P.overlays.map(o => ({ ...o, ws:wsCopy(o.ws) })), captions:P.captions.map(c => ({ ...c, o:c.o ? JSON.parse(JSON.stringify(c.o)) : c.o, ws:wsCopy(c.ws) })), intro:{ ...P.intro, titleWs:wsCopy(P.intro.titleWs) }, outro:{ ...P.outro }, logo:{ ...P.logo }, cap:JSON.parse(JSON.stringify(P.cap)), watermark:P.watermark, progressBar:P.progressBar, audiogram:P.audiogram ? JSON.parse(JSON.stringify(P.audiogram)) : null, music2:P.music ? { fadeIn:P.music.fadeIn, fadeOut:P.music.fadeOut } : null, vo:P.vo ? { ...P.vo } : null, music:P.music ? { ...P.music } : null };
 }
 function signature(s){ return JSON.stringify(s, (k, v) => SKIP.has(k) ? (v && v.src ? v.src : v && v.duration ? v.duration : undefined) : v); }
 function commit(){
@@ -4549,7 +5431,7 @@ function restore(i){
   P.overlays = s.overlays.map(o => ({ ...o, ws:wsCopy(o.ws) })); P.captions = s.captions.map(c => ({ ...c, ws:wsCopy(c.ws) }));
   Object.assign(P.intro, s.intro); Object.assign(P.outro, s.outro);
   P.intro.titleWs = wsCopy(s.intro.titleWs); P.outro.ctaWs = wsCopy(s.outro.ctaWs); if (!P.intro.titleWs) delete P.intro.titleWs; if (!P.outro.ctaWs) delete P.outro.ctaWs;
-  if (s.logo) Object.assign(P.logo, s.logo); if (s.cap){ P.cap = JSON.parse(JSON.stringify(s.cap)); if (typeof refreshCapUI === "function") try { refreshCapUI(); } catch(e) {} } if ("watermark" in s){ P.watermark = s.watermark; const w = $("wmOn"); if (w) w.checked = P.watermark; if (typeof renderWmPanel === "function") renderWmPanel(); } P.vo = s.vo ? { ...s.vo } : null; P.music = s.music ? { ...s.music } : null;
+  if (s.logo) Object.assign(P.logo, s.logo); if (s.cap){ P.cap = JSON.parse(JSON.stringify(s.cap)); if (typeof refreshCapUI === "function") try { refreshCapUI(); } catch(e) {} } if ("watermark" in s){ P.watermark = s.watermark; const w = $("wmOn"); if (w) w.checked = P.watermark; if (typeof renderWmPanel === "function") renderWmPanel(); } if ("progressBar" in s){ P.progressBar = s.progressBar; const pb = $("progBarOn"); if (pb) pb.checked = P.progressBar; if (typeof renderProgBarPanel === "function") renderProgBarPanel(); } if ("audiogram" in s){ P.audiogram = s.audiogram ? { ...s.audiogram } : { on:false, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 }; if (typeof renderAudiogramPanel === "function") renderAudiogramPanel(); } P.vo = s.vo ? { ...s.vo } : null; P.music = s.music ? { ...s.music } : null;
   $("introOn").checked = P.intro.on; $("outroOn").checked = P.outro.on;
   selected = null; refresh(); HIST.lock = false; updateUndoUI();
 }
@@ -4606,12 +5488,22 @@ $("voDel").addEventListener("click", () => { if (P.vo && P.vo.fromVideo) unmuteV
 $("musicDel").addEventListener("click", () => { P.music = null; if (selected && selected.type === "music") selected = null; refresh(); });
 $("recBtn").addEventListener("click", () => recording ? stopRecording() : startRecording());
 $("lang").value = P.lang; $("lang").addEventListener("change", e => { P.lang = e.target.value; persist(); });
-[["autoCaps","autoCaps"],["hearWhileRec","hearWhileRec"],["introOn",null],["outroOn",null],["wmOn","watermark"]].forEach(([id, key]) => {
+[["autoCaps","autoCaps"],["hearWhileRec","hearWhileRec"],["introOn",null],["outroOn",null],["wmOn","watermark"],["progBarOn","progressBar"],["audiogramOn","audiogram"]].forEach(([id, key]) => {
   const box = $(id);
-  if (id === "introOn") box.checked = P.intro.on; else if (id === "outroOn") box.checked = P.outro.on; else box.checked = P[key];
+  if (id === "introOn") box.checked = P.intro.on;
+  else if (id === "outroOn") box.checked = P.outro.on;
+  else if (id === "audiogramOn") box.checked = !!(P.audiogram && P.audiogram.on);
+  else box.checked = P[key];
   box.addEventListener("change", () => {
-    if (id === "introOn") P.intro.on = box.checked; else if (id === "outroOn") P.outro.on = box.checked; else P[key] = box.checked;
+    if (id === "introOn") P.intro.on = box.checked;
+    else if (id === "outroOn") P.outro.on = box.checked;
+    else if (id === "audiogramOn"){
+      if (!P.audiogram) P.audiogram = { on:false, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 };
+      P.audiogram.on = box.checked;
+      renderAudiogramPanel();
+    } else P[key] = box.checked;
     if (id === "wmOn") renderWmPanel();
+    if (id === "progBarOn") renderProgBarPanel();
     persist(); refresh();
   });
 });
@@ -4681,7 +5573,8 @@ function csPaintWeights(){
 }
 function csPalette(){
   const out = [], seen = new Set();
-  [...(GIRIKA.PALETTE || []).map(p => [hex6(p.hex), p.name]), ["#FFFFFF","White"], ["#000000","Black"]].forEach(([h, n]) => { if (!seen.has(h)){ seen.add(h); out.push([h, n]); } });
+  const viral = [["#CCFF00","Neon Lime"],["#FFD700","Gold"],["#00F0FF","Cyan"],["#FF3B30","Red"],["#FFFFFF","White"],["#111111","Dark"]];
+  [...(GIRIKA.PALETTE || []).map(p => [hex6(p.hex), p.name]), ...viral].forEach(([h, n]) => { if (!seen.has(h)){ seen.add(h); out.push([h, n]); } });
   return out;
 }
 function csColor(label, key){
@@ -5089,7 +5982,7 @@ $("capClear").addEventListener("click", e => { const b = e.currentTarget; if (b.
 
 /* transport */
 $("playBtn").addEventListener("click", () => playing ? pause() : play(playT));
-$("toStart").addEventListener("click", () => seek(0));
+$("toStart").addEventListener("click", () => { seek(0); const sc = $("tlScroll"); if (sc) sc.scrollLeft = 0; });
 $("soundBtn").addEventListener("click", () => { soundOn = !soundOn; setMonitor(); $("soundBtn").textContent = soundOn ? "Sound on" : "Sound off"; $("soundBtn").setAttribute("aria-pressed", String(soundOn)); });
 $("undoBtn").addEventListener("click", () => restore(HIST.idx - 1));
 $("redoBtn").addEventListener("click", () => restore(HIST.idx + 1));
@@ -5416,6 +6309,10 @@ function gradeAfter(c, clip){
   else if (lk === "moody"){ blendFill(c, "multiply", "rgba(40,60,80,.22)", W, H); vignette(c, W, H, .55); }
   else if (lk === "aerial"){ blendFill(c, "soft-light", "rgba(90,150,210,.12)", W, H); vignette(c, W, H, .18); }
   else if (lk === "clean"){ blendFill(c, "screen", "rgba(255,255,255,.05)", W, H); }
+  else if (lk === "blockbuster"){ blendFill(c, "multiply", "rgba(10,50,70,.18)", W, H); blendFill(c, "soft-light", "rgba(255,140,50,.32)", W, H); vignette(c, W, H, .32); }
+  else if (lk === "vintage2383"){ blendFill(c, "soft-light", "rgba(255,200,130,.25)", W, H); blendFill(c, "lighten", "rgb(20,18,16)", W, H); vignette(c, W, H, .28); }
+  else if (lk === "cyberpunk"){ blendFill(c, "color-dodge", "rgba(0,180,255,.12)", W, H); blendFill(c, "soft-light", "rgba(255,0,130,.28)", W, H); vignette(c, W, H, .38); }
+  else if (lk === "noir"){ vignette(c, W, H, .65); }
   if (a.temp) blendFill(c, "soft-light", a.temp > 0 ? `rgba(255,140,40,${(a.temp * .55).toFixed(3)})` : `rgba(40,120,255,${(-a.temp * .55).toFixed(3)})`, W, H);
   if (a.tint) blendFill(c, "soft-light", a.tint > 0 ? `rgba(255,60,200,${(a.tint * .4).toFixed(3)})` : `rgba(60,255,90,${(-a.tint * .4).toFixed(3)})`, W, H);
   if (a.fade){ const v = Math.round(a.fade * 70); blendFill(c, "lighten", `rgb(${v},${v},${v + 4})`, W, H); }
@@ -5922,15 +6819,37 @@ function videoToolsUI(it){
       toggleRow("Play in reverse (great for drone pull-backs)", it.reverse, v => { it.reverse = v; changed(); }),
       hint(`Plays ${it.dur.toFixed(1)} s on the timeline from ${(it.trimOut - it.trimIn).toFixed(1)} s of footage. Clip sound is muted when slowed or sped up a lot, or reversed. Reverse preview can stutter; the export is smooth.`),
       fSlider("Horizon fix", it.tilt || 0, -12, 12, .1, v => { it.tilt = v; changed(false); }, v => (+v).toFixed(1) + "°")),
-    el("div", { class:"row field" }, [btn("Freeze frame here", () => freezeFrame(it), "btn sm pro-only"), btn("Find best part", () => bestPartOfClip(it)), btn("Make it cinematic", () => cinematic(it), "btn sm dark")]),
+    el("div", { class:"row field", style:"flex-wrap:wrap;gap:6px" }, [btn("Freeze frame here", () => freezeFrame(it), "btn sm pro-only"), btn("Find best part", () => bestPartOfClip(it)), btn("Make it cinematic", () => cinematic(it), "btn sm dark"), btn("🎙️ Clean speech (DSP)", extractVideoSound, "btn sm dark")]),
     hint("Make it cinematic: smooth speed ramp, slow push-in, teal and orange grade, blur transition. Find best part keeps the clip length and moves it to the sharpest, best-lit section.")];
 }
 function colourUI(it){
   const a = it.adj || {};
   const set = (k, v) => { it.adj = { ...(it.adj || {}), [k]:v }; changed(false); };
   const fmtS = v => (v > 0 ? "+" : "") + Math.round(v * 100);
-  return [proOnly(...ADJ.map(([k, label, mn, mx]) => fSlider(label, a[k] || 0, mn, mx, .01, v => set(k, v), fmtS))),
+  const rows = [proOnly(...ADJ.map(([k, label, mn, mx]) => fSlider(label, a[k] || 0, mn, mx, .01, v => set(k, v), fmtS))),
     el("div", { class:"row field" }, [btn("Reset colour", () => { it.adj = {}; changed(false); renderInspector(); }), btn("Copy colour to all clips", () => { P.clips.forEach(c => { if (c.kind === "image" || c.kind === "video"){ c.adj = { ...(it.adj || {}) }; c.look = it.look; } }); changed(false); toast("Look and colour copied to all photos and clips."); })])];
+  rows.push(
+    el("label", { class:"toggle", style:"margin-top:8px" }, [
+      Object.assign(el("input", { type:"checkbox" }), {
+        checked:!!it.chromaKey,
+        onchange:e => { it.chromaKey = e.target.checked; changed(false); renderInspector(); }
+      }),
+      document.createTextNode("🟢 Chroma key (remove green screen)")
+    ])
+  );
+  if (it.chromaKey){
+    rows.push(
+      el("div", { class:"field", style:"margin-top:6px;padding:8px;background:var(--soft);border-radius:8px" }, [
+        el("div", { class:"row", style:"align-items:center;gap:8px" }, [
+          el("span", { class:"lbl", text:"Key color" }),
+          fColorPicker(it.keyColor || "#00FF00", c => { it.keyColor = c; changed(false); })
+        ]),
+        fSlider("Tolerance", it.keyTol ?? 0.36, 0.1, 0.8, 0.02, v => { it.keyTol = v; changed(false); }),
+        fSlider("Feather", it.keyFeather ?? 0.14, 0.02, 0.4, 0.01, v => { it.keyFeather = v; changed(false); })
+      ])
+    );
+  }
+  return rows;
 }
 function highlightUI(it){
   const out = [h2("Highlight a spot"), hint("Point viewers to the gate, road, view or a plot corner. On photos it follows the camera move."),
@@ -6364,7 +7283,13 @@ async function renderAudioMix(){
   if (!vids.length && !P.music && !P.vo) return null;
   const off = new OfflineAudioContext(2, len, sr), out = off.createGain(); out.connect(off.destination);
   const bed = off.createGain(); bed.connect(out); bed.gain.setValueAtTime(1, 0);
-  if (P.vo && P.vo.segs) for (const [s, e] of P.vo.segs){ bed.gain.setTargetAtTime(P.duckLevel, Math.max(0, P.vo.start + s - .15), .08); bed.gain.setTargetAtTime(1, Math.max(0, P.vo.start + e + .25), .25); }
+  const duckSpans = (P.vo && P.vo.segs && P.vo.segs.length)
+    ? P.vo.segs.map(([s, e]) => [P.vo.start + s - .15, P.vo.start + e + .25])
+    : (P.captions || []).map(cp => [cp.start - .12, cp.end + .2]);
+  for (const [a, b] of duckSpans){
+    bed.gain.setTargetAtTime(P.duckLevel, Math.max(0, a), .08);
+    bed.gain.setTargetAtTime(1, Math.max(0, b), .25);
+  }
   const cache = new Map();
   for (const c of vids){
     const key = c.el.src;
@@ -6531,7 +7456,7 @@ async function serializeProject(){
     const o = {}; for (const [k, x] of Object.entries(v)){ if (k.startsWith("_") || ["thumb","poster","wave","gain","segs"].includes(k)) continue; const s2 = await ser(x); if (s2 !== undefined) o[k] = s2; }
     return o;
   };
-  const doc = { app:"girika-video", v:2, name:PROJ.name || "Untitled project", category:PROJ.category || "General", saved:new Date().toISOString(), format:P.format, watermark:P.watermark, musicVol:P.musicVol, duckLevel:P.duckLevel, voVol:P.voVol, muteVideo:P.muteVideo,
+  const doc = { app:"girika-video", v:2, name:PROJ.name || "Untitled project", category:PROJ.category || "General", saved:new Date().toISOString(), format:P.format, watermark:P.watermark, progressBar:P.progressBar, audiogram:P.audiogram, musicVol:P.musicVol, duckLevel:P.duckLevel, voVol:P.voVol, muteVideo:P.muteVideo,
     intro:P.intro, outro:P.outro, cap:P.cap, logo:P.logo, exp:P.exp, hl:P.hl,
     clips:await ser(P.clips), overlays:await ser(P.overlays), captions:await ser(P.captions), vo:await ser(P.vo), music:await ser(P.music), brand:await ser({ intro:BRAND_PHOTO.intro, outro:BRAND_PHOTO.outro }) };
   return { doc:JSON.parse(JSON.stringify(doc)), media };
@@ -6553,7 +7478,7 @@ async function loadProjectData(meta, files, label){
   };
   pause(); P.clips.forEach(c => { if (c.kind === "video") c.el.pause(); });
   const d = meta.doc;
-  ["format","watermark","musicVol","duckLevel","voVol","muteVideo"].forEach(k => { if (k in d) P[k] = d[k]; });
+  ["format","watermark","progressBar","audiogram","musicVol","duckLevel","voVol","muteVideo"].forEach(k => { if (k in d) P[k] = d[k]; });
   if (d.cap) capUpgrade(d.cap);
   ["intro","outro","cap","logo","exp","hl"].forEach(k => { if (d[k]) Object.assign(P[k], d[k]); });
   capNormalize(); capFontsReady(15000).then(csRender);
@@ -6570,9 +7495,10 @@ async function loadProjectData(meta, files, label){
   }
   if (P.vo && P.vo.buffer){ P.vo.raw = P.vo.raw || P.vo.buffer; P.vo.segs = speechSegments(P.vo.buffer); P.vo.wave = waveform(P.vo.buffer); }
   $("start").hidden = true; $("introOn").checked = P.intro.on; $("outroOn").checked = P.outro.on; $("wmOn").checked = P.watermark; $("muteVideo").checked = P.muteVideo;
+  const pb = $("progBarOn"); if (pb) pb.checked = !!P.progressBar;
   ["musicVol","duckLevel","voVol"].forEach(k => { $(k).value = P[k]; $(k + "Out").textContent = pct(P[k]); });
   selected = null; HIST.stack = []; HIST.idx = -1;
-  refreshCapUI(); renderWmPanel(); buildExportUI(); buildHlUI(); setFormat(P.format);
+  refreshCapUI(); renderWmPanel(); renderProgBarPanel(); renderAudiogramPanel(); buildExportUI(); buildHlUI(); setFormat(P.format);
   P.clips.forEach(c => { if (c.kind === "scene") c.thumb = sceneThumb(c); }); renderTimeline(); seek(SEQ[0] && SEQ[0].kind === "intro" ? Math.min(1.2, SEQ[0].dur * .5) : 0);
   PROJ.name = d.name || PROJ.name || "Untitled project"; $("projName").value = PROJ.name; setCategory(d.category || "General");
   toast(`Opened ${label || PROJ.name}.`);
@@ -6968,12 +7894,44 @@ onFiles("startHighlights", async fs => { closeStart(); await addVideos(fs); open
 buildExportUI(); buildHlUI();
 
 /* ---------- timeline: drag to move, drag edges to trim, snapping, toolbar ---------- */
-let tlJustDragged = false, snapOn = true, snapLineT = null, tlRaf = 0;
+let tlJustDragged = false, snapOn = true, beatSnapOn = false, snapLineT = null, tlRaf = 0;
 try { snapOn = localStorage.getItem("girika-snap") !== "0"; } catch(e) {}
+try { beatSnapOn = localStorage.getItem("girika-beat-snap") === "1"; } catch(e) {}
+
+function getMusicBeats(){
+  if (!P.music || !P.music.buffer) return null;
+  if (!P.music._beats){
+    try { P.music._beats = detectBeat(P.music.buffer); } catch(e){ P.music._beats = null; }
+  }
+  return P.music._beats;
+}
+
+function isBeatSnapPoint(t){
+  if (!beatSnapOn || !P.music) return false;
+  const b = getMusicBeats();
+  if (!b || !b.period) return false;
+  const off = (P.music.offset || 0) % b.period;
+  const rem = Math.abs((t - off) % b.period);
+  return rem < 0.035 || Math.abs(rem - b.period) < 0.035;
+}
+
 function snapT(t, ignore){
-  snapLineT = null; if (!snapOn) return t;
+  snapLineT = null; if (!snapOn && !beatSnapOn) return t;
   const thr = 8 / P.pps, pts = [playT, 0, TOTAL];
-  SEQ.forEach(c => { if (c !== ignore){ pts.push(c._start, c._start + c.dur); } });
+  if (snapOn){
+    SEQ.forEach(c => { if (c !== ignore){ pts.push(c._start, c._start + c.dur); } });
+  }
+  if (beatSnapOn && P.music){
+    const b = getMusicBeats();
+    if (b && b.period > 0){
+      const off = (P.music.offset || 0) % b.period;
+      const count = Math.ceil(TOTAL / b.period) + 2;
+      for (let k = 0; k < count; k++){
+        const bt = off + k * b.period;
+        if (bt >= 0 && bt <= TOTAL + 1) pts.push(bt);
+      }
+    }
+  }
   let best = t, bd = thr; for (const q of pts){ const d = Math.abs(q - t); if (d < bd){ bd = d; best = q; } }
   if (best !== t) snapLineT = best; return best;
 }
@@ -6982,6 +7940,8 @@ function drawSnapLine(){
   if (snapLineT == null){ if (ln) ln.remove(); return; }
   if (!ln){ ln = document.createElement("div"); ln.className = "snapline"; $("tlInner").appendChild(ln); }
   ln.style.left = (snapLineT * P.pps) + "px";
+  if (isBeatSnapPoint(snapLineT)) ln.classList.add("beat");
+  else ln.classList.remove("beat");
 }
 function tlLive(){ if (tlRaf) return; tlRaf = requestAnimationFrame(() => { tlRaf = 0; layoutSeq(); renderTimeline(); drawSnapLine(); if (!playing){ syncVideos(playT, true); renderFrame(playT); } updateLen(); }); }
 /* spec: { left(dt, state), right(dt, state), body(dt, state), begin() } */
@@ -7055,6 +8015,26 @@ $("tlDel").addEventListener("click", () => { if (selected) deleteSelected(); els
 $("tlText").addEventListener("click", () => addTextOverlay(TEXT_PRESETS[0]));
 $("tlSnap").setAttribute("aria-pressed", String(snapOn));
 $("tlSnap").addEventListener("click", () => { snapOn = !snapOn; $("tlSnap").setAttribute("aria-pressed", String(snapOn)); try { localStorage.setItem("girika-snap", snapOn ? "1" : "0"); } catch(e) {} });
+const bSnapBtn = $("tlBeatSnap");
+if (bSnapBtn){
+  bSnapBtn.setAttribute("aria-pressed", String(beatSnapOn));
+  bSnapBtn.addEventListener("click", () => {
+    if (!P.music){
+      toast("Add a background music track first to snap cuts to the beat! 🎵");
+      return;
+    }
+    beatSnapOn = !beatSnapOn;
+    bSnapBtn.setAttribute("aria-pressed", String(beatSnapOn));
+    try { localStorage.setItem("girika-beat-snap", beatSnapOn ? "1" : "0"); } catch(e) {}
+    const b = getMusicBeats();
+    if (beatSnapOn && b){
+      toast(`🎵 Beat Snap ON · ${b.bpm} BPM (cuts snap to rhythm)`);
+    } else {
+      toast("Beat Snap " + (beatSnapOn ? "ON" : "OFF"));
+    }
+    renderTimeline();
+  });
+}
 $("tlOut").addEventListener("click", () => zoomBy(1 / 1.4));
 $("tlIn").addEventListener("click", () => zoomBy(1.4));
 $("tlFit").addEventListener("click", zoomFit);
@@ -7099,6 +8079,14 @@ function studioTemplates(){
 }
 if (EMBED){
   document.documentElement.classList.add("embedded"); $("start").hidden = true;
+  document.querySelectorAll(".bar .nav a").forEach(a => {
+    a.addEventListener("click", e => {
+      e.preventDefault();
+      const href = a.getAttribute("href") || "";
+      const to = href.includes("post") ? "post" : href.includes("video") ? "video" : "home";
+      parent.postMessage({ girika:"nav", to }, "*");
+    });
+  });
   window.addEventListener("message", async e => {
     const m = e.data; if (!m || !m.girika) return;
     if (m.girika === "mode"){ setUiMode.quiet = true; setUiMode(m.mode); setUiMode.quiet = false; }
@@ -7125,7 +8113,7 @@ if (EMBED){
 
 /* init */
 $("brandMark").innerHTML = GIRIKA.KIT.id === "girika" && !GIRIKA.IMG ? `<svg viewBox="45 57 1067 1294" width="100%" height="100%"><path d="${LOGO.arch}" fill="${C.lime}"/><path d="${LOGO.sun}" fill="${C.clayLt}"/></svg>` : `<svg viewBox="0 0 24 24" width="100%" height="100%" fill="none" stroke="${C.clayLt}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="3"/><path d="M17 10l4-2v8l-4-2"/></svg>`;
-GIRIKA.onReady(() => { if (!playing) renderFrame(playT); renderWmPanel(); });
+GIRIKA.onReady(() => { if (!playing) renderFrame(playT); renderWmPanel(); renderProgBarPanel(); });
 setFormat(P.format); updateTransport(); setMonitor();
 document.fonts.ready.then(() => { if (!playing) renderFrame(playT); });
 Promise.all([`500 40px "${GIRIKA.FONTS.head}"`,`italic 500 40px "${GIRIKA.FONTS.head}"`,`600 20px "${GIRIKA.FONTS.body}"`,`700 20px "${GIRIKA.FONTS.body}"`].map(f => document.fonts.load(f))).catch(() => {}).then(() => { if (!playing) renderFrame(playT); });
