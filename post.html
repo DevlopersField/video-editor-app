@@ -221,6 +221,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 .btn.primary:hover{filter:brightness(.96)}
 .group,.tpl-box,.pj-row,.stage-tools,.pv-bar,.cs-panel,.rs-fp-pop{border-radius:10px}
 :focus-visible{outline-color:var(--accent)!important}
+@media (max-width:560px){.theme-slot{display:none}}
 .recnote{color:var(--on-accent)}
 [style*="background:var(--clay)"],[style*="background: var(--clay)"]{color:var(--on-accent)!important}
 
@@ -260,6 +261,41 @@ body.recording #selLayer,body.recording .stage-tools{display:none}
 .el-head .btn{padding:5px 10px;font-size:12px}
 #elPanel .chips .chip{padding:5px 10px;font-size:12px}
 #elPanel .slider{grid-template-columns:92px 1fr 42px}
+/* word styling */
+.wbox{border:1px solid var(--line);border-radius:10px;padding:10px;margin:0 0 14px;background:var(--bg)}
+.wbox .lbl{margin-bottom:6px}
+.wchips{display:flex;flex-wrap:wrap;gap:4px}
+.wchip{border:1px solid var(--line);background:var(--surface);color:var(--heading);border-radius:6px;padding:3px 8px;font:600 13px/1.3 var(--sans);cursor:pointer;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wchip:hover{border-color:var(--muted)}
+.wchip.styled{background:color-mix(in srgb,var(--wc,var(--accent)) 24%,var(--surface));border-color:var(--wc,var(--accent));box-shadow:inset 0 -3px 0 var(--wc,var(--accent))}
+.wchip.hid{opacity:.5;text-decoration:line-through}
+.wchip[aria-pressed="true"]{outline:2px solid var(--accent);outline-offset:1px;border-color:var(--heading)}
+.wctl{margin-top:10px}
+.wctl .field{margin-bottom:10px}
+.wctl .slider{grid-template-columns:92px 1fr 42px}
+.wsel-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px;font-size:12px;font-weight:650;color:var(--heading)}
+.wsel-head .btn{padding:4px 9px;font-size:12px}
+.emo-grid{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px}
+.emo-grid button{border:0;background:none;border-radius:6px;font-size:20px;line-height:1;padding:5px 0;cursor:pointer}
+.emo-grid button:hover,.emo-grid button[aria-pressed="true"]{background:var(--soft)}
+.emo-in{width:100%;border:1px solid var(--line);border-radius:6px;padding:6px 9px;background:var(--surface);font-size:14px;margin-top:6px}
+.word-sel{position:absolute;outline:2px solid #FF4FA3;outline-offset:1px;border-radius:3px;background:rgba(255,79,163,.12)}
+/* add menu */
+.add-wrap{position:relative}
+.add-pop{position:fixed;top:0;left:16px;z-index:45;width:min(352px,calc(100vw - 32px));max-height:min(70vh,560px);overflow-y:auto;background:var(--surface);border:1px solid var(--line);box-shadow:0 12px 32px rgba(0,0,0,.18);padding:12px}
+.add-sec+.add-sec{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.add-h{display:block;font:650 12px var(--sans);color:var(--muted);margin-bottom:6px}
+.add-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
+.add-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+.add-grid.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.add-it{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;min-height:44px;border:1px solid var(--line);background:var(--surface);color:var(--heading);border-radius:8px;padding:6px 4px;font:600 12px var(--sans);cursor:pointer}
+.add-it:hover{background:var(--bg);border-color:var(--muted)}
+.add-it svg{width:30px;height:22px}
+.add-it canvas{display:block;width:100%;max-width:96px;height:46px;object-fit:contain}
+.add-emo{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:2px}
+.add-emo button{border:0;background:none;border-radius:6px;font-size:22px;line-height:1;padding:6px 0;cursor:pointer}
+.add-emo button:hover{background:var(--soft)}
+body.recording .add-wrap{display:none}
 </style>
 </head>
 <body>
@@ -313,7 +349,14 @@ body.recording #selLayer,body.recording .stage-tools{display:none}
   <main class="stage">
     <div class="stage-top">
       <div class="title"><b id="fmtTitle">Instagram Post</b><span id="fmtDims">1080 x 1350</span></div>
-      <label class="toggle"><input type="checkbox" id="guidesToggle" checked> Safe zone guides</label>
+      <div class="row" style="gap:14px">
+        <div class="add-wrap">
+          <button class="btn primary" id="addBtn" type="button" aria-haspopup="true" aria-expanded="false" aria-controls="addPop"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Add</button>
+          <div class="add-pop" id="addPop" hidden role="menu" aria-label="Add to the post"></div>
+          <input type="file" id="addImgIn" accept="image/png,image/jpeg,image/webp" hidden>
+        </div>
+        <label class="toggle"><input type="checkbox" id="guidesToggle" checked> Safe zone guides</label>
+      </div>
     </div>
     <div class="stage-tools" id="stageTools" role="toolbar" aria-label="Edit the selected element"></div>
     <div class="canvas-area" id="canvasArea">
@@ -580,6 +623,8 @@ try {
   if (saved && typeof saved === "object") st = { ...st, ...saved, colors:{ ...DEFAULT_STATE.colors, ...(saved.colors||{}) }, sizes:{ ...DEFAULT_STATE.sizes, ...(saved.sizes||{}) } };
   if (!FORMATS[st.format]) st.format = DEFAULT_STATE.format;
 } catch(e) {}
+/* imgs: images placed on the post (Add > Image), { id: dataURL }, referenced by extras { type:"image", img:id } */
+if (!st.imgs || typeof st.imgs !== "object" || Array.isArray(st.imgs)) st.imgs = {};
 /* pages: per-page layout, text and photo position. Style stays shared across pages. */
 if (!Array.isArray(st.pages) || !st.pages.length) st.pages = [newPage(1, st.layout, st.fields)];
 st.pages = st.pages.slice(0, MAX_PAGES).map((p, i) => newPage(p.id || i + 1, p.layout, p.fields, p.els, p.extras));
@@ -595,7 +640,11 @@ function persist(){
   saveTimer = setTimeout(() => {
     try {
       const keep = { ...st, pages: st.pages.map(({ id, layout, fields, els, extras }) => ({ id, layout, fields, ...(els && Object.keys(els).length ? { els } : {}), ...(extras && extras.length ? { extras } : {}) })) };
-      localStorage.setItem(STORE_KEY, JSON.stringify(keep));
+      const used = new Set(); st.pages.forEach(p => (p.extras || []).forEach(x => x && x.img && used.add(x.img)));
+      keep.imgs = Object.fromEntries(Object.entries(st.imgs || {}).filter(([id]) => used.has(id)));
+      if (!Object.keys(keep.imgs).length) delete keep.imgs;
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(keep)); }
+      catch(e2) { $("saveStatus").textContent = keep.imgs ? "Draft not saved: the images are too big for browser storage" : "Draft not saved (storage blocked)"; return; }
       $("saveStatus").textContent = "Draft saved on this browser";
     } catch(e) { $("saveStatus").textContent = "Draft not saved (storage blocked)"; }
   }, 400);
@@ -773,10 +822,14 @@ function tagEl(key, item, info){
     const c = fctx, L = EL.L, al = (info.kind === "text" && ov.align) || align;
     const w = item.w != null ? item.w : (W || 0), h = item.h;
     const bx = W && al === "center" ? x + (W - w) / 2 : W && al === "right" ? x + W - w : x;
-    const s = ov.s || 1, dx = (ov.dx || 0) * L.W, dy = (ov.dy || 0) * L.H, cx = bx + w / 2, cy = y + h / 2;
+    const s = ov.s || 1, dx = (ov.dx || 0) * L.W, dy = (ov.dy || 0) * L.H, cx = bx + w / 2, cy = y + h / 2, rot = (ov.rot || 0) * Math.PI / 180;
     const boxOn = info.kind === "text" && ov.box && ov.box !== "none", fs = info.size || 30, bpx = boxOn ? fs * .45 : 0, bpy = boxOn ? fs * .28 : 0;
+    let hw = (w / 2 + bpx) * s, hh = (h / 2 + bpy) * s;
+    if (rot){ const co = Math.abs(Math.cos(rot)), si = Math.abs(Math.sin(rot)); [hw, hh] = [hw * co + hh * si, hw * si + hh * co]; }
     const rec = { key, kind:info.kind || "shape", fam:info.fam || "body", base:info.base || {}, size:info.size || 0, color:info.color, hl:info.hl, weight:info.weight,
-      z:ov.z || 0, order:EL.n++, hide:!!ov.hide, x:cx + dx - (w / 2 + bpx) * s, y:cy + dy - (h / 2 + bpy) * s, w:(w + bpx * 2) * s, h:(h + bpy * 2) * s };
+      z:ov.z || 0, order:EL.n++, hide:!!ov.hide, x:cx + dx - hw, y:cy + dy - hh, w:hw * 2, h:hh * 2 };
+    /* word boxes (canvas coords) for clicking a word on the canvas, worked out only when asked */
+    if (item.wordRects && !rot) rec.wordsFn = () => item.wordRects(x, y, W, al).map(q => ({ i:q.i, x:cx + dx + (q.x - cx) * s, y:cy + dy + (q.y - cy) * s, w:q.w * s, h:q.h * s }));
     EL.list.push(rec);
     if (rec.hide) return;
     const sh = [c.shadowColor, c.shadowBlur, c.shadowOffsetX, c.shadowOffsetY];
@@ -785,7 +838,8 @@ function tagEl(key, item, info){
       [c.shadowColor, c.shadowBlur, c.shadowOffsetX, c.shadowOffsetY] = sh;
       if (ov.shadow === "on" && info.kind !== "pill"){ c.shadowColor = "rgba(0,0,0,.42)"; c.shadowBlur = 16 * L.u; c.shadowOffsetX = 0; c.shadowOffsetY = 3 * L.u; }
       else if (ov.shadow === "off") c.shadowColor = "rgba(0,0,0,0)";
-      if (s !== 1 || dx || dy){ c.translate(cx + dx, cy + dy); c.scale(s, s); c.translate(-cx, -cy); }
+      if (s !== 1 || dx || dy || rot){ c.translate(cx + dx, cy + dy); if (rot) c.rotate(rot); c.scale(s, s); c.translate(-cx, -cy); }
+      if (ov.op != null) c.globalAlpha *= Math.min(1, Math.max(0, +ov.op));
       if (boxOn){ /* background box or pill behind a text element */
         const bh = h + bpy * 2, col = ov.boxColor || (GIRIKA.lum(info.color || "#FFFFFF") > .4 ? C.ink : "#FFFFFF");
         c.save(); c.fillStyle = rgbaOf(col, ov.boxOpacity != null ? ov.boxOpacity : .85); c.beginPath();
@@ -804,6 +858,12 @@ function drawExtras(L){
   const p = st.pages[st.page]; if (!p || !p.extras || !p.extras.length) return;
   const lk = layoutKey(), onPhoto = lk === "feature" || lk === "listing", c = fctx, u = L.u, maxW = L.W * .84;
   p.extras.forEach(x => {
+    const xt = x.type || "text";
+    if (xt !== "text"){ /* emoji, sticker, shape, arrow, badge, image */
+      const it = xt === "badge" ? pill(c, x.text || "", u, { key:"x" + x.id, size:28, padX:30, padY:16, ls:.04, weight:700, bg:C.deodar, fg:C.lime, radius:999 }) : extraItem(c, x, "x" + x.id, u);
+      if (it) it.draw(x.x * L.W - it.w / 2, x.y * L.H - it.h / 2);
+      return;
+    }
     const blk = textBlock(c, x.text, { key:"x" + x.id, font:fSans(600), size:56 * u, min:10 * u, lh:1.2, maxW, maxLines:40 });
     const it = textEl(c, blk, onPhoto ? "#FFFFFF" : L.T.head, onPhoto ? C.clayLt : L.T.hl);
     if (!it) return;
@@ -813,12 +873,158 @@ function drawExtras(L){
   });
 }
 
+/* ---------- page-level extras added from the Add menu ----------
+   extras: { id, x, y, type, ... } with type "emoji" (text), "sticker" (kind, text), "shape" (kind),
+   "arrow" (kind), "badge" (text), "image" (img = id in st.imgs, ar = height / width). No type = text.
+   Their look lives in pg().els["x" + id] like any element: s, dx, dy, z, rot, op, color, fill, stroke, sw, bw, bh, font, weight. */
+const EMOJI_FONT = `"Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",${SANS}`;
+const XSTK = { new:{ w:280, h:120, text:"NEW" }, sold:{ w:330, h:140, text:"SOLD" }, offer:{ w:340, h:120, text:"OFFER" },
+  price:{ w:360, h:140, text:"Best price" }, burst:{ w:280, h:280, text:"Best deal" }, check:{ w:200, h:200, text:"" } };
+const XIMG = new Map();
+function xImg(id){
+  if (!id || !st.imgs || !st.imgs[id]) return null;
+  let im = XIMG.get(id);
+  if (!im){ im = new Image(); im.onload = () => { fgDirty = true; requestRender(); }; im.src = st.imgs[id]; XIMG.set(id, im); }
+  return im;
+}
+function drawSticker(c, kind, text, x, y, w, h, u, ov){
+  ov = ov || NO_OV;
+  const fill = ov.fill && ov.fill !== "none" ? ov.fill : (kind === "check" ? C.deodar : C.clay);
+  const fg = ov.color || (kind === "sold" ? fill : "#FFFFFF");
+  const label = (t, cx, cy, maxW, maxH) => {
+    t = String(t || "").trim(); if (!t) return;
+    if (kind !== "price" && kind !== "burst") t = t.toUpperCase();
+    const F = sz => ovFontStr(`800 ${sz}px ${SANS}`, ov);
+    let lines = [t], fs = maxH;
+    const widest = () => { c.font = F(fs); return Math.max(...lines.map(l => c.measureText(l).width)); };
+    if (kind === "burst" && /\s/.test(t) && widest() > maxW * 1.25){ const ws = t.split(/\s+/), m = Math.ceil(ws.length / 2); lines = [ws.slice(0, m).join(" "), ws.slice(m).join(" ")]; fs = maxH * .7; }
+    const mw = widest(); if (mw > maxW) fs *= maxW / mw;
+    c.font = F(fs); c.fillStyle = fg; c.textAlign = "center"; c.textBaseline = "middle";
+    lines.forEach((l, i) => c.fillText(l, cx, cy + (i - (lines.length - 1) / 2) * fs * 1.05 + fs * .04));
+    c.textAlign = "left";
+  };
+  c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.fillStyle = fill; c.strokeStyle = fill; c.lineJoin = "round"; c.lineCap = "round";
+  if (kind === "sold"){
+    c.lineWidth = 9 * u; c.beginPath(); c.roundRect(x + 5 * u, y + 5 * u, w - 10 * u, h - 10 * u, 14 * u); c.stroke();
+    c.lineWidth = 3 * u; c.beginPath(); c.roundRect(x + 18 * u, y + 18 * u, w - 36 * u, h - 36 * u, 8 * u); c.stroke();
+    label(text, x + w / 2, y + h / 2, w * .7, h * .42);
+  } else if (kind === "offer"){
+    const n = h * .32; c.beginPath(); c.moveTo(x, y); c.lineTo(x + w, y); c.lineTo(x + w - n, y + h / 2); c.lineTo(x + w, y + h); c.lineTo(x, y + h); c.lineTo(x + n, y + h / 2); c.closePath(); c.fill();
+    label(text, x + w / 2, y + h / 2, w - n * 2 - 24 * u, h * .44);
+  } else if (kind === "price"){
+    const p = h * .42; c.beginPath(); c.moveTo(x, y + h / 2); c.lineTo(x + p, y); c.lineTo(x + w, y); c.lineTo(x + w, y + h); c.lineTo(x + p, y + h); c.closePath();
+    c.moveTo(x + p * .78 + h * .09, y + h / 2); c.arc(x + p * .78, y + h / 2, h * .09, 0, Math.PI * 2); c.fill("evenodd");
+    label(text, x + p + (w - p) / 2, y + h / 2, (w - p) * .84, h * .42);
+  } else if (kind === "burst"){
+    const R = Math.min(w, h) / 2, r = R * .84, n = 18, cx = x + w / 2, cy = y + h / 2;
+    c.beginPath(); for (let i = 0; i < n * 2; i++){ const a = -Math.PI / 2 + i * Math.PI / n, rr = i % 2 ? r : R; i ? c.lineTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr) : c.moveTo(cx + Math.cos(a) * rr, cy + Math.sin(a) * rr); } c.closePath(); c.fill();
+    label(text, cx, cy, R * 1.42, R * .36);
+  } else if (kind === "check"){
+    c.beginPath(); c.arc(x + w / 2, y + h / 2, Math.min(w, h) / 2, 0, Math.PI * 2); c.fill();
+    c.strokeStyle = fg; c.lineWidth = w * .09; c.beginPath(); c.moveTo(x + w * .28, y + h * .52); c.lineTo(x + w * .44, y + h * .67); c.lineTo(x + w * .73, y + h * .36); c.stroke();
+  } else { /* new */
+    c.beginPath(); c.roundRect(x, y, w, h, h / 2); c.fill();
+    c.globalAlpha *= .55; c.strokeStyle = fg; c.lineWidth = 3 * u; c.beginPath(); c.roundRect(x + 9 * u, y + 9 * u, w - 18 * u, h - 18 * u, (h - 18 * u) / 2); c.stroke(); c.globalAlpha /= .55;
+    label(text, x + w / 2, y + h / 2, w * .72, h * .46);
+  }
+  c.restore();
+}
+function drawShape(c, kind, x, y, w, h, sw, ov){
+  const fill = kind === "line" || ov.fill === "none" ? null : (ov.fill || C.deodar);
+  const stroke = kind === "line" ? (ov.stroke && ov.stroke !== "none" ? ov.stroke : C.clay) : (ov.stroke && ov.stroke !== "none" ? ov.stroke : null);
+  c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.beginPath();
+  if (kind === "line"){ c.lineCap = "round"; c.lineWidth = sw; c.strokeStyle = stroke; c.moveTo(x + sw / 2, y + h / 2); c.lineTo(x + w - sw / 2, y + h / 2); c.stroke(); c.restore(); return; }
+  if (kind === "circle") c.ellipse(x + w / 2, y + h / 2, w / 2, h / 2, 0, 0, Math.PI * 2);
+  else if (kind === "round") c.roundRect(x, y, w, h, Math.min(w, h) * .18);
+  else c.rect(x, y, w, h);
+  if (fill){ c.fillStyle = fill; c.fill(); }
+  if (stroke && sw > 0){ c.lineWidth = sw; c.strokeStyle = stroke; c.stroke(); }
+  c.restore();
+}
+function drawArrow(c, kind, x, y, w, h, sw, color, u){
+  c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.strokeStyle = color; c.lineWidth = sw; c.lineCap = "round"; c.lineJoin = "round";
+  const hs = Math.max(24 * u, sw * 2.6), pad = sw / 2 + 2 * u;
+  let x1, y1, ang;
+  c.beginPath();
+  if (kind === "curved"){
+    const x0 = x + pad, y0 = y + h - pad - hs * .3, qx = x + w * .45, qy = y - h * .35; x1 = x + w - pad - hs * .2; y1 = y + h * .5;
+    c.moveTo(x0, y0); c.quadraticCurveTo(qx, qy, x1, y1); ang = Math.atan2(y1 - qy, x1 - qx);
+  } else { x1 = x + w - pad; y1 = y + h / 2; c.moveTo(x + pad, y1); c.lineTo(x1, y1); ang = 0; }
+  c.stroke();
+  c.beginPath(); c.moveTo(x1 - hs * Math.cos(ang - .5), y1 - hs * Math.sin(ang - .5)); c.lineTo(x1, y1); c.lineTo(x1 - hs * Math.cos(ang + .5), y1 - hs * Math.sin(ang + .5)); c.stroke();
+  c.restore();
+}
+function extraItem(c, x, key, u){
+  const ov = elOv(key), t = x.type;
+  const item = (w, h, kind, fn) => tagEl(key, { w, h, gap:0, draw(bx, by){ fn(bx, by); } }, { kind });
+  if (t === "emoji"){
+    const txt = String(x.text || "").trim(); if (!txt) return null;
+    const fs = 170 * u, F = `400 ${fs}px ${EMOJI_FONT}`; c.font = F;
+    const w = Math.max(fs * .6, c.measureText(txt).width), h = fs * 1.15;
+    return item(w, h, "emoji", (bx, by) => { c.font = F; c.textBaseline = "middle"; c.textAlign = "center"; c.fillStyle = ov.color || "#FFFFFF"; c.fillText(txt, bx + w / 2, by + h / 2 + fs * .04); c.textAlign = "left"; });
+  }
+  if (t === "sticker"){
+    const d = XSTK[x.kind] || XSTK.new, w = d.w * u, h = d.h * u;
+    return item(w, h, "sticker", (bx, by) => drawSticker(c, x.kind, x.text, bx, by, w, h, u, ov));
+  }
+  if (t === "shape"){
+    const line = x.kind === "line", sw = (ov.sw != null ? +ov.sw : line ? 10 : 6) * u;
+    const w = (x.kind === "circle" ? 260 : line ? 420 : 380) * u * (ov.bw || 1), h = line ? Math.max(sw, 24 * u) : (x.kind === "circle" ? 260 : 240) * u * (ov.bh || 1);
+    return item(w, h, "xshape", (bx, by) => drawShape(c, x.kind, bx, by, w, h, sw, ov));
+  }
+  if (t === "arrow"){
+    const sw = (ov.sw != null ? +ov.sw : 10) * u, w = 380 * u * (ov.bw || 1), h = x.kind === "curved" ? 150 * u * (ov.bh || 1) : Math.max(60 * u, sw * 5);
+    return item(w, h, "xarrow", (bx, by) => drawArrow(c, x.kind, bx, by, w, h, sw, ov.color || C.clay, u));
+  }
+  if (t === "image"){
+    const im = xImg(x.img), ar = x.ar || (im && im.naturalWidth ? im.naturalHeight / im.naturalWidth : 1), w = 380 * u, h = w * ar;
+    return item(w, h, "image", (bx, by) => { if (im && im.complete && im.naturalWidth){ c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.drawImage(im, bx, by, w, h); c.restore(); } });
+  }
+  return null;
+}
+
+/* ---------- word styles ----------
+   pg().els[key].ws = { [wordIndex]: { color, s, font, b, i, hl, box, emoji, hide } }
+   Words are counted the way they are drawn: across all lines, *stars* removed (tag and button: split on spaces). */
+const wsHas = ws => !!ws && typeof ws === "object" && Object.keys(ws).length > 0;
+function wsFont(f, w){
+  if (!w || !(w.s || w.font || w.b || w.i)) return f;
+  const m = /^(italic )?(\d+) ([\d.e+-]+)px (.*)$/.exec(f); if (!m) return f;
+  const wt = w.b ? (+m[2] >= 700 ? 900 : 700) : m[2], it = w.i ? "italic " : (m[1] || "");
+  const fam = w.font ? `"${String(w.font).replace(/["';{}<>\\]/g, "")}", ${m[4]}` : m[4];
+  return `${it}${wt} ${+m[3] * (w.s || 1)}px ${fam}`;
+}
+const fontPx = f => +((/([\d.e+-]+)px/.exec(f) || [0, 30])[1]);
+function wsMeasure(c, t, f, ls, w, hl){
+  const k = (w && w.s) || 1, F = wsFont(f, w), L = ls * k;
+  c.font = F; c.letterSpacing = L + "px";
+  const tw = c.measureText(t).width;
+  c.letterSpacing = "0px";
+  const ew = w && w.emoji ? c.measureText(String(w.emoji)).width : 0, eg = ew ? fontPx(F) * .2 : 0;
+  return { t, hl, w, f:F, ls:L, k, tw, ew, eg, ww:tw + eg + ew };
+}
+function wsPaint(c, wd, x, cy, color){
+  const w = wd.w;
+  if (w && w.box){ const fs = fontPx(wd.f), px = fs * .16, ph = fs * .62; c.save(); c.shadowColor = "rgba(0,0,0,0)"; c.fillStyle = w.box; c.beginPath(); c.roundRect(x - px, cy - ph, wd.ww + px * 2, ph * 2, fs * .16); c.fill(); c.restore(); }
+  c.font = wd.f; c.letterSpacing = wd.ls + "px"; c.fillStyle = (w && w.color) || color;
+  c.fillText(wd.t, x, cy);
+  if (wd.ew){ c.letterSpacing = "0px"; c.fillText(String(w.emoji), x + wd.tw + wd.eg, cy); }
+}
+/* one line of words (tag, button, link): every word measured on its own */
+function runWords(c, text, F, ls, ws){
+  ws = ws || {}; c.font = F; c.letterSpacing = ls + "px";
+  const sp = c.measureText(" ").width, items = []; let w = 0, k = 1;
+  String(text).split(/\s+/).filter(Boolean).forEach((t, i) => { const s = ws[i]; if (s && s.hide) return; const wd = wsMeasure(c, t, F, ls, s, !!(s && s.hl)); wd.i = i; w += (items.length ? sp : 0) + wd.ww; k = Math.max(k, wd.k); items.push(wd); });
+  c.letterSpacing = "0px";
+  return { items, w, sp, k };
+}
+
 /* ---------- rich text: *word* = highlight ---------- */
 function parseRich(text){
-  const paras = []; let hl = false;
+  const paras = []; let hl = false, n = 0;
   for (const line of String(text).split("\n")){
     const words = []; let cur = "", curHl = null;
-    const push = () => { if (cur) words.push({ t:cur, hl:curHl }); cur = ""; curHl = null; };
+    const push = () => { if (cur) words.push({ t:cur, hl:curHl, i:n++ }); cur = ""; curHl = null; };
     for (const ch of line){
       if (ch === "*"){ hl = !hl; continue; }
       if (/\s/.test(ch)){ push(); continue; }
@@ -829,19 +1035,26 @@ function parseRich(text){
   }
   return paras;
 }
-function layoutRich(c, paras, maxW, f, hf, ls){
+function layoutRich(c, paras, maxW, f, hf, ls, ws){
   c.font = f; c.letterSpacing = ls + "px";
-  const sp = c.measureText(" ").width, lines = [];
+  const sp = c.measureText(" ").width, lines = [], on = wsHas(ws);
   let widest = 0;
   for (const words of paras){
-    let line = [], lw = 0;
+    let line = [], lw = 0, lk = 1;
     for (const wd of words){
-      c.font = wd.hl ? hf : f;
-      const ww = c.measureText(wd.t).width;
-      if (line.length && lw + sp + ww > maxW){ lines.push({ words:line, w:lw }); widest = Math.max(widest, lw); line = []; lw = 0; }
-      lw += line.length ? sp + ww : ww; line.push({ t:wd.t, hl:wd.hl, ww });
+      const s = on ? ws[wd.i] : null;
+      let it;
+      if (s){ /* styled word: own font, size, emoji */
+        if (s.hide) continue;
+        const hl = s.hl != null ? !!s.hl : wd.hl;
+        it = wsMeasure(c, wd.t, hl ? hf : f, ls, s, hl); c.letterSpacing = ls + "px";
+      } else { c.font = wd.hl ? hf : f; it = { t:wd.t, hl:wd.hl, ww:c.measureText(wd.t).width }; }
+      it.i = wd.i;
+      const ww = it.ww;
+      if (line.length && lw + sp + ww > maxW){ lines.push({ words:line, w:lw, k:lk }); widest = Math.max(widest, lw); line = []; lw = 0; lk = 1; }
+      lw += line.length ? sp + ww : ww; line.push(it); lk = Math.max(lk, it.k || 1);
     }
-    lines.push({ words:line, w:lw }); widest = Math.max(widest, lw);
+    lines.push({ words:line, w:lw, k:lk }); widest = Math.max(widest, lw);
   }
   c.letterSpacing = "0px";
   return { lines, sp, f, hf, ls, widest };
@@ -854,32 +1067,37 @@ function textBlock(c, text, o){
   const paras = parseRich(o.upper ? String(text).toUpperCase() : text);
   let s = o.size, res;
   for (let i = 0; i < 60; i++){
-    res = layoutRich(c, paras, o.maxW, o.font(s), (o.hlFont || o.font)(s), o.ls ? o.ls * s : 0);
-    const h = res.lines.length * s * o.lh;
+    res = layoutRich(c, paras, o.maxW, o.font(s), (o.hlFont || o.font)(s), o.ls ? o.ls * s : 0, ov.ws);
+    const h = res.lines.reduce((a, ln) => a + (ln.k || 1), 0) * s * o.lh;
     const ok = res.lines.length <= (o.maxLines || 99) && h <= (o.maxH || Infinity) && res.widest <= o.maxW + 1;
     if (ok || s <= o.min) break;
     s = Math.max(o.min, s * .95);
   }
   const blk = { ...res, size:s, lh:o.lh, key:o.key, base, fam };
-  blk.h = res.lines.length * s * o.lh;
+  blk.h = res.lines.reduce((a, ln) => a + (ln.k || 1), 0) * s * o.lh;
   return blk;
 }
 function textEl(c, blk, color, hlColor, gap){
   if (!blk) return null;
   const ov = elOv(blk.key); color = ov.color || color; hlColor = ov.hl || hlColor;
+  const walk = (x, y, w, align, fn) => {
+    let yy = y;
+    blk.lines.forEach(ln => {
+      const lh = blk.size * blk.lh * (ln.k || 1), cy = yy + lh / 2;
+      let lx = align === "center" ? x + (w - ln.w) / 2 : align === "right" ? x + w - ln.w : x;
+      ln.words.forEach((wd, j) => { fn(wd, lx, cy, lh); lx += wd.ww + (j < ln.words.length - 1 ? blk.sp : 0); });
+      yy += lh;
+    });
+  };
   return tagEl(blk.key, { h:blk.h, gap:gap || 0, w:blk.widest, draw(x, y, w, align){
     c.textBaseline = "middle";
-    blk.lines.forEach((ln, i) => {
-      let lx = align === "center" ? x + (w - ln.w) / 2 : align === "right" ? x + w - ln.w : x;
-      const cy = y + (i + .5) * blk.size * blk.lh;
-      ln.words.forEach((wd, j) => {
-        c.font = wd.hl ? blk.hf : blk.f; c.letterSpacing = blk.ls + "px";
-        c.fillStyle = wd.hl ? hlColor : color; c.fillText(wd.t, lx, cy);
-        lx += wd.ww + (j < ln.words.length - 1 ? blk.sp : 0);
-      });
+    walk(x, y, w, align, (wd, lx, cy) => {
+      if (wd.f){ wsPaint(c, wd, lx, cy, wd.hl ? hlColor : color); return; }
+      c.font = wd.hl ? blk.hf : blk.f; c.letterSpacing = blk.ls + "px";
+      c.fillStyle = wd.hl ? hlColor : color; c.fillText(wd.t, lx, cy);
     });
     c.letterSpacing = "0px";
-  }}, { kind:"text", fam:blk.fam, base:blk.base, size:blk.size, color, hl:hlColor, weight:+((/(\d+) /.exec(blk.f) || [0, 500])[1]) });
+  }, wordRects(x, y, w, align){ const out = []; walk(x, y, w, align, (wd, lx, cy, lh) => out.push({ i:wd.i, x:lx, y:cy - lh / 2, w:wd.ww, h:lh })); return out; } }, { kind:"text", fam:blk.fam, base:blk.base, size:blk.size, color, hl:hlColor, weight:+((/(\d+) /.exec(blk.f) || [0, 500])[1]) });
 }
 const fSerif = s => `500 ${s}px ${SERIF}`, fSerifI = s => `italic 500 ${s}px ${SERIF}`;
 const fSans = w => s => `${w} ${s}px ${SANS}`;
@@ -891,14 +1109,23 @@ function pill(c, text, u, opts){
     radius:ov.box === "pill" ? 999 : ov.box === "box" ? 3 : opts.radius, shadow:ov.shadow ? ov.shadow === "on" : opts.shadow };
   const k = SZ("ui"), size = opts.size * u * k, padX = opts.padX * u * k, padY = opts.padY * u * k, ls = (opts.ls || 0) * size;
   const t = opts.upper ? text.toUpperCase() : text, PF = ovFontStr(`${opts.weight || 700} ${size}px ${SANS}`, ov);
+  const run = runWords(c, t, PF, ls, ov.ws), styled = wsHas(ov.ws), hlc = ov.hl || C.clayLt;
   c.font = PF; c.letterSpacing = ls + "px";
-  const tw = c.measureText(t).width - ls; c.letterSpacing = "0px";
-  const w = Math.min(tw + padX*2, opts.maxW || Infinity), h = size + padY*2;
-  return tagEl(opts.key, { w, h, gap:opts.gap || 0, draw(x, y, W, align){
+  const tw = (styled ? run.w : c.measureText(t).width) - ls; c.letterSpacing = "0px";
+  const w = Math.min(tw + padX*2, opts.maxW || Infinity), h = size * (styled ? run.k : 1) + padY*2;
+  return tagEl(opts.key, { w, h, gap:opts.gap || 0, wordRects(x, y, W, align){
+    const bx = align === "center" && W ? x + (W - w)/2 : align === "right" && W ? x + W - w : x;
+    let rx = bx + (w - run.w) / 2; return run.items.map(wd => { const q = { i:wd.i, x:rx, y, w:wd.ww, h }; rx += wd.ww + run.sp; return q; });
+  }, draw(x, y, W, align){
     const bx = align === "center" && W ? x + (W - w)/2 : align === "right" && W ? x + W - w : x;
     if (opts.shadow){ c.save(); c.shadowColor = "rgba(0,0,0,.28)"; c.shadowBlur = 24*u; c.shadowOffsetY = 8*u; }
     if (opts.bg){ c.globalAlpha = opts.bgA != null ? opts.bgA : 1; c.fillStyle = opts.bg; c.beginPath(); c.roundRect(bx, y, w, h, Math.min(h / 2, (opts.radius || 10) * u)); c.fill(); c.globalAlpha = 1; }
     if (opts.shadow) c.restore();
+    if (styled){
+      let rx = bx + (w - run.w) / 2 + ls / 2; c.textBaseline = "middle"; c.textAlign = "left";
+      run.items.forEach(wd => { wsPaint(c, wd, rx, y + h/2 + size*.04, wd.hl ? hlc : opts.fg); rx += wd.ww + run.sp; });
+      c.letterSpacing = "0px"; return;
+    }
     c.font = PF; c.letterSpacing = ls + "px";
     c.fillStyle = opts.fg; c.textBaseline = "middle"; c.textAlign = "center";
     c.fillText(t, bx + w/2 + ls/2, y + h/2 + size*.04, w - padX*1.2);
@@ -914,12 +1141,18 @@ function arrowLinkEl(c, t, u, color, gap){
   if (!t || !t.trim()) return null;
   const ov = elOv("cta"); color = ov.color || color;
   const size = 26*u*SZ("ui"), ls = (ov.ls != null ? ov.ls : .12)*size, txt = t.toUpperCase(), F = ovFontStr(`700 ${size}px ${SANS}`, ov);
-  c.font = F; c.letterSpacing = ls + "px"; const tw = c.measureText(txt).width; c.letterSpacing = "0px";
-  const aw = 34*u, w = tw + 16*u + aw, h = size * 1.3;
-  return tagEl("cta", { w, h, gap:gap||0, draw(x, y, W, align){
+  const run = runWords(c, txt, F, ls, ov.ws), styled = wsHas(ov.ws);
+  c.font = F; c.letterSpacing = ls + "px"; const tw = styled ? run.w : c.measureText(txt).width; c.letterSpacing = "0px";
+  const aw = 34*u, w = tw + 16*u + aw, h = size * 1.3 * (styled ? run.k : 1);
+  return tagEl("cta", { w, h, gap:gap||0, wordRects(x, y, W, align){
+    const bx = align === "center" ? x + (W - w)/2 : align === "right" && W ? x + W - w : x;
+    let rx = bx; return run.items.map(wd => { const q = { i:wd.i, x:rx, y, w:wd.ww, h }; rx += wd.ww + run.sp; return q; });
+  }, draw(x, y, W, align){
     const bx = align === "center" ? x + (W - w)/2 : align === "right" && W ? x + W - w : x, cy = y + h/2;
-    c.font = F; c.letterSpacing = ls + "px"; c.fillStyle = color; c.textBaseline = "middle";
-    c.fillText(txt, bx, cy); c.letterSpacing = "0px";
+    c.textBaseline = "middle";
+    if (styled){ let rx = bx; run.items.forEach(wd => { wsPaint(c, wd, rx, cy, wd.hl ? (ov.hl || C.clayLt) : color); rx += wd.ww + run.sp; }); c.letterSpacing = "0px"; }
+    else { c.font = F; c.letterSpacing = ls + "px"; c.fillStyle = color;
+    c.fillText(txt, bx, cy); c.letterSpacing = "0px"; }
     const ax = bx + tw + 16*u;
     c.strokeStyle = color; c.lineWidth = 3.2*u; c.lineCap = "round"; c.lineJoin = "round";
     c.beginPath(); c.moveTo(ax, cy); c.lineTo(ax + aw, cy); c.moveTo(ax + aw - 12*u, cy - 12*u); c.lineTo(ax + aw, cy); c.lineTo(ax + aw - 12*u, cy + 12*u); c.stroke();
@@ -1244,7 +1477,7 @@ function buildFields(){
     const id = "f-" + k;
     wrap.innerHTML = `<label for="${id}">${d.label}</label>` + (d.type === "area" ? `<textarea id="${id}" rows="${k === "headline" ? 2 : 3}"></textarea>` : `<input type="text" id="${id}">`);
     const inp = wrap.querySelector("input,textarea"); inp.value = st.fields[k] || "";
-    inp.addEventListener("input", () => { st.fields[k] = inp.value; requestRender(); persist(); updateAria(); });
+    inp.addEventListener("input", () => { const old = st.fields[k]; st.fields[k] = inp.value; wsKeep(k, old, inp.value); requestRender(); persist(); updateAria(); if (ED.wordUI && ED.wordUI.key === k) ED.wordUI.rebuild(); });
     host.appendChild(wrap);
   });
 }
@@ -1845,14 +2078,17 @@ $("resetBtn").addEventListener("click", e => {
    Cmd or Ctrl + C, V or D duplicate text as a new text box. Cmd or Ctrl + Z undo, Shift to redo.
    Edits are stored per page in pg().els, see "Element layer" above.
    ========================================================= */
-const ED = { sel:null, drag:null, pts:new Map(), pinch:null, guides:null, hover:null, clip:null, html:"", listSig:"", panelTag:"" };
+const ED = { sel:null, drag:null, pts:new Map(), pinch:null, guides:null, hover:null, clip:null, html:"", listSig:"", panelTag:"", wsSel:[], wsAnchor:null, wsTag:"", wordUI:null };
 const EL_NAMES = { headline:"Headline", body:"Supporting line", eyebrow:"Small line", badge:"Tag", cta:"Button", price:"Price", specs:"Details",
   number:"Slide number", handle:"Footer left", swipe:"Footer right", tagline:"Tagline", contact:"Contact line", logo:"Logo",
   divider:"Divider", rule:"Accent line", indicator:"Page indicator" };
-const STYLE_KEYS = ["font","weight","color","hl","ls","lh","align","box","boxColor","boxOpacity","shadow"];
+const STYLE_KEYS = ["font","weight","color","hl","ls","lh","align","box","boxColor","boxOpacity","shadow","fill","stroke","sw","op","bw","bh"];
+const XNAMES = { text:"Text", emoji:"Emoji", sticker:"Sticker", shape:"Shape", arrow:"Arrow", badge:"Badge", image:"Image" };
+const XTEXT = ["text","badge","sticker","emoji"];
 const isExtraKey = k => /^x\d+$/.test(k || "");
 const extraOf = k => isExtraKey(k) ? ((pg().extras || []).find(x => "x" + x.id === k) || null) : null;
-const elName = k => k === "photo" ? (media.type ? "Photo" : "Background") : isExtraKey(k) ? "Text" : EL_NAMES[k] || (FIELDS[k] && FIELDS[k].label) || "Element";
+const xType = k => { const x = extraOf(k); return x ? (x.type || "text") : null; };
+const elName = k => k === "photo" ? (media.type ? "Photo" : "Background") : isExtraKey(k) ? (XNAMES[xType(k)] || "Text") : EL_NAMES[k] || (FIELDS[k] && FIELDS[k].label) || "Element";
 const elRec = k => EL.list.find(r => r.key === k) || null;
 const clampN = (v, a, b) => Math.min(b, Math.max(a, v));
 const edBusy = () => document.body.classList.contains("recording");
@@ -1860,19 +2096,33 @@ function canvasPt(e){ const r = cv.getBoundingClientRect(); return [(e.clientX -
 const screenK = () => cv.width / Math.max(1, cv.getBoundingClientRect().width);
 
 /* the words an element shows (null for logo, indicator and lines) */
-function elText(k){ const x = extraOf(k); if (x) return x.text; return FIELDS[k] && LAYOUTS[layoutKey()].fields.includes(k) ? (st.fields[k] || "") : null; }
+function elText(k){ const x = extraOf(k); if (x) return XTEXT.includes(x.type || "text") ? (x.text || "") : null; return FIELDS[k] && LAYOUTS[layoutKey()].fields.includes(k) ? (st.fields[k] || "") : null; }
 function setElText(k, v){
-  const x = extraOf(k);
+  const x = extraOf(k), old = elText(k);
   if (x) x.text = v;
   else if (FIELDS[k]){ st.fields[k] = v; const f = $("f-" + k); if (f && f.value !== v) f.value = v; updateAria(); }
+  wsKeep(k, old, v);
   requestRender(); persist();
+  if (ED.wordUI && ED.wordUI.key === k) ED.wordUI.rebuild();
+}
+/* the words of an element, counted the way the renderer counts them */
+function wordsOf(k, t){
+  t = String(t || ""); const x = extraOf(k);
+  return k === "badge" || k === "cta" || (x && x.type === "badge") ? t.split(/\s+/).filter(Boolean) : parseRich(t).flat().map(w => w.t);
+}
+/* word styles stay while the number of words is the same, and are dropped when it changes */
+function wsKeep(k, a, b){
+  const p = pg(), o = p && p.els && p.els[k];
+  if (!o || !o.ws || wordsOf(k, a).length === wordsOf(k, b).length) return;
+  delete o.ws; if (!Object.keys(o).length) delete p.els[k];
+  ED.wsSel = []; ED.wsAnchor = null;
 }
 /* write per-element edits; null or default values are removed so the template value applies again */
 function setOv(k, patch){
   const p = pg(); if (!p || !k || k === "photo") return;
   p.els = p.els || {};
   const o = { ...(p.els[k] || {}), ...patch };
-  Object.keys(o).forEach(n => { const v = o[n]; if (v == null || v === "" || v === false || ((n === "dx" || n === "dy" || n === "z") && v === 0) || (n === "s" && v === 1)) delete o[n]; });
+  Object.keys(o).forEach(n => { const v = o[n]; if (v == null || v === "" || v === false || ((n === "dx" || n === "dy" || n === "z" || n === "rot") && v === 0) || (n === "s" && v === 1) || (n === "ws" && !wsHas(v))) delete o[n]; });
   if (Object.keys(o).length) p.els[k] = o; else delete p.els[k];
   requestRender(); persist(); edToolbar(); edSyncSize();
 }
@@ -1921,8 +2171,44 @@ function edAddText(text, x, y, style){
   fgDirty = true; draw(); persist(); scheduleThumbs();
   edSelect("x" + id); edFocusText();
 }
+function edAddExtra(obj, style){
+  histCut();
+  const p = pg(); p.extras = p.extras || [];
+  const id = p.extras.reduce((m, q) => Math.max(m, q.id), 0) + 1, n = p.extras.length % 6;
+  p.extras.push({ id, x:+(.5 + (n % 3 - 1) * .05).toFixed(4), y:+(.42 + n * .025).toFixed(4), ...obj });
+  if (style && Object.keys(style).length){ p.els = p.els || {}; p.els["x" + id] = style; }
+  fgDirty = true; draw(); persist(); scheduleThumbs();
+  edSelect("x" + id);
+}
+function edDuplicate(k){
+  const x = extraOf(k); if (!x) return false;
+  histCut();
+  const p = pg(), id = p.extras.reduce((m, q) => Math.max(m, q.id), 0) + 1, n = structuredClone(x);
+  n.id = id; n.x = +clampN(x.x + .03, .04, .96).toFixed(4); n.y = +clampN(x.y + .03, .04, .96).toFixed(4);
+  p.extras.push(n);
+  if (p.els && p.els[k]) p.els["x" + id] = structuredClone(p.els[k]);
+  fgDirty = true; draw(); persist(); scheduleThumbs(); edSelect("x" + id);
+  return true;
+}
+/* an uploaded picture, scaled to 1200 px at most; JPEG unless it has see-through parts */
+function edReadImage(file, done){
+  if (!file || !/^image\//.test(file.type)){ if (file) alert("Please choose a PNG or JPG image."); return; }
+  const url = URL.createObjectURL(file), im = new Image();
+  im.onload = () => {
+    const M = 1200, k = Math.min(1, M / Math.max(im.naturalWidth, im.naturalHeight)), w = Math.max(1, Math.round(im.naturalWidth * k)), h = Math.max(1, Math.round(im.naturalHeight * k));
+    const cc = document.createElement("canvas"); cc.width = w; cc.height = h; const x = cc.getContext("2d"); x.drawImage(im, 0, 0, w, h);
+    let alpha = false;
+    if (file.type !== "image/jpeg"){ try { const d = x.getImageData(0, 0, w, h).data; for (let i = 3; i < d.length; i += 64) if (d[i] < 250){ alpha = true; break; } } catch(e) { alpha = true; } }
+    URL.revokeObjectURL(url);
+    const id = "i" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    st.imgs = st.imgs || {}; st.imgs[id] = cc.toDataURL(alpha ? "image/png" : "image/jpeg", .88);
+    done(id, +(h / w).toFixed(5));
+  };
+  im.onerror = () => { URL.revokeObjectURL(url); alert("This image could not be opened. Try a PNG or JPG."); };
+  im.src = url;
+}
 function edCopy(){
-  const k = ED.sel, r = elRec(k), t = k && k !== "photo" ? elText(k) : null;
+  const k = ED.sel, r = elRec(k), t = k && k !== "photo" && (!isExtraKey(k) || xType(k) === "text") ? elText(k) : null;
   if (t == null || !t.trim() || !r) return false;
   const { dx, dy, z, hide, s, ...style } = elOv(k), L = EL.L;
   if (!isExtraKey(k)){ /* carry the template look over to the new text box */
@@ -1947,7 +2233,12 @@ function edPaste(){
 function edFocusText(){ setTimeout(() => { const t = $("elText"); if (t){ t.focus(); t.select && t.select(); } }, 40); }
 
 /* ---------- selection ---------- */
-function edSelect(k){ if (ED.sel === k) return; ED.sel = k; ED.hover = null; edPaint(); }
+function edSelect(k){ if (ED.sel === k) return; ED.sel = k; ED.hover = null; ED.wsSel = []; ED.wsAnchor = null; edPaint(); }
+function edHitWord(r, px, py){
+  if (!r || !r.wordsFn) return null;
+  const pad = 3 * screenK();
+  return r.wordsFn().find(q => px >= q.x - pad && px <= q.x + q.w + pad && py >= q.y && py <= q.y + q.h) || null;
+}
 function edHit(px, py){
   const pad = 6 * screenK();
   const hits = EL.list.filter(r => !r.hide && px >= r.x - pad && px <= r.x + r.w + pad && py >= r.y - pad && py <= r.y + r.h + pad);
@@ -1970,6 +2261,7 @@ function edPaint(){
   let html = "";
   if (ED.hover && ED.hover !== k && !ED.drag){ const h = elRec(ED.hover); if (h && !h.hide) html += box("hov-box", h); }
   if (r) html += box("sel-box" + (r.photo ? " photo" : "") + (r.hide ? " off" : ""), r, !r.hide && (!r.photo || media.type) ? '<span class="sel-handle" title="Drag to resize"></span>' : "");
+  if (r && !r.hide && r.wordsFn && ED.wsSel.length && ED.wordUI && ED.wordUI.key === k) r.wordsFn().filter(q => ED.wsSel.includes(q.i)).forEach(q => { html += box("word-sel", q); });
   if (ED.guides){
     if (ED.guides.v != null) html += `<div class="snap v" style="left:${P(ED.guides.v, L.W)}"></div>`;
     if (ED.guides.h != null) html += `<div class="snap h" style="top:${P(ED.guides.h, L.H)}"></div>`;
@@ -1985,7 +2277,7 @@ function edList(){
   if (sig === ED.listSig) return; ED.listSig = sig;
   host.innerHTML = "";
   const add = (k, off) => {
-    const b = document.createElement("button"); b.type = "button"; b.className = "chip" + (off ? " off" : ""); b.textContent = isExtraKey(k) ? "Text: " + (() => { const t = (elText(k) || "").replace(/\*/g, "").trim(); return t.length > 16 ? t.slice(0, 15) + "..." : t; })() : elName(k);
+    const b = document.createElement("button"); b.type = "button"; b.className = "chip" + (off ? " off" : ""); b.textContent = isExtraKey(k) && ["text","badge"].includes(xType(k)) ? elName(k) + ": " + (() => { const t = (elText(k) || "").replace(/\*/g, "").trim(); return t.length > 16 ? t.slice(0, 15) + "..." : t; })() : elName(k);
     b.setAttribute("aria-pressed", String(ED.sel === k)); if (off) b.title = "Hidden. Select it, then choose Show.";
     b.addEventListener("click", () => edSelect(ED.sel === k ? null : k)); host.appendChild(b);
   };
@@ -2002,7 +2294,7 @@ function edToolbar(){
   const sep = () => span("st-sep", "");
   const k = ED.sel;
   if (!k){
-    span("st-hint", "Click anything on the post to edit it. Double-click to add text.");
+    span("st-hint", "Click anything on the post to edit it. Use Add for text, stickers, shapes and images.");
     b("Add text", () => edAddText("Your text", .5, .45), "Add a text box");
   } else if (k === "photo"){
     span("st-name", elName(k));
@@ -2017,8 +2309,12 @@ function edToolbar(){
     const o = elOv(k);
     span("st-name", elName(k));
     b("&minus;", () => edScale(1 / 1.1), "Smaller"); span("st-val", pct(o.s || 1)); b("+", () => edScale(1.1), "Bigger"); sep();
-    b("Reset", () => setOv(k, { dx:null, dy:null, s:null, z:null, hide:null }), "Back to the template layout", { disabled:!(o.dx || o.dy || o.s || o.z || o.hide) });
+    b("Reset", () => setOv(k, { dx:null, dy:null, s:null, z:null, hide:null, rot:null }), "Back to the template layout", { disabled:!(o.dx || o.dy || o.s || o.z || o.hide || o.rot) });
     b("Front", () => edOrder(1), "Bring to front"); b("Back", () => edOrder(-1), "Send to back");
+    if (isExtraKey(k)){
+      b("Rotate", () => { const v = (((o.rot || 0) + 15 + 180) % 360) - 180; setOv(k, { rot:v || null }); edPanel(); }, "Rotate 15 degrees");
+      b("Duplicate", () => edDuplicate(k), "Duplicate (Cmd or Ctrl + D)");
+    }
     if (o.hide) b("Show", () => setOv(k, { hide:null }), "Show it again");
     else b("Delete", edDelete, isExtraKey(k) ? "Delete this text" : "Hide this element");
   }
@@ -2030,8 +2326,9 @@ function edToolbar(){
 /* ---------- style panel (right) ---------- */
 function edPanel(){
   const host = $("elPanel"); if (!host) return;
-  host.innerHTML = "";
+  host.innerHTML = ""; ED.wordUI = null;
   const k = ED.sel; $("elHint").hidden = !!k;
+  if (ED.wsTag !== ED.panelTag){ ED.wsTag = ED.panelTag; ED.wsSel = []; ED.wsAnchor = null; }
   if (!k) return;
   const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
   const head = mk("div", "el-head"); head.append(mk("b", "", elName(k)));
@@ -2054,27 +2351,90 @@ function edPanel(){
       b.addEventListener("click", () => { histCut(); row.querySelectorAll(".chip").forEach(x => x.setAttribute("aria-pressed", String(x === b))); on(v || null); }); row.append(b); });
     return field(label, row, cls);
   };
-  const colors = (label, cur, on, cls) => {
-    const row = mk("div", "row"); row.style.gap = "6px";
-    const auto = mk("button", "auto-chip", "Auto"); auto.type = "button";
+  const colors = (label, cur, on, cls, opt) => {
+    const row = mk("div", "row"); row.style.gap = "6px"; row.style.flexWrap = "wrap";
+    const auto = mk("button", "auto-chip", (opt && opt.auto) || "Auto"); auto.type = "button";
     const sw = TEXT_PALETTE.map(([hex, name]) => { const b = mk("button", "swatch sm"); b.type = "button"; b.style.background = hex; b.title = name; b.setAttribute("aria-label", label + ": " + name); b.dataset.v = hex; return b; });
     const inp = document.createElement("input"); inp.type = "color"; inp.className = "el-color"; inp.title = "Any colour"; inp.setAttribute("aria-label", label + ": any colour");
     inp.value = /^#[0-9a-f]{6}$/i.test(cur || "") ? cur.toLowerCase() : "#ffffff";
-    const paint = v => { auto.setAttribute("aria-pressed", String(!v)); sw.forEach(b => b.setAttribute("aria-pressed", String(!!v && b.dataset.v.toLowerCase() === String(v).toLowerCase()))); };
+    const none = opt && opt.none ? mk("button", "auto-chip", "None") : null; if (none) none.type = "button";
+    const paint = v => { auto.setAttribute("aria-pressed", String(!v)); if (none) none.setAttribute("aria-pressed", String(v === "none")); sw.forEach(b => b.setAttribute("aria-pressed", String(!!v && b.dataset.v.toLowerCase() === String(v).toLowerCase()))); };
     const pick = (v, cut) => { if (cut) histCut(); paint(v); on(v); };
     auto.addEventListener("click", () => pick(null, true));
+    if (none){ none.addEventListener("click", () => pick("none", true)); row.append(none); }
     sw.forEach(b => b.addEventListener("click", () => { inp.value = b.dataset.v.toLowerCase(); pick(b.dataset.v, true); }));
     inp.addEventListener("input", () => pick(inp.value));
-    row.append(auto, ...sw, inp); paint(cur);
+    row.prepend(auto); row.append(...sw, inp); paint(cur);
     return field(label, row, cls);
   };
+  const xt = xType(k);
+  const xCommon = () => {
+    slider("Rotate", "", -180, 180, 1, o.rot || 0, v => Math.round(v) + "\u00B0", v => setOv(k, { rot:Math.round(v) || null }));
+    slider("Opacity", "", .05, 1, .01, o.op != null ? o.op : 1, pct, v => setOv(k, { op:v >= .995 ? null : v }));
+  };
+  if (xt && xt !== "text" && xt !== "badge"){ /* emoji, sticker, shape, arrow, image */
+    const x = extraOf(k), r0 = elRec(k);
+    const redo = () => { requestRender(); persist(); edPanel(); edPaint(); };
+    if (xt === "emoji"){
+      const g = mk("div", "emo-grid");
+      ADD_EMOJI.forEach(e => { const b = mk("button", "", e); b.type = "button"; b.setAttribute("aria-label", "Use " + e); b.setAttribute("aria-pressed", String(x.text === e)); b.addEventListener("click", () => { histCut(); x.text = e; redo(); }); g.append(b); });
+      const inp = mk("input", "emo-in"); inp.type = "text"; inp.value = x.text || ""; inp.placeholder = "Type or paste any emoji"; inp.setAttribute("aria-label", "Emoji");
+      inp.addEventListener("input", () => { x.text = inp.value; requestRender(); persist(); });
+      const wrap = mk("div"); wrap.append(g, inp); field("Emoji", wrap);
+    }
+    if (xt === "sticker"){
+      chips("Sticker", STICKERS, x.kind, v => { const old = XSTK[x.kind] || XSTK.new, nk = v || "new"; if (!x.text || x.text === old.text) x.text = (XSTK[nk] || XSTK.new).text; x.kind = nk; redo(); });
+      if (x.kind !== "check"){ const inp = mk("input"); inp.type = "text"; inp.id = "elText"; inp.value = x.text || ""; inp.addEventListener("input", () => { x.text = inp.value; requestRender(); persist(); }); field("Text", inp); }
+      colors("Colour", o.fill, v => setOv(k, { fill:v }));
+      colors(x.kind === "check" ? "Tick colour" : "Text colour", o.color, v => setOv(k, { color:v }));
+      if (x.kind !== "check" && window.RS && RS.fonts) field("Font", RS.fonts.picker({ value:o.font || GIRIKA.FONTS.body, label:"Font", pinned:() => [GIRIKA.FONTS.head, GIRIKA.FONTS.body],
+        onChange:f => { setOv(k, { font:f }); RS.fonts.load(f).then(() => { fgDirty = true; requestRender(); }).catch(() => {}); } }));
+    }
+    if (xt === "shape"){
+      chips("Shape", [["rect","Rectangle"],["round","Rounded box"],["circle","Circle"],["line","Line"]], x.kind, v => { x.kind = v || "rect"; redo(); });
+      if (x.kind === "line"){
+        colors("Colour", o.stroke, v => setOv(k, { stroke:v }));
+        slider("Thickness", "", 1, 60, 1, o.sw != null ? o.sw : 10, v => Math.round(v) + "", v => setOv(k, { sw:v }));
+      } else {
+        colors("Fill", o.fill, v => setOv(k, { fill:v }), "", { none:true });
+        colors("Outline", o.stroke, v => setOv(k, { stroke:v }), "", { auto:"None" });
+        slider("Outline width", "", 1, 40, 1, o.sw != null ? o.sw : 6, v => Math.round(v) + "", v => setOv(k, { sw:v }));
+      }
+    }
+    if (xt === "arrow"){
+      chips("Arrow", [["straight","Straight"],["curved","Curved"]], x.kind, v => { x.kind = v || "straight"; redo(); });
+      colors("Colour", o.color, v => setOv(k, { color:v }));
+      slider("Thickness", "", 2, 40, 1, o.sw != null ? o.sw : 10, v => Math.round(v) + "", v => setOv(k, { sw:v }));
+    }
+    if (xt === "image"){
+      const lb = mk("label", "btn block upload", "Replace image"), fi = mk("input"); fi.type = "file"; fi.accept = "image/png,image/jpeg,image/webp"; lb.append(fi);
+      fi.addEventListener("change", () => { const f = fi.files && fi.files[0]; fi.value = ""; edReadImage(f, (id, ar) => { histCut(); x.img = id; x.ar = ar; fgDirty = true; redo(); }); });
+      const f = mk("div", "field"); f.append(lb); host.append(f);
+      if (!xImg(x.img)) host.append(mk("p", "hint", "This image is missing. Replace it to show it again."));
+    }
+    if (!r0){ host.append(mk("p", "hint", "This item is empty. Add some text or an emoji to show it.")); return; }
+    slider("Size", "elSize", .2, 4, .01, o.s || 1, pct, v => setOv(k, { s:v }));
+    if ((xt === "shape" && x.kind !== "line") || xt === "arrow"){
+      slider("Width", "", .2, 5, .01, o.bw || 1, pct, v => setOv(k, { bw:Math.abs(v - 1) < .005 ? null : v }));
+      if (xt === "shape" || x.kind === "curved") slider("Height", "", .2, 5, .01, o.bh || 1, pct, v => setOv(k, { bh:Math.abs(v - 1) < .005 ? null : v }));
+    }
+    if (xt === "shape" && x.kind === "line") slider("Length", "", .2, 5, .01, o.bw || 1, pct, v => setOv(k, { bw:Math.abs(v - 1) < .005 ? null : v }));
+    xCommon();
+    if (STYLE_KEYS.some(n => o[n] != null) || o.rot){
+      const rb = mk("button", "btn block", "Reset style"); rb.type = "button"; rb.style.marginTop = "4px";
+      rb.addEventListener("click", () => { const z = { rot:null }; STYLE_KEYS.forEach(n => z[n] = null); setOv(k, z); edPanel(); });
+      host.append(rb);
+    }
+    return;
+  }
   if (txt != null){
-    const multi = ["headline","body"].includes(k) || isExtraKey(k), ta = document.createElement(multi ? "textarea" : "input");
+    const multi = ["headline","body"].includes(k) || xt === "text", ta = document.createElement(multi ? "textarea" : "input");
     ta.id = "elText"; if (multi) ta.rows = 2; else ta.type = "text"; ta.value = txt;
     ta.addEventListener("input", () => setElText(k, ta.value));
     field("Text", ta);
   }
   if (!r){ host.append(mk("p", "hint", "This element is empty. Type above to show it.")); return; }
+  if (txt != null && String(txt).trim() && ["text","pill","link"].includes(kind)) edWordsUI(host, k, mk);
   slider("Size", "elSize", .2, 4, .01, o.s || 1, pct, v => setOv(k, { s:v }));
   const typed = ["text","pill","link","chips"].includes(kind);
   if (typed){
@@ -2102,12 +2462,149 @@ function edPanel(){
   }
   if (["text","pill","link"].includes(kind)) chips("Shadow", [["","Auto"],["on","On"],["off","Off"]], o.shadow, v => setOv(k, { shadow:v }), "pro-only");
   if (kind === "logo") host.append(mk("p", "hint", "Choose the logo type and version under Logo."));
+  if (isExtraKey(k)) xCommon();
   if (STYLE_KEYS.some(n => o[n] != null)){
     const rb = mk("button", "btn block", "Reset style"); rb.type = "button"; rb.style.marginTop = "4px";
     rb.addEventListener("click", () => { const z = {}; STYLE_KEYS.forEach(n => z[n] = null); setOv(k, z); edPanel(); });
     host.append(rb);
   }
 }
+/* ---------- words: pick words of the selected text and style them on their own ---------- */
+const WS_EMOJI = ["✨","🔥","⭐","✅","🎉","📍","🏡","🔑","💰","📞","👉","❤️","🌿","📅","🚀","👍"];
+function edWordsUI(host, k, mk){
+  const box = mk("div", "wbox"), lbl = mk("span", "lbl", "Words"), row = mk("div", "wchips"), ctl = mk("div", "wctl");
+  box.append(lbl, row, ctl); host.append(box);
+  const getWs = () => elOv(k).ws || {};
+  const paint = () => {
+    const ws = getWs();
+    [...row.children].forEach(b => { const i = +b.dataset.i, w = ws[i]; b.setAttribute("aria-pressed", String(ED.wsSel.includes(i))); b.classList.toggle("styled", !!w); b.classList.toggle("hid", !!(w && w.hide));
+      if (w && (w.color || w.box)) b.style.setProperty("--wc", w.color || w.box); else b.style.removeProperty("--wc"); });
+  };
+  const rebuildChips = () => {
+    row.innerHTML = ""; const list = wordsOf(k, elText(k));
+    ED.wsSel = ED.wsSel.filter(i => i < list.length);
+    list.forEach((t, i) => { const b = mk("button", "wchip", t); b.type = "button"; b.dataset.i = i; b.title = "Shift-click to pick a range"; b.addEventListener("click", e => pick(i, e.shiftKey)); row.append(b); });
+    paint();
+  };
+  function pick(i, shift, canvas){
+    if (shift && ED.wsAnchor != null){ const a = Math.min(ED.wsAnchor, i), z = Math.max(ED.wsAnchor, i); ED.wsSel = Array.from({ length:z - a + 1 }, (_, j) => a + j); }
+    else { ED.wsSel = !canvas && ED.wsSel.length === 1 && ED.wsSel[0] === i ? [] : [i]; ED.wsAnchor = i; }
+    paint(); buildCtl(); ED.html = ""; edPaint();
+    const ch = row.children[i]; if (canvas && ch) ch.scrollIntoView({ block:"nearest" });
+  }
+  const setWs = (patch, cut) => {
+    if (cut) histCut();
+    const ws = { ...getWs() };
+    ED.wsSel.forEach(i => {
+      const w = { ...(ws[i] || {}), ...patch };
+      Object.keys(w).forEach(n => { const v = w[n]; if (v == null || v === "" || (["b","i","hide"].includes(n) && !v) || (n === "s" && Math.abs(v - 1) < .001)) delete w[n]; });
+      if (Object.keys(w).length) ws[i] = w; else delete ws[i];
+    });
+    setOv(k, { ws:wsHas(ws) ? ws : null }); paint(); ED.html = "";
+  };
+  const first = () => getWs()[ED.wsSel[0]] || {};
+  function buildCtl(){
+    ctl.innerHTML = "";
+    if (!ED.wsSel.length){ ctl.append(mk("p", "hint", wsHas(getWs()) ? "Tinted words have their own style. Click a word to change it. Shift-click picks a range." : "Click a word to give it its own colour, size, font or emoji. Shift-click picks a range.")); return; }
+    const w = first(), n = ED.wsSel.length;
+    const head = mk("div", "wsel-head"); head.append(mk("span", "", n === 1 ? "1 word" : n + " words"));
+    const clr = mk("button", "btn", "Clear style"); clr.type = "button"; clr.disabled = !ED.wsSel.some(i => getWs()[i]);
+    clr.addEventListener("click", () => { setWs({ color:null, s:null, font:null, b:null, i:null, hl:null, box:null, emoji:null, hide:null }, true); buildCtl(); });
+    head.append(clr); ctl.append(head);
+    const fld = (label, el) => { const f = mk("div", "field"); f.append(mk("span", "lbl", label), el); ctl.append(f); return f; };
+    const sw = (label, cur, on, autoLabel) => {
+      const r = mk("div", "row"); r.style.gap = "6px"; r.style.flexWrap = "wrap";
+      const a = mk("button", "auto-chip", autoLabel || "Auto"); a.type = "button";
+      const list = TEXT_PALETTE.map(([hex, name]) => { const b = mk("button", "swatch sm"); b.type = "button"; b.style.background = hex; b.title = name; b.setAttribute("aria-label", label + ": " + name); b.dataset.v = hex; return b; });
+      const inp = document.createElement("input"); inp.type = "color"; inp.className = "el-color"; inp.setAttribute("aria-label", label + ": any colour"); inp.value = /^#[0-9a-f]{6}$/i.test(cur || "") ? cur.toLowerCase() : "#ffffff";
+      const pnt = v => { a.setAttribute("aria-pressed", String(!v)); list.forEach(b => b.setAttribute("aria-pressed", String(!!v && b.dataset.v.toLowerCase() === String(v).toLowerCase()))); };
+      a.addEventListener("click", () => { pnt(null); on(null, true); });
+      list.forEach(b => b.addEventListener("click", () => { inp.value = b.dataset.v.toLowerCase(); pnt(b.dataset.v); on(b.dataset.v, true); }));
+      inp.addEventListener("input", () => { pnt(inp.value); on(inp.value); });
+      r.append(a, ...list, inp); pnt(cur); return fld(label, r);
+    };
+    sw("Colour", w.color, (v, cut) => setWs({ color:v }, cut));
+    const sr = mk("div", "slider"); sr.innerHTML = `<span>Size</span><input type="range" min="0.6" max="2" step="0.05" aria-label="Word size"><output></output>`;
+    const si = sr.querySelector("input"), so = sr.querySelector("output"); si.value = w.s || 1; so.textContent = pct(w.s || 1);
+    si.addEventListener("pointerdown", () => histCut());
+    si.addEventListener("input", () => { so.textContent = pct(+si.value); setWs({ s:+si.value }); });
+    ctl.append(sr);
+    if (window.RS && RS.fonts){
+      const r0 = elRec(k), brandF = r0 && r0.fam === "head" ? GIRIKA.FONTS.head : GIRIKA.FONTS.body;
+      fld("Font", RS.fonts.picker({ value:w.font || elOv(k).font || brandF, label:"Word font", pinned:() => [GIRIKA.FONTS.head, GIRIKA.FONTS.body],
+        onChange:f => { setWs({ font:f }, true); RS.fonts.load(f).then(() => { fgDirty = true; requestRender(); }).catch(() => {}); } }));
+    }
+    const tg = mk("div", "chips");
+    const tog = (label, on, fn) => { const b = mk("button", "chip", label); b.type = "button"; b.setAttribute("aria-pressed", String(!!on)); b.addEventListener("click", () => { fn(b.getAttribute("aria-pressed") !== "true"); buildCtl(); }); tg.append(b); };
+    tog("Bold", w.b, v => setWs({ b:v }, true));
+    tog("Italic", w.i, v => setWs({ i:v }, true));
+    tog("Hide", w.hide, v => setWs({ hide:v }, true));
+    fld("Style", tg);
+    const hr = mk("div", "chips");
+    [["", "Auto"], ["on", "On"], ["off", "Off"]].forEach(([v, l]) => { const cur = w.hl === true ? "on" : w.hl === false ? "off" : ""; const b = mk("button", "chip", l); b.type = "button"; b.setAttribute("aria-pressed", String(cur === v)); b.addEventListener("click", () => { setWs({ hl:v === "on" ? true : v === "off" ? false : null }, true); buildCtl(); }); hr.append(b); });
+    fld("Highlight", hr);
+    sw("Background box", w.box, (v, cut) => setWs({ box:v }, cut), "None");
+    const eg = mk("div", "emo-grid");
+    WS_EMOJI.forEach(e => { const b = mk("button", "", e); b.type = "button"; b.setAttribute("aria-label", "Add " + e + " after the word"); b.setAttribute("aria-pressed", String(w.emoji === e)); b.addEventListener("click", () => { setWs({ emoji:w.emoji === e ? null : e }, true); buildCtl(); }); eg.append(b); });
+    const ei = mk("input", "emo-in"); ei.type = "text"; ei.value = w.emoji || ""; ei.placeholder = "Or type an emoji or symbol"; ei.setAttribute("aria-label", "Emoji after the word"); ei.maxLength = 16;
+    ei.addEventListener("input", () => setWs({ emoji:ei.value.trim() || null }));
+    const ew = mk("div"); ew.append(eg, ei); fld("Emoji after the word", ew);
+  }
+  rebuildChips(); buildCtl();
+  ED.wordUI = { key:k, rebuild(){ rebuildChips(); buildCtl(); }, pick };
+}
+
+/* ---------- Add menu: text, emoji, stickers, shapes, arrows, badge, image ---------- */
+const ADD_EMOJI = ["🏡","🏠","🔑","📍","✨","🔥","⭐","✅","🎉","💰","📞","🌿","🌄","❤️","👉","📅"];
+const STICKERS = [["new","New"],["sold","Sold"],["offer","Offer"],["price","Price tag"],["burst","Star burst"],["check","Check badge"]];
+const SHAPE_ICONS = {
+  rect:'<svg viewBox="0 0 30 22"><rect x="3" y="3" width="24" height="16" fill="currentColor"/></svg>',
+  round:'<svg viewBox="0 0 30 22"><rect x="3" y="3" width="24" height="16" rx="5" fill="currentColor"/></svg>',
+  circle:'<svg viewBox="0 0 30 22"><circle cx="15" cy="11" r="8.5" fill="currentColor"/></svg>',
+  line:'<svg viewBox="0 0 30 22"><path d="M4 11h22" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>',
+  straight:'<svg viewBox="0 0 30 22"><path d="M4 11h21M19 6l6 5-6 5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  curved:'<svg viewBox="0 0 30 22"><path d="M4 17Q13 0 25 11M19 9.5l6 1.5-2.5 5.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>'
+};
+function stickerText(kind){ return kind === "price" ? (DEFAULT_FIELDS.price || XSTK.price.text) : (XSTK[kind] || XSTK.new).text; }
+function buildAddMenu(){
+  const pop = $("addPop"); pop.innerHTML = "";
+  const mk = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; };
+  const sec = title => { const s = mk("div", "add-sec"); if (title) s.append(mk("span", "add-h", title)); pop.append(s); return s; };
+  const it = (host, label, html, fn) => { const b = mk("button", "add-it"); b.type = "button"; b.setAttribute("role", "menuitem"); if (html) b.innerHTML = html; b.append(mk("span", "", label)); b.addEventListener("click", () => { closeAddMenu(); fn(); }); host.append(b); return b; };
+  const top = mk("div", "add-row"); sec().append(top);
+  it(top, "Text", "", () => { edAddExtra({ text:"Your text" }); edFocusText(); });
+  it(top, "Badge", "", () => { edAddExtra({ type:"badge", text:"Limited offer" }); edFocusText(); });
+  it(top, "Image", "", () => $("addImgIn").click());
+  const sg = mk("div", "add-grid"); sec("Shapes").append(sg);
+  [["rect","Rectangle"],["round","Rounded"],["circle","Circle"],["line","Line"]].forEach(([kd, l]) => it(sg, l, SHAPE_ICONS[kd], () => edAddExtra({ type:"shape", kind:kd })));
+  const ag = mk("div", "add-grid"); sec("Arrows").append(ag);
+  [["straight","Straight"],["curved","Curved"]].forEach(([kd, l]) => it(ag, l, SHAPE_ICONS[kd], () => edAddExtra({ type:"arrow", kind:kd })));
+  const kg = mk("div", "add-grid three"); sec("Stickers").append(kg);
+  STICKERS.forEach(([kd, l]) => {
+    const d = XSTK[kd], cvs = document.createElement("canvas"), sc = Math.min(180 / d.w, 84 / d.h);
+    cvs.width = 192; cvs.height = 92; const x = cvs.getContext("2d");
+    x.translate((192 - d.w * sc) / 2, (92 - d.h * sc) / 2); x.scale(sc, sc); drawSticker(x, kd, stickerText(kd), 0, 0, d.w, d.h, 1, NO_OV);
+    const b = it(kg, l, "", () => edAddExtra({ type:"sticker", kind:kd, text:stickerText(kd) }, kd === "sold" ? { rot:-10 } : null)); b.prepend(cvs);
+  });
+  const eg = mk("div", "add-emo"); sec("Emoji").append(eg);
+  ADD_EMOJI.forEach(e => { const b = mk("button", "", e); b.type = "button"; b.setAttribute("role", "menuitem"); b.setAttribute("aria-label", "Add " + e); b.addEventListener("click", () => { closeAddMenu(); edAddExtra({ type:"emoji", text:e }); }); eg.append(b); });
+}
+/* fixed position, kept inside the window on every screen size */
+function placeAddMenu(){
+  const pop = $("addPop"); if (pop.hidden) return;
+  const r = $("addBtn").getBoundingClientRect(), w = Math.min(352, window.innerWidth - 32);
+  pop.style.width = w + "px"; pop.style.left = Math.max(16, Math.min(r.right - w, window.innerWidth - w - 16)) + "px";
+  pop.style.top = (r.bottom + 6) + "px"; pop.style.maxHeight = Math.max(220, Math.min(560, window.innerHeight - r.bottom - 22)) + "px";
+}
+window.addEventListener("resize", placeAddMenu);
+document.addEventListener("scroll", e => { if (!$("addPop").contains(e.target)) placeAddMenu(); }, true);
+function openAddMenu(){ if (edBusy()) return; buildAddMenu(); $("addPop").hidden = false; placeAddMenu(); $("addBtn").setAttribute("aria-expanded", "true"); const f = $("addPop").querySelector("button"); if (f) f.focus(); }
+function closeAddMenu(){ if ($("addPop").hidden) return; $("addPop").hidden = true; $("addBtn").setAttribute("aria-expanded", "false"); }
+$("addBtn").addEventListener("click", () => $("addPop").hidden ? openAddMenu() : closeAddMenu());
+document.addEventListener("pointerdown", e => { if (!$("addPop").hidden && !e.target.closest(".add-wrap")) closeAddMenu(); }, true);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && !$("addPop").hidden){ e.preventDefault(); closeAddMenu(); $("addBtn").focus(); } });
+$("addImgIn").addEventListener("change", e => { const f = e.target.files && e.target.files[0]; e.target.value = ""; edReadImage(f, (id, ar) => edAddExtra({ type:"image", img:id, ar })); });
+
 /* keep the panel's text box in step with the Text fields on the left */
 document.addEventListener("input", e => { const t = $("elText"); if (t && e.target && e.target.id === "f-" + ED.sel && t !== e.target) t.value = e.target.value; });
 
@@ -2121,7 +2618,9 @@ cv.addEventListener("pointerdown", e => {
   if (ED.pts.size === 2 && ED.sel){ const [[ax, ay], [bx, by]] = [...ED.pts.values()]; ED.pinch = { d:Math.max(10, Math.hypot(ax - bx, ay - by)), v:edSize() }; ED.drag = null; return; }
   const hit = edHit(px, py);
   if (hit){
+    const again = ED.sel === hit.key;
     edSelect(hit.key);
+    if (again && ED.wordUI && ED.wordUI.key === hit.key){ const w = edHitWord(hit, px, py); if (w) ED.wordUI.pick(w.i, e.shiftKey, true); }
     const o = elOv(hit.key);
     ED.drag = { kind:"move", key:hit.key, x:px, y:py, dx0:o.dx || 0, dy0:o.dy || 0, cx:hit.x + hit.w / 2, cy:hit.y + hit.h / 2 };
   } else if (inMedia(px, py)){
@@ -2199,7 +2698,7 @@ document.addEventListener("keydown", e => {
   const k = ED.sel; if (!k) return;
   if (e.key === "Escape"){ edSelect(null); return; }
   if (mod && key === "c"){ if (edCopy()) e.preventDefault(); return; }
-  if (mod && key === "d"){ e.preventDefault(); if (edCopy()) edPaste(); return; }
+  if (mod && key === "d"){ e.preventDefault(); if (!edDuplicate(k) && edCopy()) edPaste(); return; }
   if (e.key === "Delete" || e.key === "Backspace"){ if (k !== "photo"){ e.preventDefault(); edDelete(); } return; }
   if (!mod && (e.key === "+" || e.key === "=")){ if (edScale(1.05)) e.preventDefault(); return; }
   if (!mod && (e.key === "-" || e.key === "_")){ if (edScale(1 / 1.05)) e.preventDefault(); return; }
@@ -2214,7 +2713,7 @@ document.addEventListener("keydown", e => {
 /* ---------- undo / redo: snapshots of pages, page edits and style, taken after each change settles ---------- */
 const HIST = { undo:[], redo:[], cur:null, t:0 };
 function histSnap(){
-  const { page, guides, pages, ...rest } = st;
+  const { page, guides, pages, imgs, ...rest } = st;
   return JSON.stringify({ ...rest, pages:st.pages.map(({ id, layout, fields, els, extras, zoom, px, py }) => ({ id, layout, fields, els, extras, zoom, px, py })) });
 }
 function histNote(){ clearTimeout(HIST.t); HIST.t = setTimeout(histCommit, 450); }
@@ -2248,7 +2747,7 @@ function histApply(json){
 /* fonts chosen for single elements load like any brand font */
 function edLoadFonts(){
   if (!(window.RS && RS.fonts)) return;
-  const fams = new Set(); st.pages.forEach(p => Object.values(p.els || {}).forEach(o => o && o.font && fams.add(o.font)));
+  const fams = new Set(); st.pages.forEach(p => Object.values(p.els || {}).forEach(o => { if (!o) return; if (o.font) fams.add(o.font); Object.values(o.ws || {}).forEach(w => w && w.font && fams.add(w.font)); }));
   fams.forEach(f => RS.fonts.load(f).then(ok => { if (ok){ fgDirty = true; requestRender(); } }).catch(() => {}));
 }
 function edInit(){ edToolbar(); edPaint(); edLoadFonts(); HIST.cur = histSnap(); }
