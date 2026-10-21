@@ -5680,7 +5680,7 @@ let csFolderEl = null;
 function csFolder(){
   if (!window.RS || !RS.fs) return null;
   if (!csFolderEl){ csFolderEl = el("div", { class:"cs-folder" }, [el("p", { class:"hint", text:"Styles are saved as files in your save folder." })]); RS.fs.badge(csFolderEl); }
-  csFolderEl.hidden = RS.fs.state === "ready";
+  csFolderEl.hidden = RS.fs.state === "ready" || RS.fs.state === "unsupported";
   return csFolderEl;
 }
 function renderSaveRow(){
@@ -5953,7 +5953,7 @@ capFontsReady(15000).then(csRender);
 if (CS){
   CS.onChange(() => { CS_LIST = CS.list(); renderMyStyles(); renderSaveRow(); renderPresets(); csRender(); });
   CS.sync().catch(() => {});
-  if (RS.fs && RS.fs.onChange) RS.fs.onChange(st => { if (st === "ready") CS.sync().catch(() => {}); if (csFolderEl) csFolderEl.hidden = st === "ready"; });
+  if (RS.fs && RS.fs.onChange) RS.fs.onChange(st => { if (st === "ready") CS.sync().catch(() => {}); if (csFolderEl) csFolderEl.hidden = st === "ready" || st === "unsupported"; });
 }
 /* for caption-presets.js (loaded after this script) */
 $("capDockClose").addEventListener("click", () => { csDockClosed = true; renderCapExtras(); const e = $("capEditStyle"); if (e && !e.hidden) e.focus(); });
@@ -7570,8 +7570,10 @@ async function saveProject(o){
   if (RS.fs.state === "needs-permission" && !o.auto){ try { await RS.fs.reconnect(); } catch(e) {} }
   if (RS.fs.state !== "ready"){
     if (o.auto){ await autosaveToBrowser(); return; }
-    if (RS.fs.supported){ projAskFolder(); return; }
-    await downloadProject(); return;
+    if (RS.fs.supported && RS.fs.state === "none"){ projAskFolder(); return; }
+    await autosaveToBrowser();
+    await downloadProject();
+    return;
   }
   PROJ.busy = true; projState("Saving...");
   try {
@@ -7643,7 +7645,26 @@ function closeProjDlg(){ $("projDlg").hidden = true; }
 async function openProjDlg(){
   const box = $("projDlgList"); $("projDlg").hidden = false; box.innerHTML = "";
   const head = $("projDlgFolder"); head.innerHTML = ""; RS.fs.badge(head, { onChange:() => openProjDlg() });
-  if (RS.fs.state !== "ready"){ box.appendChild(el("p", { class:"hint", text:"Connect your save folder to see your projects here, or open a .girika file." })); return; }
+  if (RS.fs.state !== "ready"){
+    const isSub = (function(){ try { return window.self !== window.top; } catch(e){ return true; } })();
+    const p = el("p", { class:"hint" });
+    if (RS.fs.state === "unsupported"){
+      p.textContent = isSub
+        ? "This editor is currently running in an embedded frame. Projects and media are autosaved safely in this browser, and you can download or open .girika project files anytime."
+        : "Projects are autosaved safely in this browser. You can also download or open .girika project files below.";
+    } else {
+      p.textContent = "Connect your save folder to see your saved folder projects, or download / open a .girika file.";
+    }
+    box.appendChild(p);
+    if (projHasContent()){
+      const actions = el("div", { class:"row", style:"margin-top:12px;gap:8px" }, [
+        btn("Download this project (.girika)", () => downloadProject(), "btn sm dark"),
+        btn("Autosave now to browser", async () => { await autosaveToBrowser(); toast("Autosaved to browser storage."); }, "btn sm")
+      ]);
+      box.appendChild(actions);
+    }
+    return;
+  }
   const dirs = (await RS.fs.list("projects")).filter(f => f.kind === "directory");
   const rows = [];
   for (const d of dirs){ const j = await RS.fs.readJSON(`projects/${d.name}/project.json`); if (j && j.doc) rows.push({ slug:d.name, cat:j.doc.category || "General", name:j.doc.name || d.name, at:Date.parse(j.doc.saved) || 0, n:(j.media || []).length, fmt:j.doc.format }); }

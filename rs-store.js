@@ -40,7 +40,23 @@ window.RS = (function(){
 
   /* ---------------- save folder ---------------- */
   const fs = (function(){
-    const supported = typeof window.showDirectoryPicker === "function";
+    const inSubframe = (function(){
+      try { return window.self !== window.top; } catch(e) { return true; }
+    })();
+
+    const isRestrictedFrame = (function(){
+      if (!inSubframe) return false;
+      try {
+        if (!window.top || !window.top.location) return true;
+        if (window.location.protocol === "file:" || window.location.origin === "null") return true;
+        if (window.top.location.origin !== window.location.origin) return true;
+      } catch(e) {
+        return true;
+      }
+      return false;
+    })();
+
+    let supported = typeof window.showDirectoryPicker === "function" && !isRestrictedFrame;
     const DIRS = ["brands", "caption-styles", "projects", "exports", "fonts"];
     const ev = emitter();
     let root = null, state = supported ? "none" : "unsupported";
@@ -50,7 +66,16 @@ window.RS = (function(){
       if (!supported) return state;
       try {
         const h = await idb.get("rootDir"); if (!h) { set("none"); return state; }
-        root = h; const p = await h.queryPermission({ mode:"readwrite" });
+        root = h;
+        let p;
+        try {
+          p = await h.queryPermission({ mode:"readwrite" });
+        } catch(err) {
+          if (err && (err.name === "SecurityError" || /cross[- ]origin|sub[- ]?frame|not allowed/i.test(err.message || ""))) {
+            supported = false; set("unsupported"); return state;
+          }
+          throw err;
+        }
         set(p === "granted" ? "ready" : "needs-permission");
       } catch(e) { set("none"); }
       return state;
@@ -64,16 +89,40 @@ window.RS = (function(){
     }
     /* must be called from a click */
     async function connect(){
-      if (!supported) throw new Error("This browser cannot save to a folder. Use Chrome or Edge.");
-      const h = await window.showDirectoryPicker({ id:"reelstudio", mode:"readwrite", startIn:"documents" });
-      if ((await h.requestPermission({ mode:"readwrite" })) !== "granted") throw new Error("Permission was not given.");
+      if (!supported) throw new Error(inSubframe ? "Folder saving is not supported in an embedded frame. Saved in browser storage." : "This browser cannot save to a folder. Use Chrome or Edge.");
+      let h;
+      try {
+        h = await window.showDirectoryPicker({ id:"reelstudio", mode:"readwrite", startIn:"documents" });
+      } catch(err) {
+        if (err && (err.name === "SecurityError" || /cross[- ]origin|sub[- ]?frame|not allowed to show/i.test(err.message || ""))) {
+          supported = false; set("unsupported");
+          throw new Error("Folder saving is not allowed inside an embedded view. Everything is safely saved in this browser.");
+        }
+        throw err;
+      }
+      try {
+        if ((await h.requestPermission({ mode:"readwrite" })) !== "granted") throw new Error("Permission was not given.");
+      } catch(err) {
+        if (err && (err.name === "SecurityError" || /cross[- ]origin|sub[- ]?frame|not allowed to show/i.test(err.message || ""))) {
+          supported = false; set("unsupported");
+          throw new Error("Folder permission is not allowed inside an embedded view. Everything is safely saved in this browser.");
+        }
+        throw err;
+      }
       root = h; await idb.set("rootDir", h); set("ready"); await ensureLayout(); return h.name;
     }
     /* must be called from a click */
     async function reconnect(){
       if (!root) return connect();
-      const p = await root.requestPermission({ mode:"readwrite" });
-      if (p === "granted"){ set("ready"); await ensureLayout(); return true; }
+      try {
+        const p = await root.requestPermission({ mode:"readwrite" });
+        if (p === "granted"){ set("ready"); await ensureLayout(); return true; }
+      } catch(err) {
+        if (err && (err.name === "SecurityError" || /cross[- ]origin|sub[- ]?frame|not allowed to show/i.test(err.message || ""))) {
+          supported = false; set("unsupported"); return false;
+        }
+        throw err;
+      }
       return false;
     }
     async function disconnect(){ root = null; await idb.del("rootDir"); set(supported ? "none" : "unsupported"); }
@@ -111,7 +160,12 @@ window.RS = (function(){
       wrap.append(b, note);
       const paint = () => {
         const n = root ? root.name : "";
-        if (state === "unsupported"){ b.hidden = true; note.textContent = "Saved in this browser. Use Chrome or Edge to save into a folder."; }
+        if (state === "unsupported"){
+          b.hidden = true;
+          note.textContent = inSubframe
+            ? "Saved in this browser. To save into a computer folder, open this editor in its own tab."
+            : "Saved in this browser. Use Chrome or Edge to save into a folder.";
+        }
         else if (state === "none"){ b.hidden = false; b.textContent = "Choose save folder"; note.textContent = "Brands, caption styles and projects save into a folder you pick."; }
         else if (state === "needs-permission"){ b.hidden = false; b.textContent = "Reconnect folder"; note.textContent = `"${n}" needs your OK again after a restart.`; }
         else { b.hidden = false; b.textContent = "Change folder"; note.textContent = `Saving to folder "${n}".`; }
@@ -125,7 +179,7 @@ window.RS = (function(){
       return wrap;
     }
 
-    return { supported, ready, get state(){ return state; }, get name(){ return root ? root.name : ""; }, onChange:ev.on,
+    return { get supported(){ return supported; }, ready, get state(){ return state; }, get name(){ return root ? root.name : ""; }, onChange:ev.on,
       connect, reconnect, disconnect, dirOf, writeBlob, writeText, writeJSON, readFile, readText, readJSON, exists, list, remove, badge };
   })();
 

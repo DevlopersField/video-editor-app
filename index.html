@@ -224,6 +224,9 @@ var done=function(){if(!s.isConnected)return;s.classList.add("out");setTimeout(f
     <button type="button" data-v="video" aria-pressed="false">Video editor</button>
     <button type="button" data-v="settings" aria-pressed="false">Brand settings</button>
   </nav>
+  <button type="button" id="tabPopout" class="btn sm" title="Open active editor in a new browser tab" style="margin-left:4px;padding:3px 8px;font-size:11px;display:none;align-items:center;gap:4px" aria-label="Open editor in new tab">
+    <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6M15 3h6v6M10 14L21 3"/></svg>Full tab
+  </button>
   <span class="theme-slot"></span>
   <div class="mode-sw" role="group" aria-label="Editing mode"><button type="button" data-m="simple">Simple</button><button type="button" data-m="pro">Pro</button></div>
   <span class="status" id="status">Everything stays on this computer</span>
@@ -323,8 +326,8 @@ var done=function(){if(!s.isConnected)return;s.classList.add("out");setTimeout(f
   </div>
 </main>
 
-<iframe class="view" id="f-post" src="post.html" title="Post editor" hidden></iframe>
-<iframe class="view" id="f-video" src="video.html" title="Video editor" hidden></iframe>
+<iframe class="view" id="f-post" src="post.html" title="Post editor" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
+<iframe class="view" id="f-video" src="video.html" title="Video editor" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
 
 <script src="rs-store.js"></script>
 <script>RS.theme.mount(document.querySelector(".theme-slot"));</script>
@@ -340,6 +343,8 @@ const FR = { post:$("f-post"), video:$("f-video") }, READY = { post:false, video
 let view = "home";
 function show(v){
   view = v; $("home").hidden = v !== "home"; $("settings").hidden = v !== "settings"; FR.post.hidden = v !== "post"; FR.video.hidden = v !== "video";
+  const pop = $("tabPopout");
+  if (pop) pop.style.display = (v === "post" || v === "video") ? "inline-flex" : "none";
   if (v === "settings") openSettings();
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
   if (location.hash !== "#" + v) history.replaceState(null, "", v === "home" ? location.pathname : "#" + v);
@@ -347,6 +352,10 @@ function show(v){
 }
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => show(b.dataset.v)));
 $("goHome").addEventListener("click", () => show("home"));
+const popBtn = $("tabPopout");
+if (popBtn) popBtn.addEventListener("click", () => {
+  if (view === "post" || view === "video") window.open(view + ".html", "_blank");
+});
 function send(app, msg){ if (READY[app]) FR[app].contentWindow.postMessage(msg, "*"); else QUEUE[app].push(msg); }
 
 /* ---------- simple / pro ---------- */
