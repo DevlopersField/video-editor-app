@@ -433,6 +433,12 @@ body.recording .add-wrap{display:none}
       </div>
     </div>
 
+    <div class="group" id="plotGroup">
+      <h2>Plot highlight</h2>
+      <p class="hint">Outline a plot with front, width, length, and area badges. Exactly like Reel.</p>
+      <div id="plotSideBox" style="margin-top:10px"></div>
+    </div>
+
     <div class="group">
       <h2>Text</h2>
       <div id="fieldList"></div>
@@ -874,9 +880,17 @@ function tagEl(key, item, info){
 function elFlush(){ EL.list.filter(r => r.paint).sort((a, b) => (a.z - b.z) || (a.order - b.order)).forEach(r => r.paint()); }
 
 /* ---------- plot highlight on posts: boundary, area and perimeter dimensions ---------- */
-const PLOT_COLORS = { red:["#E63B2E", "230,59,46"], clay:[C.clayLt || "#C98B6E", "201,139,110"], lime:[C.lime || "#F4F1EC", "244,241,236"], sage:[C.sage || "#A9B896", "169,184,150"], yellow:["#F5C518", "245,197,24"] };
+const PLOT_COLORS = {
+  red: ["#E63B2E", "230,59,46"],
+  yellow: ["#FFD700", "255,215,0"],
+  green: ["#00E676", "0,230,118"],
+  clay: [C.clayLt || "#FF6D00", "255,109,0"],
+  lime: ["#FFFFFF", "255,255,255"],
+  blue: ["#00B0FF", "0,176,255"],
+  sage: ["#2E7D32", "46,125,50"]
+};
 const AREA_UNITS = [["sqyd","sq yd (gaj)"],["sqft","sq ft"],["sqm","sq m"]];
-const LABEL_BG = { red:"#E63B2E", yellow:"#F5C518", white:"#FFFFFF", dark:"#1C2128", green:"#556348", clay:"#C98B6E" };
+const LABEL_BG = { red:"#E63B2E", yellow:"#FFD700", green:"#00E676", white:"#FFFFFF", dark:"#1C2128", clay:"#FF6D00", blue:"#00B0FF" };
 
 function plotArea(pl){
   if (pl.areaText && pl.areaText.trim()) return pl.areaText.trim();
@@ -945,6 +959,8 @@ function drawPlotPost(c, pl, L){
   const [col, rgb] = PLOT_COLORS[pl.color] || PLOT_COLORS.red;
   const closed = pts.length >= 3;
   const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
+  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
 
   // 1. Interior fill
   const fillKey = pl.fill === undefined ? (pl.color || "red") : pl.fill;
@@ -962,15 +978,26 @@ function drawPlotPost(c, pl, L){
   // 2. Glowing perimeter outline
   c.save();
   c.strokeStyle = col;
-  c.lineWidth = 6 * u;
+  c.lineWidth = 7 * u;
   c.lineJoin = "round";
   c.lineCap = "round";
-  c.shadowColor = `rgba(${rgb},0.85)`;
-  c.shadowBlur = 14 * u;
+  c.shadowColor = `rgba(${rgb},0.95)`;
+  c.shadowBlur = 18 * u;
   c.beginPath();
   pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py));
   if (closed) c.closePath();
   c.stroke();
+
+  // White survey dash line along perimeter (matching Reel)
+  if (closed && pl.motion !== false){
+    c.save();
+    c.strokeStyle = "#FFFFFF";
+    c.lineWidth = 2.5 * u;
+    c.shadowColor = "transparent";
+    c.setLineDash([18 * u, 14 * u]);
+    c.stroke();
+    c.restore();
+  }
   c.restore();
 
   // 3. Corner dots & badges
@@ -1011,8 +1038,6 @@ function drawPlotPost(c, pl, L){
   if (!closed) return;
 
   // 4. Perimeter side length badges
-  const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
-  const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const unit = pl.unit === "m" ? "m" : "ft";
   const sides = [];
   if (pl.front){
@@ -1112,6 +1137,7 @@ function cancelPlotDrawPost(){
   const db = $("drawBarPost"); if (db) db.hidden = true;
   fgDirty = true;
   requestRender();
+  if (typeof updatePlotSidebarUI === "function") updatePlotSidebarUI();
   if (pl) edSelect("x" + pl.id);
 }
 function finishPlotDrawPost(){
@@ -1123,6 +1149,7 @@ function finishPlotDrawPost(){
   fgDirty = true;
   requestRender();
   persist();
+  if (typeof updatePlotSidebarUI === "function") updatePlotSidebarUI();
   edSelect("x" + pl.id);
 }
 
@@ -1149,6 +1176,7 @@ function edAddPlot(){
   };
   p.extras = p.extras || [];
   p.extras.push(pl);
+  if (typeof updatePlotSidebarUI === "function") updatePlotSidebarUI();
   startPlotDrawPost(pl);
 }
 
@@ -2113,9 +2141,178 @@ function syncUI(){
   document.querySelectorAll("[data-for]").forEach(el => el.hidden = !el.dataset.for.split(" ").includes(lk));
   $("overlay").value = st.overlay;
   $("indField").hidden = !fmt().carousel;
-  buildGuides(); fitCanvas(); updateExportUI(); updateAria();
+  buildGuides(); fitCanvas(); updateExportUI(); updateAria(); updatePlotSidebarUI();
 }
 function updateAria(){ cv.setAttribute("aria-label", `${fmt().platform} ${fmt().short} preview: ${(st.fields.headline || st.fields.tagline || "").replace(/\*/g, "")}`); }
+
+function updatePlotSidebarUI(){
+  const host = $("plotSideBox");
+  if (!host) return;
+  host.innerHTML = "";
+  const p = pg();
+  const pl = (p.extras || []).find(x => x.type === "plot");
+  if (!pl){
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btn primary block";
+    btn.innerHTML = `<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M3 21h18M3 7v14M21 7v14M7 3l14 14M7 3v4h4"/></svg> Add plot highlight`;
+    btn.addEventListener("click", () => edAddPlot());
+    host.appendChild(btn);
+    return;
+  }
+
+  const redo = () => { fgDirty = true; requestRender(); persist(); edPanel(); edPaint(); updatePlotSidebarUI(); };
+
+  // Top action row
+  const topRow = document.createElement("div");
+  topRow.className = "row";
+  topRow.style.gap = "6px";
+  topRow.style.marginBottom = "8px";
+
+  const editBtn = document.createElement("button");
+  editBtn.type = "button";
+  editBtn.className = "btn sm primary";
+  editBtn.style.flex = "1";
+  editBtn.textContent = "Select on canvas";
+  editBtn.addEventListener("click", () => edSelect("x" + pl.id));
+
+  const redrawBtn = document.createElement("button");
+  redrawBtn.type = "button";
+  redrawBtn.className = "btn sm";
+  redrawBtn.textContent = "Redraw corners";
+  redrawBtn.addEventListener("click", () => startPlotDrawPost(pl));
+
+  const delBtn = document.createElement("button");
+  delBtn.type = "button";
+  delBtn.className = "btn sm dark";
+  delBtn.style.color = "#FF453A";
+  delBtn.textContent = "Delete";
+  delBtn.addEventListener("click", () => {
+    p.extras = (p.extras || []).filter(x => x !== pl);
+    if (ED.sel === "x" + pl.id) edSelect(null);
+    redo();
+  });
+
+  topRow.append(editBtn, redrawBtn, delBtn);
+  host.appendChild(topRow);
+
+  // 1. Dimensions: Front, Width, Length
+  const dimWrap = document.createElement("div");
+  dimWrap.className = "field";
+  dimWrap.innerHTML = `
+    <span class="lbl">Plot dimensions</span>
+    <div class="row" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px">
+      <div>
+        <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Front side</small>
+        <input type="text" id="sidePlFront" value="${pl.front || ""}" placeholder="40" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+      </div>
+      <div>
+        <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Width</small>
+        <input type="text" id="sidePlW" value="${pl.w || ""}" placeholder="40" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+      </div>
+      <div>
+        <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Length / Depth</small>
+        <input type="text" id="sidePlL" value="${pl.l || ""}" placeholder="60" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+      </div>
+    </div>
+  `;
+  const updateAreaText = () => {
+    const areaP = host.querySelector("#sideAreaPreview");
+    if (areaP){
+      const a = plotArea(pl);
+      areaP.textContent = a ? `Total area badge: ${a}` : "Enter front/width & length to calculate area badge.";
+    }
+  };
+  dimWrap.querySelector("#sidePlFront").addEventListener("input", e => { pl.front = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaText(); });
+  dimWrap.querySelector("#sidePlW").addEventListener("input", e => { pl.w = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaText(); });
+  dimWrap.querySelector("#sidePlL").addEventListener("input", e => { pl.l = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaText(); });
+  host.appendChild(dimWrap);
+
+  // 2. Units: Dimension unit & Area badge unit (sq ft, sq yd, sq m)
+  const unitRow = document.createElement("div");
+  unitRow.className = "field";
+  unitRow.innerHTML = `<span class="lbl">Dimension unit</span><div class="chips" id="sideUnitList"></div>`;
+  host.appendChild(unitRow);
+  const fillChips = (id, cur, list, onSel) => {
+    const el = host.querySelector("#" + id); if (!el) return; el.innerHTML = "";
+    list.forEach(([v, l]) => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip";
+      b.setAttribute("aria-pressed", String(v === cur)); b.textContent = l;
+      b.addEventListener("click", () => { onSel(v); fillChips(id, v, list, onSel); redo(); });
+      el.appendChild(b);
+    });
+  };
+  fillChips("sideUnitList", pl.unit || "ft", [["ft","Feet"],["m","Metres"]], v => { pl.unit = v; });
+
+  const areaUnitRow = document.createElement("div");
+  areaUnitRow.className = "field";
+  areaUnitRow.innerHTML = `<span class="lbl">Show area badge in</span><div class="chips" id="sideAreaUnitList"></div>`;
+  host.appendChild(areaUnitRow);
+  fillChips("sideAreaUnitList", pl.areaUnit || "sqyd", [["sqft","sq ft"],["sqyd","sq yd (gaj)"],["sqm","sq m"]], v => { pl.areaUnit = v; });
+
+  // 3. Area badge override & Presets
+  const areaField = document.createElement("div");
+  areaField.className = "field";
+  areaField.innerHTML = `
+    <span class="lbl">Area badge text (or type custom)</span>
+    <input type="text" id="sideAreaInp" value="${pl.areaText || ""}" placeholder="e.g. 250 sq yd or 2,400 sq ft" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+    <div class="row" style="gap:5px;flex-wrap:wrap;margin-top:6px">
+      <button class="btn sm" type="button" data-val="100 sq yd">100 sq yd</button>
+      <button class="btn sm" type="button" data-val="200 sq yd">200 sq yd</button>
+      <button class="btn sm" type="button" data-val="250 sq yd">250 sq yd</button>
+      <button class="btn sm" type="button" data-val="1000 sq ft">1000 sq ft</button>
+      <button class="btn sm" type="button" data-val="2400 sq ft">2400 sq ft</button>
+      <button class="btn sm" type="button" data-val="1 bigha">1 bigha</button>
+    </div>
+    <p class="hint" id="sideAreaPreview" style="margin-top:6px;font-weight:600;color:var(--deodar)"></p>
+  `;
+  const areaInp = areaField.querySelector("#sideAreaInp");
+  areaInp.addEventListener("input", e => { pl.areaText = e.target.value; fgDirty = true; requestRender(); persist(); updateAreaText(); });
+  areaField.querySelectorAll("button[data-val]").forEach(b => {
+    b.addEventListener("click", () => {
+      pl.areaText = b.dataset.val;
+      areaInp.value = b.dataset.val;
+      fgDirty = true;
+      requestRender();
+      persist();
+      updateAreaText();
+    });
+  });
+  host.appendChild(areaField);
+  updateAreaText();
+
+  // 4. Line & Fill Colours
+  const colorRow = document.createElement("div");
+  colorRow.className = "field";
+  colorRow.innerHTML = `<span class="lbl">Highlight line colour</span><div class="chips" id="sideColorList"></div>`;
+  host.appendChild(colorRow);
+  fillChips("sideColorList", pl.color || "red", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"]], v => { pl.color = v; });
+
+  const fillRow = document.createElement("div");
+  fillRow.className = "field";
+  fillRow.innerHTML = `<span class="lbl">Fill inside plot</span><div class="chips" id="sideFillList"></div>`;
+  host.appendChild(fillRow);
+  fillChips("sideFillList", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["none","No fill"]], v => { pl.fill = v; });
+
+  // 5. Area badge style
+  const styleRow = document.createElement("div");
+  styleRow.className = "field";
+  styleRow.innerHTML = `<span class="lbl">Area badge style</span><div class="chips" id="sideBadgeStyleList"></div>`;
+  host.appendChild(styleRow);
+  fillChips("sideBadgeStyleList", pl.labelStyle || "pill", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], v => { pl.labelStyle = v; });
+
+  // 6. Reset badges button
+  const btmRow = document.createElement("div");
+  btmRow.className = "row";
+  btmRow.style.marginTop = "8px";
+  const rstBtn = document.createElement("button");
+  rstBtn.type = "button";
+  rstBtn.className = "btn sm block";
+  rstBtn.textContent = "Put badges back to default";
+  rstBtn.addEventListener("click", () => { delete pl.lx; delete pl.ly; delete pl.side; redo(); });
+  btmRow.appendChild(rstBtn);
+  host.appendChild(btmRow);
+}
 
 /* ---------- guides ---------- */
 function buildGuides(){
@@ -2629,7 +2826,7 @@ function edPaste(){
 function edFocusText(){ setTimeout(() => { const t = $("elText"); if (t){ t.focus(); t.select && t.select(); } }, 40); }
 
 /* ---------- selection ---------- */
-function edSelect(k){ if (ED.sel === k) return; ED.sel = k; ED.hover = null; ED.wsSel = []; ED.wsAnchor = null; edPaint(); }
+function edSelect(k){ if (ED.sel === k) return; ED.sel = k; ED.hover = null; ED.wsSel = []; ED.wsAnchor = null; edPaint(); if (typeof updatePlotSidebarUI === "function") updatePlotSidebarUI(); }
 function edHitWord(r, px, py){
   if (!r || !r.wordsFn) return null;
   const pad = 3 * screenK();
@@ -2905,15 +3102,34 @@ function edPanel(){
         host.append(cRow);
       }
 
-      chips("Line colour", [["red","Red"],["yellow","Yellow"],["clay","Clay"],["lime","White"],["sage","Green"]], pl.color || "red", v => { pl.color = v || "red"; redo(); });
-      chips("Fill inside", [["red","Red"],["yellow","Yellow"],["lime","White"],["sage","Green"],["none","No fill"]], pl.fill === undefined ? (pl.color || "red") : pl.fill, v => { pl.fill = v; redo(); });
+      chips("Line colour", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"]], pl.color || "red", v => { pl.color = v || "red"; redo(); });
+      chips("Fill inside", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["none","No fill"]], pl.fill === undefined ? (pl.color || "red") : pl.fill, v => { pl.fill = v; redo(); });
       if ((pl.fill ?? "x") !== "none"){
         slider("Fill strength", "", 0.1, 0.8, 0.01, pl.fillK ?? 0.35, pct, v => { pl.fillK = v; fgDirty = true; requestRender(); persist(); });
       }
 
       chips("Area badge style", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], pl.labelStyle || "pill", v => { pl.labelStyle = v || "pill"; redo(); });
-      chips("Area badge colour", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["white","White"],["dark","Dark"],["green","Green"]], pl.labelColor || "auto", v => { pl.labelColor = v === "auto" ? undefined : v; redo(); });
+      chips("Area badge colour", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["white","White"],["dark","Dark"]], pl.labelColor || "auto", v => { pl.labelColor = v === "auto" ? undefined : v; redo(); });
+      chips("Font", [["bold","Bold"],["serif","Elegant"]], pl.labelFont || "bold", v => { pl.labelFont = v; redo(); });
       slider("Badge size", "", 0.6, 2, 0.01, pl.labelSize || 1, pct, v => { pl.labelSize = v; fgDirty = true; requestRender(); persist(); });
+
+      const ldrRow = mk("label", "toggle");
+      const ldrBox = mk("input"); ldrBox.type = "checkbox"; ldrBox.checked = pl.leader !== false;
+      ldrBox.addEventListener("change", e => { pl.leader = e.target.checked; redo(); });
+      ldrRow.append(ldrBox, document.createTextNode(" Line from badge to plot centre"));
+      host.append(ldrRow);
+
+      const dashRow = mk("label", "toggle");
+      const dashBox = mk("input"); dashBox.type = "checkbox"; dashBox.checked = pl.motion !== false;
+      dashBox.addEventListener("change", e => { pl.motion = e.target.checked; redo(); });
+      dashRow.append(dashBox, document.createTextNode(" Survey dashed border line"));
+      host.append(dashRow);
+
+      const cbRow = mk("label", "toggle");
+      const cbBox = mk("input"); cbBox.type = "checkbox"; cbBox.checked = pl.showCorners !== false;
+      cbBox.addEventListener("change", e => { pl.showCorners = e.target.checked; redo(); });
+      cbRow.append(cbBox, document.createTextNode(" Show corner markers (C1, C2...)"));
+      host.append(cbRow);
 
       const rstRow = mk("div", "row field", "");
       rstRow.style.gap = "8px";

@@ -1675,7 +1675,15 @@ function drawClip(c, clip, local){
 }
 
 /* ---------- plot highlight: outline draws on, dimensions and total area pop in ---------- */
-const PLOT_COLORS = { red:["#E63B2E", "230,59,46"], clay:[C.clayLt, "201,139,110"], lime:[C.lime, "244,241,236"], sage:[C.sage, "169,184,150"], yellow:["#F5C518", "245,197,24"] };
+const PLOT_COLORS = {
+  red: ["#E63B2E", "230,59,46"],
+  yellow: ["#FFD700", "255,215,0"],
+  green: ["#00E676", "0,230,118"],
+  clay: [C.clayLt || "#FF6D00", "255,109,0"],
+  lime: ["#FFFFFF", "255,255,255"],
+  blue: ["#00B0FF", "0,176,255"],
+  sage: ["#2E7D32", "46,125,50"]
+};
 const AREA_UNITS = [["sqft","sq ft"],["sqyd","sq yd (gaj)"],["sqm","sq m"]];
 function plotArea(pl){
   if (pl.areaText && pl.areaText.trim()) return pl.areaText.trim();
@@ -1693,7 +1701,7 @@ function plotArea(pl){
   return `${Math.round(val).toLocaleString("en-IN")} ${label}`;
 }
 /* big, readable size label. styles: pill (solid), glass (dark box), text (no box), tag (box + pointer), stamp (rotated badge). Returns its box for dragging. */
-const LABEL_BG = { red:"#E63B2E", yellow:"#F5C518", white:"#FFFFFF", dark:"#1C2128", green:"#556348", clay:"#C98B6E" };
+const LABEL_BG = { red:"#E63B2E", yellow:"#FFD700", green:"#00E676", white:"#FFFFFF", dark:"#1C2128", clay:"#FF6D00", blue:"#00B0FF" };
 function bigLabel(c, text, x, y, u, fs, a, sc, bg, style = "pill", font = "bold", txtOver){
   if (!text || a <= 0) return null;
   const { W, H } = geo(); c.save();
@@ -4433,13 +4441,13 @@ function renderInspector(){
       fText("Name (optional, e.g. Plot 14)", pl.name, v => { pl.name = v; changed(); }),
       fSlider("Size label", pl.labelSize || 1, .6, 2, .01, v => { pl.labelSize = v; changed(false); }),
       fChips("Label style", pl.labelStyle || "pill", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], v => { pl.labelStyle = v; changed(false); }),
-      fChips("Label colour", pl.labelColor || "auto", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["white","White"],["dark","Dark"],["green","Green"],["custom","Custom"]], v => { pl.labelColor = v === "auto" ? undefined : v; if (v === "custom" && !pl.labelHex) pl.labelHex = "#1F3D2E"; changed(false); renderInspector(); }),
+      fChips("Label colour", pl.labelColor || "auto", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["white","White"],["dark","Dark"],["custom","Custom"]], v => { pl.labelColor = v === "auto" ? undefined : v; if (v === "custom" && !pl.labelHex) pl.labelHex = "#1F3D2E"; changed(false); renderInspector(); }),
       pl.labelColor === "custom" ? plotColorField("Label colour", pl.labelHex || "#1F3D2E", v => { pl.labelHex = v; changed(false); }) : "",
       plotColorField("Text colour", pl.labelText || "", v => { pl.labelText = v || undefined; changed(false); }, true),
       fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"]], v => { pl.labelFont = v; changed(false); }),
       el("div", { class:"row field" }, [btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; changed(false); }), toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })]),
-      fChips("Line colour", pl.color || "red", [["red","Red"],["yellow","Yellow"],["clay","Clay"],["lime","White"],["sage","Green"]], v => { pl.color = v; changed(false); }),
-      fChips("Fill inside (after the line draws)", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["lime","White"],["sage","Green"],["none","No fill"]], v => { pl.fill = v; changed(false); renderInspector(); }),
+      fChips("Line colour", pl.color || "red", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"]], v => { pl.color = v; changed(false); }),
+      fChips("Fill inside (after the line draws)", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["none","No fill"]], v => { pl.fill = v; changed(false); renderInspector(); }),
       (pl.fill ?? "x") !== "none" ? fSlider("Fill strength", pl.fillK ?? .35, .1, .8, .01, v => { pl.fillK = v; changed(false); }) : "",
       fChips("Show for", String(pl.dur > 0 ? pl.dur : 0), [["2","2 s"],["3","3 s"],["5","5 s"],["0","Until the clip ends"]], v => { pl.dur = +v; changed(); }),
       toggleRow("Moving dashes around the outline", pl.motion !== false, v => { pl.motion = v; changed(false); }),
