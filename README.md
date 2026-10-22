@@ -99,49 +99,39 @@ Professional, privacy-first real estate and social video editor that runs 100% i
 
 ---
 
-### 8. 📸 Photo Studio Pro: Background Replacement & Adobe Image Expand (`photo-editor.html`)
-A dedicated, professional photo editing studio with instant background replacement, Adobe/Premiere Pro style canvas expansion, and high-resolution multi-format export.
+### 8. ✂️ AI Background Remover Pro (`bg-remover.html`)
+Professional on-device AI background remover running 100% locally in your browser with zero cloud uploads and zero external API keys.
 
-- **🎨 Background Remover & Replacement Engine:**
-  - **⚡ One-Click Instant Cutout:** Fast client-side subject detection separating people, properties, cars, or products from backgrounds in <200ms.
-  - **Interactive Manual Touch-Up:** Keep Brush, Erase Brush, and Magic Wand color flood keyer with adjustable tolerance and softness.
-  - **Photoshop-Grade Refine Edge:** Edge smoothing, feathering radius (0–15px), and boundary choke/shift (-12px to +12px) to eradicate fringes.
-  - **Fill Background with Solid Colors:** Full-spectrum live color picker plus luxury studio swatches (Studio White, Dark Obsidian, Emerald Green, Warm Gold, Midnight Navy, Ruby Red).
-  - **Fill Background with Studio Gradients:** Photographic studio lighting gradients (Vignette, Sunset Glow, Cyberpunk Violet, Luxury Gold).
-  - **Fill Background with Other Photos & Scenes:**
-    - Upload any custom background image from your computer.
-    - Built-in luxury architectural presets (Modern Villa, Penthouse Balcony, Minimalist Interior, Sunset Sky, Forest Sanctuary, Commercial Office).
-    - **DSLR Bokeh Blur Slider (0–30px):** Real-time adjustable optical depth-of-field background blur behind your cutout subject.
-  - **Drop / Ground Contact Shadow:** Realistic soft drop shadow under the subject with depth and blur controls.
-
-- **🔲 Adobe & Premiere Pro Image Expand (Aspect Ratio Expander):**
-  - **Social Aspect Ratio Presets:** Seamlessly convert any photo into `9:16 (Reel/Story)`, `16:9 (Landscape)`, `1:1 (Square)`, `4:5 (Portrait)`, `2.39:1 (Cinemascope)`, or `Custom` canvas size.
-  - **Expand Fill Methods:**
-    - 🪞 **Seamless Mirror Blend:** Photoshop-style mirror edge reflection with feathered gradient blending.
-    - 🌫️ **Ambient Blur Fill:** Premiere Pro / After Effects Gaussian blurred pillarbox fill.
-    - 🎨 **Edge Gradient:** Diffuse color gradient sampled from the perimeter of your photo.
-    - ⚪ **Solid / Scene Backdrop:** Clean backdrop fill.
-  - **Subject Placement & Feathering:** Subject scale slider (50%–120%), anchor alignment (Center, Top, Bottom, Left, Right), edge feather radius (5–80px), and manual border padding sliders (Left, Right, Top, Bottom).
-  - **Expanded Subject Drop Shadow:** Adds subtle depth separation between the subject and the expanded canvas.
-
-- **🎛️ Lumetri Color & Tone Adjustments:**
-  - Real-time sliders for Exposure (-50 to +50), Contrast, Saturation, Warmth / White Balance temp, and Vignette.
-
-- **💎 High-Resolution Export Engine:**
-  - **Resolution Multipliers:** `1x Native`, `2x Ultra HD 4K`, and `4x Super Resolution (Print-Ready)`.
-  - **Lossless Formats:** Export as transparent `PNG`, high-quality `JPEG`, or modern `WebP`.
-  - **Instant Integrations:** 📥 Download file, 📋 Copy directly to clipboard, 📲 Send to Post Editor, or 🎬 Send to Video Editor.
+- **⚡ Pro AI Neural Engine (`@imgly/background-removal`):**
+  - Industry-standard deep learning subject segmentation (ISNet / ONNX WebAssembly).
+  - Isolates people, portraits, real estate, vehicles, and products with hair-level edge precision.
+  - One-time model download (~40 MB) cached in the browser for instant, offline repeat use.
+- **📁 Single & Batch Queue Processing:**
+  - Drop or browse multiple photos at once; processes the entire queue automatically.
+  - Interactive queue bar with live thumbnail statuses (`queued`, `working`, `done`, `error`) and single-click removal.
+  - Download individual cutouts or **Download All (Batch)** at once.
+- **🔍 Interactive Before / After Split Slider:**
+  - Responsive comparison curtain slider comparing the original photo against the cutout in real time.
+  - Stage zoom controls (`+`, `-`, `Fit`, percentage indicator).
+- **🎨 Backdrop Preview Modes:**
+  - 🏁 Transparent checkerboard.
+  - ⚪ Solid white.
+  - ⚫ Solid black.
+  - 🌫️ **Blurred Original Background:** DSLR-style cinematic portrait bokeh blur behind the subject.
+  - 🎨 Custom color picker.
+- **✨ Real-Time Edge Refinement:**
+  - **Feather Slider (0–8px):** Softens and blends alpha edges.
+  - **Expand / Shrink Slider (-6px to +6px):** Grows or tightens the cutout mask using GPU canvas compositing to eliminate halos or recover fine details.
+- **💾 On-Device AI Storage Management:**
+  - Built-in storage auditor showing HTTP cache entries with one-click app storage cleanup.
+- **📥 Multi-Format Export & App Integrations:**
+  - Export full-resolution transparent **PNG**, high-efficiency **WebP**, or flat **JPG**.
+  - 📋 **Copy transparent PNG** directly to system clipboard.
+  - 📲 **Send to Post Editor** or 🎬 **Send to Video Editor** as an image overlay sticker.
 
 ---
 
-### 9. ✂️ AI Background Remover Standalone (`bg-remover.html`)
-- **⚡ One-Click Instant Background Removal:** Fast subject segmentation with interactive split curtain Before/After slider.
-- **Selection Tools:** Keep Brush, Erase Brush, Magic Wand, and Lasso tool.
-- **Export:** Transparent PNG download, clipboard copy, and direct export to Post and Video editors.
-
----
-
-### 10. 📊 Reel Progress Bar & Dynamic Audiograms
+### 9. 📊 Reel Progress Bar & Dynamic Audiograms
 - **Veed-Style Progress Bar:** Top, bottom, left, or right glowing progress bar tracking reel duration.
 - **Dynamic Audiogram Waveform:** Reactive animated voice waveforms (bars, wave, or dots) synchronized to voiceover playback.
 
@@ -151,8 +141,7 @@ A dedicated, professional photo editing studio with instant background replaceme
 
 | File | Purpose |
 |---|---|
-| `photo-editor.html` | Photo Studio Pro: Background replacement (colors & photos), Adobe Image Expand, 4K export |
-| `bg-remover.html` | Background Remover Pro: one-click removal, manual brush, wand, refine edge, export |
+| `bg-remover.html` | AI Background Remover Pro: batch processing, before/after slider, edge polish, multi-format export |
 | `video.html` | Core video editor: timeline, canvas rendering, plot tools, captions, export |
 | `index.html` | App shell, brand kit manager, and project launcher |
 | `post.html` | Social post and flyer image editor |
