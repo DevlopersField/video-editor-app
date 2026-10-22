@@ -31,9 +31,18 @@
     const k = Math.max(S / iw, S / ih) * zoom * 1.45; /* oversize so rotation never shows corners */
     const pc = clip && plotCentre(clip), ox = pc ? (.5 - pc.u) * iw * k : 0, oy = pc ? (.5 - pc.v) * ih * k : 0; /* the plot is the centre of the flight */
     g.translate(S / 2, S / 2); g.rotate(rot); g.translate(ox, oy); g.drawImage(img, -iw * k / 2, -ih * k / 2, iw * k, ih * k);
-    if (pc){ /* plot outline painted on the ground so it stays glued to the land in 3D */
+    if (pc){ /* plot outline and road painted on the ground so it stays glued to the land in 3D */
       const col = (typeof PLOT_COLORS === "object" && PLOT_COLORS[pc.pl.color] ? PLOT_COLORS[pc.pl.color][0] : "#E63B2E");
       const tt = local == null ? 99 : local, at = pc.pl.at || 0, draw = clamp((tt - at) / 1.2), pts = pc.pl.pts.map(([a, b]) => [(a - .5) * iw * k, (b - .5) * ih * k]);
+      if (typeof drawRoadCorridor === "function" && pc.pl.road && pc.pl.road.on && pts.length >= 3){
+        const cx0 = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy0 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+        const roadCfg = { ...pc.pl.road, front: pc.pl.front || pc.pl.w || 40, unit: pc.pl.unit || "ft" };
+        const sideMode = pc.pl.road.side ?? 0, edgesToDraw = (sideMode === "corner") ? [0, 1] : [+sideMode || 0];
+        edgesToDraw.forEach(ei => {
+          const p1 = pts[ei], p2 = pts[(ei + 1) % pts.length];
+          if (p1 && p2) drawRoadCorridor(g, p1, p2, cx0, cy0, roadCfg, S / 1080, { isVideo: false });
+        });
+      }
       if (draw > 0){
         /* fill fades in after the line, then breathes */
         const fillA = clamp((tt - at - 1) / .6) * (.22 + .1 * Math.sin((tt - at) * 3));

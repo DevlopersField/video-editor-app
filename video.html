@@ -6,7 +6,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reel Studio Video Editor</title>
-<meta name="description" content="Reel Studio video editor: photo videos, clip editing, captions, voiceover, music, brand intro and outro.">
+<meta name="description" content="Reel Studio Video Editor: Professional real estate video editing with property plot highlights, road corridors, spotlight focus, captions, voiceover, and multi-track audio.">
+<link rel="canonical" href="https://devlopersfield.github.io/video-editor-app/video.html">
+<meta property="og:title" content="Reel Studio Video Editor">
+<meta property="og:description" content="Professional real estate video editor: plot & road highlights, spotlight, captions, voiceover, music, and multi-track editing.">
+<meta property="og:url" content="https://devlopersfield.github.io/video-editor-app/video.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Reel Studio Video Editor">
+<meta name="twitter:description" content="Professional real estate video editor: plot & road highlights, spotlight, captions, voiceover, music, and multi-track editing.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Manrope:wght@400;500;600;700;800&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Serif+Devanagari:wght@500&display=swap" rel="stylesheet">
@@ -603,6 +611,16 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       <div class="slider"><span>Voiceover</span><input type="range" id="voVol" min="0" max="2" step="0.01"><output id="voVolOut"></output></div>
     </div>
 
+    <div class="group" id="sfxGroup">
+      <h2>Sound effects</h2>
+      <p class="hint">Click any sound to add it at the playhead (<b id="sfxPlayheadT">0.0s</b>) on the timeline.</p>
+      <div class="chips" id="sfxQuickChips" style="gap:5px;margin-top:6px"></div>
+      <div id="sfxListWrap" style="margin-top:10px">
+        <span class="lbl" id="sfxListTitle">Sounds in video (0)</span>
+        <div id="sfxActiveList" style="display:flex;flex-direction:column;gap:5px;margin-top:5px;max-height:200px;overflow-y:auto"></div>
+      </div>
+    </div>
+
     <div class="group">
       <h2>Captions</h2>
       <span class="lbl">Style</span>
@@ -748,11 +766,12 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
         <button type="button" class="tbtn" id="tlFit" title="Fit the whole video">Fit</button>
       </div>
     </div>
-    <div class="tl-labels"><div class="big">Clips</div><div>On top</div><div>Captions</div><div>Voice</div><div>Music</div><div class="lbl-sfx">Sound FX</div></div>
+    <div class="tl-labels"><div class="big">Clips</div><div class="lbl-plots">Plots &amp; Roads</div><div class="lbl-ovl">Text &amp; Titles</div><div>Captions</div><div>Voice</div><div>Music</div><div class="lbl-sfx">Sound FX</div></div>
     <div class="tl-scroll" id="tlScroll">
       <div class="tl-inner" id="tlInner">
         <div class="ruler" id="ruler"></div>
         <div class="track big" id="trClips"></div>
+        <div class="track" id="trPlots"></div>
         <div class="track" id="trOvl"></div>
         <div class="track" id="trCap"></div>
         <div class="track" id="trVo"></div>
@@ -768,6 +787,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 <script>RS.theme.mount(document.querySelector(".theme-slot"));</script>
 <script src="brand.js"></script>
 <script src="packs.js"></script>
+<script src="mask-tracker.js"></script>
 <!-- mp4box.js 0.5.2 (BSD-3-Clause, GPAC/Telecom ParisTech): reads MP4/MOV so export can decode frames directly. Wrapped so it adds only MP4Box and DataStream. -->
 <script>(function(){
 /*! mp4box 19-03-2022 */
@@ -1555,8 +1575,16 @@ function geo(){ const f = F(), W = Math.round(f.w * RES / 2) * 2, H = Math.round
 /* =========================================================
    Clip renderers
    ========================================================= */
+function isPlotFrozen(c, local){
+  if (!c || c.kind !== "video") return null;
+  return (c.plots || []).find(p => p.freezeVideo === true && local >= (p.at || 0) && local <= (p.at || 0) + (p.dur > 0 ? p.dur : c.dur));
+}
 function imageClipIndex(clip){ return P.clips.filter(c => c.kind === "image").indexOf(clip); }
-function motionOf(clip){ if (clip.motion !== "auto") return clip.motion; return ["zoom-in","pan-right","zoom-out","pan-left"][Math.max(0, imageClipIndex(clip)) % 4]; }
+function motionOf(clip){
+  if (clip.motion && clip.motion !== "auto") return clip.motion;
+  if (clip.plots && clip.plots.length) return "still";
+  return ["zoom-in","pan-right","zoom-out","pan-left"][Math.max(0, imageClipIndex(clip)) % 4];
+}
 function motionParams(m, p){
   const e = ease(p), L = (a, b) => a + (b - a) * e;
   switch (m){
@@ -1580,6 +1608,8 @@ function clipXform(clip, local){
   else if (clip.kind === "video" && clip._xsrc && exporting){ src = clip._xsrc; sw = src.displayWidth || src.width; sh = src.displayHeight || src.height; }
   else if (clip.kind === "video"){ const v = clip.el; if (v.readyState >= 2){ src = v; sw = v.videoWidth; sh = v.videoHeight; } else if (clip.poster){ src = clip.poster; sw = src.width; sh = src.height; } }
   if (!src || !sw || !sh) return null;
+  const freezePl = isPlotFrozen(clip, local);
+  if (freezePl) local = freezePl.at || 0;
   const p = clip.dur ? clamp(local / clip.dur) : 0;
   const keyed = clip.kf && clip.kf.length;
   let [sc, fx, fy, rot] = keyed ? kfParams(clip, local) : clip.kind === "image" ? motionParams(motionOf(clip), p) : [1, .5, .5, 0];
@@ -1744,38 +1774,261 @@ function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
   c.fillStyle = fg; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, 0, size * .04);
   c.restore();
 }
+function drawRoadCorridor(c, A, B, cx, cy, cfg, u, opt = {}){
+  const dx = B[0] - A[0], dy = B[1] - A[1];
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L, uy = dy / L;
+  let nx = -uy, ny = ux;
+  const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+  if ((mx - cx) * nx + (my - cy) * ny < 0){ nx = -nx; ny = -ny; }
+  const wFt = parseFloat(cfg.width) || 30;
+  const frontFt = parseFloat(cfg.front) || 40;
+  let roadPx = L * (wFt / Math.max(15, frontFt));
+  roadPx = Math.max(46 * u, Math.min(230 * u, roadPx));
+  const ext = Math.max(28 * u, L * 0.22);
+  const R0 = [A[0] - ux * ext, A[1] - uy * ext];
+  const R1 = [B[0] + ux * ext, B[1] + uy * ext];
+  const R2 = [R1[0] + nx * roadPx, R1[1] + ny * roadPx];
+  const R3 = [R0[0] + nx * roadPx, R0[1] + ny * roadPx];
+
+  c.save();
+  // 1. Asphalt corridor base
+  c.beginPath();
+  c.moveTo(...R0); c.lineTo(...R1); c.lineTo(...R2); c.lineTo(...R3); c.closePath();
+  const roadStyle = cfg.style || "asphalt";
+  if (roadStyle === "yellow") c.fillStyle = "rgba(255, 215, 0, 0.28)";
+  else if (roadStyle === "white") c.fillStyle = "rgba(255, 255, 255, 0.24)";
+  else if (roadStyle === "lime") c.fillStyle = "rgba(0, 230, 118, 0.24)";
+  else c.fillStyle = "rgba(18, 22, 28, 0.92)";
+  c.fill();
+
+  // 2. Curbs / Boundary lines
+  c.beginPath(); c.moveTo(...R0); c.lineTo(...R1);
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 3.5 * u; c.lineCap = "round"; c.stroke();
+
+  const curbCol = roadStyle === "yellow" ? "#FFD700" : roadStyle === "lime" ? "#00E676" : roadStyle === "white" ? "#FFFFFF" : "#FFC107";
+  c.beginPath(); c.moveTo(...R3); c.lineTo(...R2);
+  c.strokeStyle = curbCol; c.lineWidth = 4.5 * u;
+  c.shadowColor = curbCol; c.shadowBlur = 10 * u;
+  c.stroke();
+  c.shadowColor = "transparent";
+
+  // 3. Center road divider dashed line (animated in videos!)
+  const C0 = [(R0[0] + R3[0]) / 2, (R0[1] + R3[1]) / 2];
+  const C1 = [(R1[0] + R2[0]) / 2, (R1[1] + R2[1]) / 2];
+  c.beginPath(); c.moveTo(...C0); c.lineTo(...C1);
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 3.5 * u;
+  c.setLineDash([20 * u, 16 * u]);
+  if (opt.time != null && opt.isVideo && opt.motion !== false){
+    c.lineDashOffset = -opt.time * 50 * u;
+  }
+  c.stroke();
+  c.setLineDash([]);
+
+  // 4. Subtle road width dimension lines across edges
+  c.strokeStyle = "rgba(255,255,255,0.4)";
+  c.lineWidth = 1.5 * u;
+  c.beginPath();
+  c.moveTo(...R0); c.lineTo(...R3);
+  c.moveTo(...R1); c.lineTo(...R2);
+  c.stroke();
+
+  // 5. Road Badge
+  const unit = (cfg.unit === "m") ? "M" : "FT";
+  const rawW = String(cfg.width || 30).trim();
+  const wLabel = /ft|m|gaj|yd/i.test(rawW) ? rawW : `${rawW} ${unit}`;
+  let roadText = cfg.text && cfg.text.trim() ? cfg.text.trim() : `${wLabel} ROAD`;
+  if (!/road/i.test(roadText)) roadText = `${roadText} ROAD`;
+
+  let bx = (C0[0] + C1[0]) / 2;
+  let by = (C0[1] + C1[1]) / 2;
+  if (opt.bx != null && opt.by != null){
+    bx = opt.bx; by = opt.by;
+  }
+
+  const badgeText = `🛣️ ${roadText.toUpperCase()}`;
+  const fs = 24 * u;
+  c.font = `800 ${fs}px sans-serif`;
+  const tw = c.measureText(badgeText).width + 36 * u, th = fs + 22 * u;
+
+  c.save();
+  c.translate(bx, by);
+  c.shadowColor = "rgba(0,0,0,0.7)";
+  c.shadowBlur = 14 * u;
+  c.fillStyle = "#0A0D12";
+  c.beginPath();
+  c.roundRect(-tw / 2, -th / 2, tw, th, th / 2);
+  c.fill();
+  c.shadowColor = "transparent";
+
+  c.strokeStyle = curbCol;
+  c.lineWidth = 2.5 * u;
+  c.stroke();
+
+  c.fillStyle = "#FFD700";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillText(badgeText, 0, 1 * u);
+  c.restore();
+
+  c.restore();
+
+  return { x: bx - tw / 2, y: by - th / 2, w: tw, h: th, cx: bx, cy: by };
+}
+
+function plotPtsAt(pl, local){
+  if (!pl || !pl.pts || !pl.pts.length) return [];
+  // 1. If keyframes exist, interpolate smoothly between keyframes
+  if (pl.kf && pl.kf.length){
+    const ks = pl.kf;
+    if (local <= ks[0].t) return ks[0].pts;
+    if (local >= ks[ks.length - 1].t) return ks[ks.length - 1].pts;
+    for (let i = 0; i < ks.length - 1; i++){
+      const k1 = ks[i], k2 = ks[i + 1];
+      if (local >= k1.t && local <= k2.t){
+        const factor = (local - k1.t) / Math.max(1e-4, k2.t - k1.t);
+        return k1.pts.map(([u1, v1], idx) => {
+          const [u2, v2] = (k2.pts && k2.pts[idx]) || [u1, v1];
+          return [u1 + (u2 - u1) * factor, v1 + (v2 - v1) * factor];
+        });
+      }
+    }
+    return ks[ks.length - 1].pts;
+  }
+
+  // 2. Parametric Drone Motion Match: Circular Orbit, Zoom In (Fly-In), Zoom Out (Pull-Back), Drift
+  const m = pl.droneMotion || (["orbit-cw","orbit-ccw","zoom-in","zoom-out"].includes(pl.stickMode) ? pl.stickMode : null);
+  if (!m || m === "none" || m === "stick") return pl.pts;
+
+  const t = Math.max(0, local - (pl.at || 0));
+  if (t <= 0) return pl.pts;
+
+  const pts = pl.pts;
+  const N = pts.length;
+  const cu = pts.reduce((s, p) => s + p[0], 0) / N;
+  const cv = pts.reduce((s, p) => s + p[1], 0) / N;
+
+  const { W, H } = geo();
+  const aspect = (W && H) ? (W / H) : 1;
+
+  // Zoom scale factor:
+  let sc = 1.0;
+  if (m === "zoom-in"){
+    const rate = typeof pl.zoomRate === "number" ? pl.zoomRate : 0.08;
+    sc = 1.0 + rate * t;
+  } else if (m === "zoom-out"){
+    const rate = typeof pl.zoomRate === "number" ? pl.zoomRate : 0.08;
+    sc = Math.max(0.15, 1.0 - rate * t);
+  } else if (m === "orbit-cw" || m === "orbit-ccw"){
+    const orbZoom = typeof pl.orbitZoom === "number" ? pl.orbitZoom : 0;
+    sc = Math.max(0.15, 1.0 + orbZoom * t);
+  }
+
+  // Circular Orbit Rotation angle:
+  let rot = 0;
+  if (m === "orbit-cw" || m === "orbit-ccw"){
+    const spd = typeof pl.orbitSpeed === "number" ? pl.orbitSpeed : 6.0;
+    const dir = m === "orbit-ccw" ? -1 : 1;
+    rot = dir * (spd * Math.PI / 180) * t;
+  }
+
+  // Drift translation:
+  const dx = (pl.driftX || 0) * t * 0.04;
+  const dy = (pl.driftY || 0) * t * 0.04;
+
+  const cosR = Math.cos(rot), sinR = Math.sin(rot);
+
+  return pts.map(([u, v]) => {
+    // Isotropic screen-space transformation with aspect ratio correction (no shearing)
+    const xp = (u - cu) * aspect;
+    const yp = (v - cv);
+    let rxp = xp * sc, ryp = yp * sc;
+    if (rot){
+      const tx = rxp * cosR - ryp * sinR;
+      const ty = rxp * sinR + ryp * cosR;
+      rxp = tx; ryp = ty;
+    }
+    return [clamp(cu + rxp / aspect + dx, -0.3, 1.3), clamp(cv + ryp + dy, -0.3, 1.3)];
+  });
+}
+
 function drawPlot(c, X, pl, local, clip){
-  const { u } = geo(), t = local - (pl.at || 0);
+  const { u, W, H } = geo(), t = local - (pl.at || 0);
   const editing = selected && selected.type === "plot" && selected.item === pl && !exporting && !playing;
   if (t < 0 && !editing) return;
-  if (!pl.pts || pl.pts.length < 2) return;
+  const curPts = plotPtsAt(pl, local);
+  if (!curPts || curPts.length < 2) return;
   /* life: shows for pl.dur seconds (0 or empty = until the clip ends), with a short fade out */
   const life = pl.dur > 0 ? pl.dur : Infinity;
   if (!editing && t > life) return;
   const out = editing ? 1 : clamp((life - t) / .35);
-  const T = editing ? Math.max(t, 1.6) : t, pts = pl.pts.map(([a, b]) => mapPt(X, a, b));
+  const T = editing ? Math.max(t, 1.6) : t;
+  // For screen HUD pinning, use fixed transform at pl.at; for video sticking, use current clipXform X so it sticks to the video
+  const useFixedX = (pl.stickMode === "screen");
+  const X_plot = useFixedX ? (clip ? (clipXform(clip, pl.at || 0) || X) : X) : X;
+  const pts = curPts.map(([a, b]) => mapPt(X_plot, a, b));
   const [col, rgb] = PLOT_COLORS[pl.color] || PLOT_COLORS.red;
-  const closed = pl.pts.length >= 3;
+  const closed = curPts.length >= 3;
+
+  // Spotlight effect: Dim the rest of the video outside the plot so ONLY that part is highlighted
+  if (closed && pl.dimRest !== false){
+    const dimAlpha = typeof pl.dimAlpha === "number" ? pl.dimAlpha : 0.65;
+    c.save();
+    c.globalAlpha = out * clamp(T / .2) * dimAlpha;
+    c.fillStyle = "#000000";
+    c.beginPath();
+    c.rect(0, 0, W, H);
+    pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y));
+    c.closePath();
+    c.fill("evenodd");
+    c.restore();
+  }
+
   c.save(); c.globalAlpha = out;
   const path = () => { c.beginPath(); pts.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (closed) c.closePath(); };
-  /* fill inside: comes in after the outline is drawn, then breathes. pl.fill = colour key or "none" */
+
+  // Road highlight corridor (if enabled)
+  pl._roadRect = null;
+  if (closed && pl.road && pl.road.on){
+    const cx0 = pts.reduce((s, p) => s + p[0], 0) / pts.length;
+    const cy0 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+    const roadCfg = { ...pl.road, front: pl.front || pl.w || 40, unit: pl.unit || "ft" };
+    const sideMode = pl.road.side ?? 0;
+    const edgesToDraw = (sideMode === "corner") ? [0, 1] : [+sideMode || 0];
+    edgesToDraw.forEach((ei, idx) => {
+      const p1 = pts[ei], p2 = pts[(ei + 1) % pts.length];
+      if (p1 && p2){
+        const opt = { isVideo: true, time: T, motion: !!pl.motion };
+        if (pl.road.ru != null && pl.road.rv != null && idx === 0){
+          const [bx, by] = mapPt(X_plot, pl.road.ru, pl.road.rv);
+          opt.bx = bx; opt.by = by;
+        }
+        const rRect = drawRoadCorridor(c, p1, p2, cx0, cy0, roadCfg, u, opt);
+        if (idx === 0) pl._roadRect = rRect;
+      }
+    });
+  }
+
+  /* fill inside: comes in with clean fade, no pulsing or wiggling */
   const fillKey = pl.fill === undefined ? (pl.color || "red") : pl.fill;
   if (closed && fillKey !== "none"){
     const frgb = (PLOT_COLORS[fillKey] || PLOT_COLORS.red)[1], k = pl.fillK ?? .35;
-    const fa = ease((T - .5) / .4) * (k + .08 * Math.sin(T * 5));
+    const fa = clamp(T / .2) * (k + (pl.motion ? .08 * Math.sin(T * 5) : 0));
     if (fa > 0){ c.fillStyle = `rgba(${frgb},${clamp(fa, 0, .9).toFixed(3)})`; path(); c.fill(); }
   }
-  /* outline draws on fast (0.6 s), with a pulsing glow */
-  const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]).slice(0, closed ? pts.length : pts.length - 1);
-  const lens = segs.map(([a, b]) => Math.hypot(b[0] - a[0], b[1] - a[1])), per = lens.reduce((s, v) => s + v, 0);
-  let left = per * ease(T / .6);
-  c.save(); c.strokeStyle = col; c.lineWidth = 8 * u; c.lineJoin = "round"; c.lineCap = "round";
-  c.shadowColor = `rgba(${rgb},.9)`; c.shadowBlur = (14 + 12 * (.5 + .5 * Math.sin(T * 6))) * u;
-  c.beginPath(); c.moveTo(...pts[0]);
-  for (let i = 0; i < segs.length && left > 0; i++){ const [a, b] = segs[i], f = Math.min(1, left / lens[i]); c.lineTo(a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f); left -= lens[i]; }
-  c.stroke(); c.restore();
-  /* moving dashes run around the outline once it is drawn */
-  if (closed && T > .55 && pl.motion !== false){
+  /* outline: solid, glowing perimeter stuck in place (no animated line tracing) */
+  c.save();
+  c.strokeStyle = col;
+  c.lineWidth = 8 * u;
+  c.lineJoin = "round";
+  c.lineCap = "round";
+  c.shadowColor = `rgba(${rgb},.9)`;
+  c.shadowBlur = (14 + (pl.motion ? 12 * (.5 + .5 * Math.sin(T * 6)) : 6)) * u;
+  path();
+  c.stroke();
+  c.restore();
+  /* moving dashes only if explicitly turned on */
+  if (closed && T > .55 && pl.motion){
     c.save(); c.globalAlpha = out * ease((T - .55) / .3); c.strokeStyle = "#FFFFFF"; c.lineWidth = 3.5 * u; c.setLineDash([22 * u, 18 * u]); c.lineDashOffset = -T * 90 * u; c.lineJoin = "round";
     path(); c.stroke(); c.restore();
   }
@@ -1788,6 +2041,7 @@ function drawPlot(c, X, pl, local, clip){
   /* side lengths on the edges, pushed outward from the centre */
   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const unit = pl.unit === "m" ? "m" : "ft";
+  const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]).slice(0, closed ? pts.length : pts.length - 1);
   const sideQ = [];
   pl._srects = [];
   const sides = [];
@@ -1813,7 +2067,7 @@ function drawPlot(c, X, pl, local, clip){
     c.font = `700 ${28 * u}px ${SANS}`; const sw = c.measureText(txt).width + 32 * u, sh = 50 * u, { W:CW, H:CH } = geo();
     const inset = Math.min(70 * u, d * .45);
     let sx = mx - (mx - cx) / d * inset, sy = my - (my - cy) / d * inset;
-    if (pl.side && pl.side[k]) [sx, sy] = mapPt(X, pl.side[k][0], pl.side[k][1]);
+    if (pl.side && pl.side[k]) [sx, sy] = mapPt(X_plot, pl.side[k][0], pl.side[k][1]);
     sx = clamp(sx, sw / 2 + 12 * u, CW - sw / 2 - 12 * u); sy = clamp(sy, sh / 2 + 12 * u, CH - sh / 2 - 12 * u);
     pl._srects[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
     sideQ.push(() => labelPill(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff"));
@@ -1821,11 +2075,11 @@ function drawPlot(c, X, pl, local, clip){
   /* name and the size you typed (or the calculated area) in the centre */
   const area = plotArea(pl), pa = clamp((T - .7) / .4);
   if (area || pl.name){
-    const sc = .7 + .3 * backOut(pa) + .03 * Math.sin(T * 5) * (pa >= 1 ? 1 : 0), a = ease(pa) * out, ls = pl.labelSize || 1;
+    const sc = .7 + .3 * backOut(pa) + (pl.motion ? .03 * Math.sin(T * 5) * (pa >= 1 ? 1 : 0) : 0), a = ease(pa) * out, ls = pl.labelSize || 1;
     const { W, H } = geo(), fs = 66 * u * ls;
-    /* label anchor: dragged spot on the picture (moves with the camera), or the plot centre */
+    /* label anchor: dragged spot on the picture, or the plot centre */
     let lx = cx, ly = cy + (pl.name ? 34 * u * ls : 0);
-    if (pl.lu != null){ [lx, ly] = mapPt(X, pl.lu, pl.lv); }
+    if (pl.lu != null){ [lx, ly] = mapPt(X_plot, pl.lu, pl.lv); }
     const lbg = pl.labelColor === "custom" && pl.labelHex ? pl.labelHex : LABEL_BG[pl.labelColor] || col;
     if (pl.lu != null && pl.leader !== false && Math.hypot(lx - cx, ly - cy) > fs * 1.4){
       c.save(); c.globalAlpha = a; c.strokeStyle = "#FFFFFF"; c.lineWidth = 4 * u; c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 8 * u; c.lineCap = "round";
@@ -3417,7 +3671,11 @@ function syncVideos(t, hard){
     if (inWin){
       const rate = rateAt(c, local);
       c.gain.gain.value = c.muted || P.muteVideo || c.reverse || Math.abs(rate) < .5 || Math.abs(rate) > 2.5 ? 0 : c.volume;
-      if (playing && c.reverse){
+      if (playing && rate === 0){
+        /* Video frame is frozen for plot highlight: keep video strictly paused on expected frame */
+        if (!v.paused) v.pause();
+        if (Math.abs(v.currentTime - expected) > .03) v.currentTime = expected;
+      } else if (playing && c.reverse){
         /* browsers cannot play backwards: step by seeking */
         if (!v.paused) v.pause();
         if (!v.seeking && Math.abs(v.currentTime - expected) > .03) v.currentTime = expected;
@@ -3426,7 +3684,10 @@ function syncVideos(t, hard){
         if (Math.abs(v.playbackRate - r) > .02) v.playbackRate = r;
         if (v.paused){ v.currentTime = expected; v.play().catch(() => {}); }
         else if (Math.abs(v.currentTime - expected) > .3 * Math.max(1, r)) v.currentTime = expected;
-      } else if (hard || Math.abs(v.currentTime - expected) > .04){ v.pause(); v.currentTime = expected; }
+      } else if (hard || Math.abs(v.currentTime - expected) > .04){
+        if (!v.paused) v.pause();
+        v.currentTime = expected;
+      }
     } else {
       c.gain.gain.value = 0;
       if (!v.paused) v.pause();
@@ -4201,12 +4462,55 @@ function renderTimeline(){
   const sel = it => (selected && selected.item === it) || (typeof msHas === "function" && msHas(it));
   const tc = $("trClips"); tc.innerHTML = "";
   SEQ.forEach(c => { const b = blk("clip", c._start * pps, c.dur * pps - 2, `${clipLabel(c)} · ${c.dur.toFixed(1)}s${speedTag(c)}`, () => { if (b.dataset.moved) return; select("clip", c); seek(c._start + .05); }, sel(c), c.thumb); if (P.clips.includes(c)) enableClipDrag(b, c); (c.kf || []).forEach(k => { if (k.t < 0 || k.t > c.dur) return; const d = document.createElement("i"); d.className = "kfd"; d.style.left = (k.t * pps - 5) + "px"; d.title = `Keyframe ${k.t.toFixed(2)} s`; b.appendChild(d); }); addHandles(b, clipDragSpec(c)); tc.appendChild(b); });
+  const tp = $("trPlots");
+  if (tp){
+    tp.innerHTML = "";
+    SEQ.forEach(c => (c.plots || []).forEach(pl => {
+      const st = c._start + (pl.at || 0);
+      const effDur = pl.dur > 0 ? Math.min(pl.dur, c.dur - (pl.at || 0)) : (c.dur - (pl.at || 0));
+      const isRoad = pl.road && pl.road.on;
+      const badgeLabel = isRoad ? `🛣️ ${pl.name || "Plot"} · ${pl.road.width || 30}ft Rd (${effDur.toFixed(1)}s)` : `📐 ${pl.name || "Plot"}${plotArea(pl) ? ` · ${plotArea(pl)}` : ""} (${effDur.toFixed(1)}s)`;
+      const b = blk("ovl plotb" + (isRoad ? " roadb" : ""), st * pps, effDur * pps, badgeLabel, () => { select("plot", pl, c); seek(st + 0.05); }, sel(pl));
+      b.title = `${isRoad ? "Plot & Road Highlight" : "Plot Highlight"}: ${pl.name || "Plot"} (${effDur.toFixed(1)}s) - Drag to move, drag edges to adjust start & duration`;
+      (pl.kf || []).forEach(k => {
+        const relT = k.t - (pl.at || 0);
+        if (relT >= 0 && relT <= effDur){
+          const d = document.createElement("i");
+          d.className = "kfd";
+          d.style.left = (relT * pps - 5) + "px";
+          d.title = `Tracking keyframe at ${k.t.toFixed(2)}s`;
+          b.appendChild(d);
+        }
+      });
+      addHandles(b, relSpec(pl, c, true));
+      tp.appendChild(b);
+    }));
+    SEQ.forEach(c => (c.spots || []).forEach(sp => {
+      const st = c._start + (sp.at || 0), effDur = Math.min(sp.dur, c.dur - (sp.at || 0));
+      const b = blk("ovl spotb", st * pps, effDur * pps, `🎯 Spotlight ${sp.label || ""} (${effDur.toFixed(1)}s)`.trim(), () => { select("spot", sp, c); seek(st + 0.05); }, sel(sp));
+      b.title = `Spotlight (${effDur.toFixed(1)}s) - Drag to move, drag edges to adjust time`;
+      addHandles(b, relSpec(sp, c, true));
+      tp.appendChild(b);
+    }));
+    SEQ.forEach(c => (c.punches || []).forEach(pz => {
+      const st = c._start + (pz.at || 0), effDur = Math.min(pz.dur, c.dur - (pz.at || 0));
+      const b = blk("ovl punchb", st * pps, effDur * pps, `🔍 Zoom ${pz.z.toFixed(1)}x (${effDur.toFixed(1)}s)`, () => { select("punch", pz, c); seek(st + 0.05); }, sel(pz));
+      b.title = `Zoom (${effDur.toFixed(1)}s) - Drag to move, drag edges to adjust time`;
+      addHandles(b, relSpec(pz, c, true));
+      tp.appendChild(b);
+    }));
+    layoutLanes(tp, document.querySelector(".tl-labels .lbl-plots"));
+  }
   const to = $("trOvl"); to.innerHTML = "";
-  SEQ.forEach(c => (c.plots || []).forEach(pl => { const st = c._start + (pl.at || 0), b = blk("ovl plotb", st * pps, (pl.dur > 0 ? Math.min(pl.dur, c.dur - (pl.at || 0)) : c._start + c.dur - st) * pps, `Plot ${pl.name || ""}`.trim() + (plotArea(pl) ? ` · ${plotArea(pl)}` : ""), () => { select("plot", pl, c); seek(st + 2); }, sel(pl)); addHandles(b, relSpec(pl, c, pl.dur > 0)); to.appendChild(b); }));
-  SEQ.forEach(c => (c.spots || []).forEach(sp => { const st = c._start + (sp.at || 0), b = blk("ovl spotb", st * pps, Math.min(sp.dur, c.dur - (sp.at || 0)) * pps, `Spotlight ${sp.label || ""}`.trim(), () => { select("spot", sp, c); seek(st + .8); }, sel(sp)); addHandles(b, relSpec(sp, c, true)); to.appendChild(b); }));
-  SEQ.forEach(c => (c.punches || []).forEach(pz => { const st = c._start + (pz.at || 0), b = blk("ovl punchb", st * pps, Math.min(pz.dur, c.dur - (pz.at || 0)) * pps, `Zoom ${pz.z.toFixed(1)}x`, () => { select("punch", pz, c); seek(st + .6); }, sel(pz)); addHandles(b, relSpec(pz, c, true)); to.appendChild(b); }));
-  P.overlays.forEach((o, i) => { const b = blk(o.kind === "text" ? "ovl textb" : o.kind === "gfx" ? "ovl gfxb" : "ovl", o.start * pps, (o.end - o.start) * pps, o.kind === "text" ? `Text: ${String(o.text || "").replace(/\*/g, "")}` : o.kind === "gfx" ? gfxLabel(o) : `Image ${i + 1}`, () => { select("overlay", o); seek(o.start + .6); }, sel(o)); addHandles(b, spanSpec(o)); to.appendChild(b); });
-  layoutLanes(to, document.querySelector(".tl-labels div:nth-child(2)"));
+  P.overlays.forEach((o, i) => {
+    const effDur = Math.max(0.3, o.end - o.start);
+    const textLabel = o.kind === "text" ? `🔤 ${String(o.text || "").replace(/\*/g, "")} (${effDur.toFixed(1)}s)` : o.kind === "gfx" ? `${gfxLabel(o)} (${effDur.toFixed(1)}s)` : `🖼️ Image ${i + 1} (${effDur.toFixed(1)}s)`;
+    const b = blk(o.kind === "text" ? "ovl textb" : o.kind === "gfx" ? "ovl gfxb" : "ovl", o.start * pps, effDur * pps, textLabel, () => { select("overlay", o); seek(o.start + 0.05); }, sel(o));
+    b.title = `Overlay: ${textLabel} - Drag to move, drag edges to adjust time`;
+    addHandles(b, spanSpec(o));
+    to.appendChild(b);
+  });
+  layoutLanes(to, document.querySelector(".tl-labels .lbl-ovl") || document.querySelector(".tl-labels div:nth-child(3)"));
   const tcap = $("trCap"); tcap.innerHTML = "";
   P.captions.forEach(cp => { const b = blk("capb", cp.start * pps, (cp.end - cp.start) * pps, cp.text.replace(/\*/g, ""), () => { select("caption", cp); seek(cp.start + .05); }, sel(cp)); addHandles(b, spanSpec(cp, .2)); tcap.appendChild(b); });
   const tv = $("trVo"); tv.innerHTML = "";
@@ -4432,6 +4736,332 @@ function renderInspector(){
       el("div", { class:"row", style:"margin-top:8px" }, [btn("Split at playhead", () => splitClip(it)), btn("Duplicate", () => duplicateClip(it))]));
     return;
   }
+  async function autoTrackPlot(pl, clip, opts = {}){
+    if (!clip || clip.kind !== "video" || !clip.el) return;
+    const v = clip.el;
+    if (!v.duration || v.readyState < 2){ toast("Video is still loading."); return; }
+    pause();
+
+    const scope = opts.scope || "entire";
+    const method = opts.method || pl.trackMethod || "psr";
+    const playheadLocal = clamp(now() - clip._start, 0, clip.dur);
+
+    // Reference time: where the user currently positioned / drew the mask
+    let tRef = playheadLocal;
+    if (scope === "duration"){
+      tRef = pl.at || 0;
+    }
+
+    // Determine range:
+    let tStart, tEnd;
+    if (scope === "entire"){
+      pl.at = 0;
+      pl.dur = clip.dur;
+      tStart = 0;
+      tEnd = clip.dur;
+    } else if (scope === "duration"){
+      tStart = pl.at || 0;
+      tEnd = Math.min(clip.dur, tStart + (pl.dur > 0 ? pl.dur : 4));
+    } else if (scope === "forward"){
+      tStart = playheadLocal;
+      tEnd = clip.dur;
+      if (pl.dur > 0 && tStart + pl.dur < clip.dur){
+        pl.dur = +(tEnd - (pl.at || 0)).toFixed(2);
+      }
+    } else if (scope === "backward"){
+      tStart = 0;
+      tEnd = playheadLocal;
+    }
+
+    const totalSpan = tEnd - tStart;
+    if (totalSpan <= 0.05){ toast("Select a wider range to track."); return; }
+
+    // Adaptive step: 0.15s to 0.25s
+    const step = totalSpan > 20 ? 0.3 : (totalSpan > 8 ? 0.2 : 0.15);
+
+    // Prepare cancellation & UI HUD
+    window._cancelMaskTracking = false;
+    let trackHUD = $("maskTrackHUD");
+    if (!trackHUD){
+      trackHUD = document.createElement("div");
+      trackHUD.id = "maskTrackHUD";
+      trackHUD.style.cssText = "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);z-index:9999;background:rgba(22,27,34,0.95);border:1.5px solid #2ea44f;box-shadow:0 12px 36px rgba(0,0,0,0.6);border-radius:12px;padding:12px 18px;min-width:320px;max-width:90vw;backdrop-filter:blur(8px);font-family:var(--sans);color:#fff;";
+      document.body.appendChild(trackHUD);
+    }
+    trackHUD.hidden = false;
+
+    function updateTrackHUD(pct, label){
+      trackHUD.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+          <span style="font-weight:700;font-size:13px;color:#2ea44f">🎯 Adobe Mask Tracker: ${Math.round(pct * 100)}%</span>
+          <button id="cancelTrackBtn" style="border:1px solid #ff6b6b;background:rgba(255,107,107,0.15);color:#ff6b6b;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer">Cancel</button>
+        </div>
+        <div style="background:rgba(255,255,255,0.15);height:6px;border-radius:3px;overflow:hidden">
+          <div style="width:${Math.round(pct * 100)}%;height:100%;background:#2ea44f;transition:width 0.1s linear"></div>
+        </div>
+        <div style="font-size:11px;color:#8b949e;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
+      `;
+      const btn = $("cancelTrackBtn");
+      if (btn) btn.onclick = () => { window._cancelMaskTracking = true; };
+    }
+
+    updateTrackHUD(0.02, "Initializing video frames & anchor features...");
+
+    const vw = v.videoWidth || 640, vh = v.videoHeight || 360;
+    const tw = Math.min(480, vw), th = Math.round(tw * (vh / vw));
+    const trCv = document.createElement("canvas");
+    trCv.width = tw; trCv.height = th;
+    const trCtx = trCv.getContext("2d", { willReadFrequently: true });
+    const P_RAD = 10, S_RAD = 26;
+
+    function getFrameLuma(){
+      trCtx.drawImage(v, 0, 0, tw, th);
+      const d = trCtx.getImageData(0, 0, tw, th).data;
+      const g = new Uint8Array(tw * th);
+      for (let p = 0, q = 0; p < d.length; p += 4, q++){
+        g[q] = (d[p] * 77 + d[p + 1] * 150 + d[p + 2] * 29) >> 8;
+      }
+      return g;
+    }
+
+    function getTrackingAnchors(pts){
+      const anchors = [];
+      const n = pts.length;
+      pts.forEach(p => anchors.push([p[0], p[1]]));
+      const cx = pts.reduce((s, p) => s + p[0], 0) / n;
+      const cy = pts.reduce((s, p) => s + p[1], 0) / n;
+      anchors.push([cx, cy]);
+      for (let i = 0; i < n; i++){
+        const p1 = pts[i], p2 = pts[(i + 1) % n];
+        anchors.push([(p1[0] + p2[0]) / 2, (p1[1] + p2[1]) / 2]);
+      }
+      if (n === 4){
+        anchors.push([(pts[0][0] + pts[1][0] + cx) / 3, (pts[0][1] + pts[1][1] + cy) / 3]);
+        anchors.push([(pts[1][0] + pts[2][0] + cx) / 3, (pts[1][0] + pts[2][1] + cy) / 3]);
+        anchors.push([(pts[2][0] + pts[3][0] + cx) / 3, (pts[2][1] + pts[3][1] + cy) / 3]);
+        anchors.push([(pts[3][0] + pts[0][0] + cx) / 3, (pts[3][0] + pts[0][0] + cy) / 3]);
+        anchors.push([(pts[0][0] + pts[2][0]) / 2, (pts[0][1] + pts[2][1]) / 2]);
+      }
+      return anchors;
+    }
+
+    function trackStep(prevLuma, curLuma, curPts){
+      if (typeof MaskTracker !== "undefined"){
+        try {
+          const pyrPrev = MaskTracker.buildPyramid(prevLuma, tw, th, 3);
+          const pyrCur = MaskTracker.buildPyramid(curLuma, tw, th, 3);
+          const feats = MaskTracker.detectFeaturesInsideMask(prevLuma, tw, th, curPts, 45);
+          const rawMatches = MaskTracker.trackPointsLK(pyrPrev, pyrCur, feats, 6, 5);
+          const verified = MaskTracker.filterCyclicMatches(pyrPrev, pyrCur, rawMatches, 1.4);
+          const model = MaskTracker.ransacSimilarity(verified, 120, 2.0);
+          if (model && model.inliers >= 2){
+            return MaskTracker.transformVertices(curPts, model, tw, th, method);
+          }
+        } catch (e){
+          console.warn("MaskTracker Pyramidal LK step:", e);
+        }
+      }
+
+      const anchors = getTrackingAnchors(curPts);
+      const matchedPairs = [];
+
+      for (let k = 0; k < anchors.length; k++){
+        const [u, vPt] = anchors[k];
+        const ax = Math.round(u * tw), ay = Math.round(vPt * th);
+        if (ax - P_RAD < 0 || ax + P_RAD >= tw || ay - P_RAD < 0 || ay + P_RAD >= th) continue;
+
+        // Check patch contrast
+        let sumV = 0, sumSq = 0, cnt = 0;
+        for (let py = -P_RAD; py <= P_RAD; py += 3){
+          for (let px = -P_RAD; px <= P_RAD; px += 3){
+            const val = prevLuma[(ay + py) * tw + (ax + px)];
+            sumV += val; sumSq += val * val; cnt++;
+          }
+        }
+        const meanV = sumV / cnt;
+        const variance = (sumSq / cnt) - meanV * meanV;
+        if (variance < 10) continue; // skip flat uniform patch
+
+        // Coarse search
+        let bestDx = 0, bestDy = 0, bestDiff = Infinity;
+        for (let dy = -S_RAD; dy <= S_RAD; dy += 2){
+          for (let dx = -S_RAD; dx <= S_RAD; dx += 2){
+            const nx = ax + dx, ny = ay + dy;
+            if (nx - P_RAD < 0 || nx + P_RAD >= tw || ny - P_RAD < 0 || ny + P_RAD >= th) continue;
+            let diff = 0;
+            for (let py = -P_RAD; py <= P_RAD; py += 3){
+              for (let px = -P_RAD; px <= P_RAD; px += 3){
+                const vOld = prevLuma[(ay + py) * tw + (ax + px)];
+                const vNew = curLuma[(ny + py) * tw + (nx + px)];
+                const dVal = vOld - vNew;
+                diff += dVal * dVal;
+              }
+            }
+            if (diff < bestDiff){ bestDiff = diff; bestDx = dx; bestDy = dy; }
+          }
+        }
+
+        // Fine refinement (1 px step around best coarse match)
+        for (let fdy = -1; fdy <= 1; fdy++){
+          for (let fdx = -1; fdx <= 1; fdx++){
+            if (fdx === 0 && fdy === 0) continue;
+            const nx = ax + bestDx + fdx, ny = ay + bestDy + fdy;
+            if (nx - P_RAD < 0 || nx + P_RAD >= tw || ny - P_RAD < 0 || ny + P_RAD >= th) continue;
+            let diff = 0;
+            for (let py = -P_RAD; py <= P_RAD; py += 2){
+              for (let px = -P_RAD; px <= P_RAD; px += 2){
+                const vOld = prevLuma[(ay + py) * tw + (ax + px)];
+                const vNew = curLuma[(ny + py) * tw + (nx + px)];
+                const dVal = vOld - vNew;
+                diff += dVal * dVal;
+              }
+            }
+            if (diff < bestDiff){ bestDiff = diff; bestDx += fdx; bestDy += fdy; }
+          }
+        }
+
+        matchedPairs.push({ p:[ax, ay], q:[ax + bestDx, ay + bestDy], dx:bestDx, dy:bestDy, diff:bestDiff });
+      }
+
+      if (!matchedPairs.length) return curPts.map(p => [...p]);
+
+      // Outlier rejection via median displacement
+      const sortedX = [...matchedPairs].map(m => m.dx).sort((a, b) => a - b);
+      const sortedY = [...matchedPairs].map(m => m.dy).sort((a, b) => a - b);
+      const medDx = sortedX[Math.floor(sortedX.length / 2)];
+      const medDy = sortedY[Math.floor(sortedY.length / 2)];
+
+      const inliers = matchedPairs.filter(m => Math.hypot(m.dx - medDx, m.dy - medDy) <= 16);
+      const activePairs = inliers.length >= 2 ? inliers : matchedPairs;
+      const nP = activePairs.length;
+
+      const ca = [activePairs.reduce((s, m) => s + m.p[0], 0) / nP, activePairs.reduce((s, m) => s + m.p[1], 0) / nP];
+      const cb = [activePairs.reduce((s, m) => s + m.q[0], 0) / nP, activePairs.reduce((s, m) => s + m.q[1], 0) / nP];
+
+      let S = 1.0;
+      if (method === "psr" || method === "ps"){
+        let da = 0, db = 0;
+        for (let i = 0; i < nP; i++){
+          da += Math.hypot(activePairs[i].p[0] - ca[0], activePairs[i].p[1] - ca[1]);
+          db += Math.hypot(activePairs[i].q[0] - cb[0], activePairs[i].q[1] - cb[1]);
+        }
+        if (da > 10){
+          S = clamp(db / da, 0.86, 1.16);
+        }
+      }
+
+      let dRot = 0.0;
+      if (method === "psr"){
+        let A = 0, B = 0;
+        for (let i = 0; i < nP; i++){
+          const ax = activePairs[i].p[0] - ca[0], ay = activePairs[i].p[1] - ca[1];
+          const bx = activePairs[i].q[0] - cb[0], by = activePairs[i].q[1] - cb[1];
+          A += ax * bx + ay * by;
+          B += ax * by - ay * bx;
+        }
+        dRot = clamp(Math.atan2(B, A), -0.32, 0.32); // clamp max ~18 deg per step
+      }
+
+      const cosR = Math.cos(dRot), sinR = Math.sin(dRot);
+      return curPts.map(([u, vPt]) => {
+        const vx = u * tw, vy = vPt * th;
+        let rx = (vx - ca[0]) * S;
+        let ry = (vy - ca[1]) * S;
+        const tx = rx * cosR - ry * sinR;
+        const ty = rx * sinR + ry * cosR;
+        const nx = cb[0] + tx;
+        const ny = cb[1] + ty;
+        return [clamp(nx / tw, -0.25, 1.25), clamp(ny / th, -0.25, 1.25)];
+      });
+    }
+
+    // Determine base points at reference time
+    const basePts = plotPtsAt(pl, tRef).map(p => [...p]);
+    const trackedKeyframes = new Map();
+    trackedKeyframes.set(+tRef.toFixed(2), basePts.map(p => [...p]));
+
+    // Total steps calculation for progress HUD
+    const fwdSteps = (tEnd > tRef) ? Math.ceil((tEnd - tRef) / step) : 0;
+    const bwdSteps = (tStart < tRef) ? Math.ceil((tRef - tStart) / step) : 0;
+    const totalSteps = Math.max(1, fwdSteps + bwdSteps);
+    let stepCount = 0;
+
+    // 1. FORWARD PASS (tRef -> tEnd)
+    if (tEnd > tRef + 0.05){
+      await seekTo(v, srcTime(clip, tRef));
+      let prevLuma = getFrameLuma();
+      let curPts = basePts.map(p => [...p]);
+      let curT = tRef;
+
+      while (curT + 0.04 < tEnd && !window._cancelMaskTracking){
+        const nextT = Math.min(tEnd, curT + step);
+        await seekTo(v, srcTime(clip, nextT));
+        const curLuma = getFrameLuma();
+        curPts = trackStep(prevLuma, curLuma, curPts);
+        prevLuma = curLuma;
+        curT = nextT;
+        trackedKeyframes.set(+curT.toFixed(2), curPts.map(p => [...p]));
+        stepCount++;
+        updateTrackHUD(stepCount / totalSteps, `Tracking Forward: ${curT.toFixed(1)}s / ${tEnd.toFixed(1)}s (${method.toUpperCase()})`);
+        pl.kf = Array.from(trackedKeyframes.entries()).map(([t, pts]) => ({ t, pts })).sort((a, b) => a.t - b.t);
+        pl.droneMotion = "track";
+        pl.stickMode = "track";
+        renderFrame(clip._start + curT);
+      }
+    }
+
+    // 2. BACKWARD PASS (tRef -> tStart)
+    if (tStart < tRef - 0.05 && !window._cancelMaskTracking){
+      await seekTo(v, srcTime(clip, tRef));
+      let prevLuma = getFrameLuma();
+      let curPts = basePts.map(p => [...p]);
+      let curT = tRef;
+
+      while (curT - 0.04 > tStart && !window._cancelMaskTracking){
+        const prevT = Math.max(tStart, curT - step);
+        await seekTo(v, srcTime(clip, prevT));
+        const curLuma = getFrameLuma();
+        curPts = trackStep(prevLuma, curLuma, curPts);
+        prevLuma = curLuma;
+        curT = prevT;
+        trackedKeyframes.set(+curT.toFixed(2), curPts.map(p => [...p]));
+        stepCount++;
+        updateTrackHUD(stepCount / totalSteps, `Tracking Backward: ${curT.toFixed(1)}s / ${tStart.toFixed(1)}s (${method.toUpperCase()})`);
+        pl.kf = Array.from(trackedKeyframes.entries()).map(([t, pts]) => ({ t, pts })).sort((a, b) => a.t - b.t);
+        pl.droneMotion = "track";
+        pl.stickMode = "track";
+        renderFrame(clip._start + curT);
+      }
+    }
+
+    // Merge existing keyframes outside tracked interval
+    if (pl.kf && pl.kf.length){
+      pl.kf.forEach(k => {
+        if (k.t < tStart - 0.05 || k.t > tEnd + 0.05){
+          if (!trackedKeyframes.has(+k.t.toFixed(2))){
+            trackedKeyframes.set(+k.t.toFixed(2), k.pts.map(p => [...p]));
+          }
+        }
+      });
+    }
+
+    // Finalize
+    pl.kf = Array.from(trackedKeyframes.entries()).map(([t, pts]) => ({ t, pts })).sort((a, b) => a.t - b.t);
+    pl.droneMotion = "track";
+    pl.stickMode = "track";
+    trackHUD.hidden = true;
+
+    changed();
+    renderInspector();
+    refresh();
+
+    // Verification seek & playback
+    const seekTarget = clip._start + (pl.at || 0);
+    seek(seekTarget);
+    toast(`✨ Adobe Mask Tracking complete! (${pl.kf.length} keyframes generated). Previewing...`);
+    play();
+    setTimeout(() => { if (playing) pause(); }, Math.min(4, pl.dur > 0 ? pl.dur : 3) * 1000);
+  }
   if (type === "plot"){
     const pl = it, clip = selected.clip;
     box.append(el("p", { class:"insp-title", text:"Plot highlight" }),
@@ -4445,13 +5075,180 @@ function renderInspector(){
       pl.labelColor === "custom" ? plotColorField("Label colour", pl.labelHex || "#1F3D2E", v => { pl.labelHex = v; changed(false); }) : "",
       plotColorField("Text colour", pl.labelText || "", v => { pl.labelText = v || undefined; changed(false); }, true),
       fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"]], v => { pl.labelFont = v; changed(false); }),
-      el("div", { class:"row field" }, [btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; changed(false); }), toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })]),
+      el("div", { class:"row field" }, [btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; if (pl.road){ delete pl.road.ru; delete pl.road.rv; } changed(false); }), toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })]),
       fChips("Line colour", pl.color || "red", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"]], v => { pl.color = v; changed(false); }),
       fChips("Fill inside (after the line draws)", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["none","No fill"]], v => { pl.fill = v; changed(false); renderInspector(); }),
       (pl.fill ?? "x") !== "none" ? fSlider("Fill strength", pl.fillK ?? .35, .1, .8, .01, v => { pl.fillK = v; changed(false); }) : "",
-      fChips("Show for", String(pl.dur > 0 ? pl.dur : 0), [["2","2 s"],["3","3 s"],["5","5 s"],["0","Until the clip ends"]], v => { pl.dur = +v; changed(); }),
-      toggleRow("Moving dashes around the outline", pl.motion !== false, v => { pl.motion = v; changed(false); }),
-      fNum("Appears after (s into clip)", pl.at || 0, v => { pl.at = clamp(v, 0, Math.max(0, clip.dur - .5)); changed(); }, .1, 0, 60),
+      el("div", { class:"cs-panel", style:"margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:8px" }, [
+          el("span", { class:"lbl", text:"⏱️ Layer timing & duration", style:"margin:0;font-weight:700" }),
+          el("span", { class:"hint", style:"margin:0;font-variant-numeric:tabular-nums;font-size:11px", text:`Video: ${(clip._start + (pl.at || 0)).toFixed(1)}s – ${(clip._start + (pl.at || 0) + (pl.dur > 0 ? pl.dur : (clip.dur - (pl.at || 0)))).toFixed(1)}s` })
+        ]),
+        el("div", { class:"grid2" }, [
+          fNum("Starts at (s in clip)", pl.at || 0, v => { pl.at = clamp(v, 0, Math.max(0, clip.dur - .4)); changed(); renderInspector(); }, .1, 0, clip.dur),
+          fNum("Duration (s)", pl.dur > 0 ? pl.dur : +(clip.dur - (pl.at || 0)).toFixed(1), v => { pl.dur = clamp(v, .4, clip.dur - (pl.at || 0)); changed(); renderInspector(); }, .1, .4, clip.dur)
+        ]),
+        el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap;margin-top:6px" }, [
+          btn("Start at playhead", () => {
+            const rel = clamp(now() - clip._start, 0, clip.dur - .4);
+            pl.at = +rel.toFixed(2);
+            changed();
+            renderInspector();
+            toast(`Plot starts at ${pl.at.toFixed(1)}s in clip.`);
+          }),
+          btn("End at playhead", () => {
+            const rel = clamp(now() - clip._start, (pl.at || 0) + .4, clip.dur);
+            pl.dur = +(rel - (pl.at || 0)).toFixed(2);
+            changed();
+            renderInspector();
+            toast(`Plot ends at ${rel.toFixed(1)}s (duration: ${pl.dur.toFixed(1)}s).`);
+          }),
+          btn("Full clip", () => {
+            pl.at = 0;
+            pl.dur = 0;
+            changed();
+            renderInspector();
+            toast("Plot now shows for the full clip duration.");
+          })
+        ]),
+        fChips("Duration preset", String(pl.dur > 0 ? (pl.dur === 2 || pl.dur === 3 || pl.dur === 4 || pl.dur === 5 || pl.dur === 8 ? pl.dur : "custom") : 0), [
+          ["2","2s"],["3","3s"],["4","4s"],["5","5s"],["8","8s"],["0","Full clip"],["custom","Custom"]
+        ], v => {
+          if (v !== "custom"){
+            pl.dur = +v;
+            changed();
+            renderInspector();
+          }
+        }),
+        toggleRow("Moving animated dashes on outline", !!pl.motion, v => { pl.motion = v; changed(false); })
+      ]),
+      el("div", { class:"cs-panel", style:"margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"🔦 Spotlight (highlight ONLY this plot)", style:"margin:0;font-weight:700" }),
+          toggleRow("Dim surroundings", pl.dimRest !== false, v => { pl.dimRest = v; changed(false); renderInspector(); })
+        ]),
+        pl.dimRest !== false ? el("div", {}, [
+          el("p", { class:"hint", text:"Darkens the entire video outside this plot so only the plot is highlighted." }),
+          fSlider("Darken strength", pl.dimAlpha ?? 0.65, 0.2, 0.9, 0.05, v => { pl.dimAlpha = v; changed(false); }, v => Math.round(v * 100) + "%")
+        ]) : el("p", { class:"hint", text:"Turn on to darken the surrounding video and shine spotlight on only this plot." })
+      ]),
+      el("div", { class:"cs-panel pro-video-tool", style:"margin:12px 0;padding:14px;border:1.5px solid var(--deodar,#2ea44f);border-radius:10px;background:var(--surface,#161b22)" }, [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:8px" }, [
+          el("span", { class:"lbl", text:"🚁 Drone Camera & Motion Match", style:"margin:0;font-weight:800;font-size:14px;color:var(--deodar,#2ea44f)" }),
+          el("span", { class:"hint", style:"margin:0;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(46,164,79,0.15);color:var(--deodar,#2ea44f)", text:"ADOBE MASK TRACKER" })
+        ]),
+
+        /* Fast-track banner for video clips */
+        clip.kind === "video" && (!pl.kf || !pl.kf.length) && pl.droneMotion !== "track" ? el("div", { style:"margin-bottom:12px;padding:10px;background:rgba(46,164,79,0.08);border:1px solid rgba(46,164,79,0.25);border-radius:8px" }, [
+          el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:4px" }, [
+            el("b", { style:"font-size:12px;color:var(--deodar,#2ea44f)", text:"🎯 Adobe Premiere Pro Mask Tracking" }),
+            el("span", { class:"hint", style:"margin:0;font-size:11px", text:"Lock to Ground" })
+          ]),
+          el("p", { class:"hint", style:"margin:0 0 8px;font-size:11px;line-height:1.4", text:"Stick this plot outline to the real moving video. Tracks drone circular orbits, zoom-ins, and flyovers across the entire video so the highlight never leaves the property." }),
+          el("div", { class:"row field", style:"gap:6px;flex-wrap:wrap" }, [
+            btn("▶▶ Track Mask across Entire Video", () => { pl.droneMotion = "track"; pl.stickMode = "track"; autoTrackPlot(pl, clip, { scope:"entire" }); }, "btn sm primary"),
+            btn("▶ Track Forward to End", () => { pl.droneMotion = "track"; pl.stickMode = "track"; autoTrackPlot(pl, clip, { scope:"forward" }); }, "btn sm dark")
+          ])
+        ]) : "",
+
+        fChips("Drone flight trajectory", pl.droneMotion || "none", [
+          ["none", "🔒 Fixed (Still)"],
+          ["track", "🎯 Adobe Mask Tracker (AI)"],
+          ["orbit-cw", "🔄 Circular Orbit (Clockwise ↻)"],
+          ["orbit-ccw", "🔄 Circular Orbit (Counter-Clockwise ↺)"],
+          ["zoom-in", "🦅 Drone Zoom In (Fly-In)"],
+          ["zoom-out", "🚀 Drone Zoom Out (Pull-Back)"],
+          ["screen", "📌 Pin to Screen (HUD)"]
+        ], v => { pl.droneMotion = v; pl.stickMode = (v === "screen" ? "screen" : (v === "track" ? "track" : "stick")); changed(false); renderInspector(); renderFrame(playT); }),
+
+        /* MULTI-POINT KEYFRAME TRACKING (ADOBE PREMIERE PRO MASK TRACKER) */
+        (pl.droneMotion === "track" || (clip.kind === "video" && pl.kf && pl.kf.length)) ? el("div", { style:"margin-top:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(46,164,79,0.25);border-radius:8px" }, [
+          el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+            el("b", { style:"color:var(--deodar,#2ea44f);font-size:12px", text:"🎯 Adobe Premiere Pro Mask Tracking" }),
+            (pl.kf && pl.kf.length) ? el("span", { class:"hint", style:"color:var(--deodar,#2ea44f);font-weight:700;margin:0;font-size:11px", text:`✨ ${pl.kf.length} keyframes active` }) : ""
+          ]),
+          el("p", { class:"hint", style:"margin-bottom:8px;line-height:1.4", text:"Uses 2D Similarity Transform (Position, Scale & Rotation) to lock the outline to ground features with zero shearing or distortion as the camera orbits or zooms." }),
+          fChips("Tracking algorithm", pl.trackMethod || "psr", [
+            ["psr", "Position, Scale & Rotation (Drone Orbits & Fly-ins)"],
+            ["ps", "Position & Scale (Zoom)"],
+            ["p", "Position Only (Pan & Tilt)"]
+          ], v => { pl.trackMethod = v; changed(false); }),
+          el("div", { class:"row field", style:"gap:6px;flex-wrap:wrap;margin-top:8px" }, [
+            btn("▶▶ Track Entire Video", () => autoTrackPlot(pl, clip, { scope:"entire", method:pl.trackMethod || "psr" }), "btn sm primary"),
+            btn("▶ Track Forward to End", () => autoTrackPlot(pl, clip, { scope:"forward", method:pl.trackMethod || "psr" }), "btn sm dark"),
+            btn("◀ Track Backward to Start", () => autoTrackPlot(pl, clip, { scope:"backward", method:pl.trackMethod || "psr" }), "btn sm"),
+            btn("▶ Track Plot Duration", () => autoTrackPlot(pl, clip, { scope:"duration", method:pl.trackMethod || "psr" }), "btn sm")
+          ]),
+          (pl.kf && pl.kf.length) ? el("div", { style:"margin-top:10px;padding-top:8px;border-top:1px dashed var(--line)" }, [
+            el("div", { class:"row", style:"align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap" }, [
+              el("span", { class:"hint", style:"margin:0;font-size:11px", text:`Span: ${pl.kf[0].t.toFixed(1)}s – ${pl.kf[pl.kf.length - 1].t.toFixed(1)}s in clip` }),
+              el("div", { class:"row", style:"gap:4px" }, [
+                btn("▶ Preview Track", () => { seek(clip._start + pl.kf[0].t); play(); setTimeout(() => { if (playing) pause(); }, Math.min(4, pl.dur > 0 ? pl.dur : 3) * 1000); }, "btn xs dark"),
+                btn("⏪ Prev", () => {
+                  const local = now() - clip._start;
+                  const prevs = pl.kf.filter(k => k.t < local - 0.05);
+                  if (prevs.length){ seek(clip._start + prevs[prevs.length - 1].t); changed(false); }
+                }, "btn xs"),
+                btn("⏩ Next", () => {
+                  const local = now() - clip._start;
+                  const nexts = pl.kf.filter(k => k.t > local + 0.05);
+                  if (nexts.length){ seek(clip._start + nexts[0].t); changed(false); }
+                }, "btn xs")
+              ])
+            ]),
+            el("div", { class:"row field", style:"margin-top:8px;gap:6px;flex-wrap:wrap" }, [
+              btn("📍 Record Keyframe at Playhead", () => {
+                const local = clamp(now() - clip._start, (pl.at || 0), (pl.at || 0) + (pl.dur > 0 ? pl.dur : clip.dur));
+                pl.kf = pl.kf || [];
+                if (!pl.kf.some(x => Math.abs(x.t - (pl.at || 0)) < 0.1)){
+                  pl.kf.push({ t: +(pl.at || 0).toFixed(2), pts: pl.pts.map(p => [...p]) });
+                }
+                const cur = plotPtsAt(pl, local).map(p => [...p]);
+                let k = pl.kf.find(x => Math.abs(x.t - local) < 0.1);
+                if (k) k.pts = cur; else { pl.kf.push({ t: +local.toFixed(2), pts:cur }); pl.kf.sort((a, b) => a.t - b.t); }
+                seek(clip._start + local);
+                changed(); renderInspector();
+                toast(`🎯 Keyframe recorded at ${local.toFixed(2)}s.`);
+              }, "btn sm dark"),
+              btn("🧹 Clear Tracking", () => { delete pl.kf; pl.droneMotion = "none"; changed(); renderInspector(); toast("Tracking cleared."); }, "btn sm")
+            ])
+          ]) : ""
+        ]) : "",
+
+        /* CIRCULAR ORBIT SETTINGS */
+        (pl.droneMotion === "orbit-cw" || pl.droneMotion === "orbit-ccw") ? el("div", { style:"margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px" }, [
+          el("p", { class:"hint", style:"color:var(--deodar,#2ea44f);font-weight:700;margin-bottom:6px", text:"🔄 Matches drone flying in a 360° circle around the property. Adjust rotation speed to lock onto the footage." }),
+          fSlider("Orbit rotation speed", pl.orbitSpeed ?? 6, 1, 30, 0.5, v => { pl.orbitSpeed = v; changed(false); renderFrame(playT); }, v => v.toFixed(1) + "°/s"),
+          fSlider("Altitude zoom during orbit", pl.orbitZoom ?? 0, -0.15, 0.15, 0.01, v => { pl.orbitZoom = v; changed(false); renderFrame(playT); }, v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%/s"),
+          fSlider("Camera horizontal drift", pl.driftX ?? 0, -0.2, 0.2, 0.01, v => { pl.driftX = v; changed(false); renderFrame(playT); }, v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%"),
+          fSlider("Camera vertical drift", pl.driftY ?? 0, -0.2, 0.2, 0.01, v => { pl.driftY = v; changed(false); renderFrame(playT); }, v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%"),
+          el("div", { class:"row field", style:"margin-top:8px" }, [
+            btn("▶ Test Circular Orbit", () => { seek(clip._start + (pl.at || 0)); play(); setTimeout(() => { if (playing) pause(); }, (pl.dur > 0 ? pl.dur : 3.5) * 1000); }, "btn sm dark"),
+            btn("Reset Orbit Parameters", () => { pl.orbitSpeed = 6; pl.orbitZoom = 0; pl.driftX = 0; pl.driftY = 0; changed(false); renderInspector(); renderFrame(playT); }, "btn sm")
+          ])
+        ]) : "",
+
+        /* ZOOM IN / ZOOM OUT SETTINGS */
+        (pl.droneMotion === "zoom-in" || pl.droneMotion === "zoom-out") ? el("div", { style:"margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px" }, [
+          el("p", { class:"hint", style:"color:var(--deodar,#2ea44f);font-weight:700;margin-bottom:6px", text: pl.droneMotion === "zoom-in" ? "🦅 Matches drone flying forward/downward toward the plot. Highlight scales in exact lockstep." : "🚀 Matches drone flying backward/upward revealing the surroundings. Highlight scales down." }),
+          fSlider("Zoom speed", pl.zoomRate ?? 0.08, 0.01, 0.35, 0.01, v => { pl.zoomRate = v; changed(false); renderFrame(playT); }, v => Math.round(v * 100) + "%/s"),
+          fSlider("Camera horizontal drift", pl.driftX ?? 0, -0.2, 0.2, 0.01, v => { pl.driftX = v; changed(false); renderFrame(playT); }, v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%"),
+          fSlider("Camera vertical drift", pl.driftY ?? 0, -0.2, 0.2, 0.01, v => { pl.driftY = v; changed(false); renderFrame(playT); }, v => (v > 0 ? "+" : "") + Math.round(v * 100) + "%"),
+          el("div", { class:"row field", style:"margin-top:8px" }, [
+            btn("▶ Test Zoom Flight", () => { seek(clip._start + (pl.at || 0)); play(); setTimeout(() => { if (playing) pause(); }, (pl.dur > 0 ? pl.dur : 3.5) * 1000); }, "btn sm dark"),
+            btn("Reset Zoom Parameters", () => { pl.zoomRate = 0.08; pl.driftX = 0; pl.driftY = 0; changed(false); renderInspector(); renderFrame(playT); }, "btn sm")
+          ])
+        ]) : "",
+
+        /* FIXED STILL SETTINGS */
+        (pl.droneMotion === "none" || !pl.droneMotion) ? el("p", { class:"hint", style:"margin-top:8px;color:var(--deodar,#2ea44f);font-weight:600", text:"🔒 Highlight stays firmly locked in place with zero drift while footage plays at 100% full speed." }) : "",
+        (pl.droneMotion === "screen") ? el("p", { class:"hint", style:"margin-top:8px", text:"📌 Highlight is pinned to the screen as a fixed HUD overlay." }) : "",
+
+        clip.kind === "video" ? el("div", { style:"margin-top:10px;border-top:1px dashed var(--line);padding-top:8px" }, [
+          toggleRow("Freeze video frame (hold still on this shot)", !!pl.freezeVideo, v => { pl.freezeVideo = v; changed(); renderInspector(); }),
+          pl.freezeVideo ? el("p", { class:"hint", style:"color:var(--deodar);font-weight:600", text:"📌 Video holds still on this frame while the plot is shown." }) : ""
+        ]) : ""
+      ]),
       el("div", {}, [el("h2", { text:"Side lengths and area (optional)", style:"margin-top:10px" }),
         el("div", { class:"grid3" }, [
           fText("Front side", pl.front, v => { pl.front = v; changed(false); renderInspectorArea(); }),
@@ -4463,6 +5260,25 @@ function renderInspector(){
         fChips("Measured in", pl.unit, [["ft","Feet"],["m","Metres"]], v => { pl.unit = v; changed(false); renderInspectorArea(); }),
         fChips("Show area in", pl.areaUnit, AREA_UNITS, v => { pl.areaUnit = v; changed(false); renderInspectorArea(); }),
         el("p", { class:"hint", id:"areaPreview", text:"" }), el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from front/width and length." })]),
+      el("div", { class:"cs-panel", style:"margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"🛣️ Road highlight", style:"margin:0;font-weight:700" }),
+          toggleRow("Show road", pl.road && pl.road.on, v => {
+            pl.road = pl.road || { width:"30", text:"", side:0, style:"asphalt" };
+            pl.road.on = v;
+            changed(false);
+            renderInspector();
+          })
+        ]),
+        (pl.road && pl.road.on) ? el("div", {}, [
+          fText("Road width (feet)", pl.road.width || "30", v => { pl.road.width = v; changed(false); }),
+          el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap" }, ["20 ft","25 ft","30 ft","40 ft","50 ft","60 ft","80 ft","100 ft"].map(v => btn(v, () => { pl.road.width = v.replace(" ft",""); changed(false); renderInspector(); }))),
+          fText("Road badge text (optional)", pl.road.text || "", v => { pl.road.text = v; changed(false); }),
+          el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap" }, ["25 ft Road","30 ft Road","40 ft Wide Road","60 ft Main Road"].map(v => btn(v, () => { pl.road.text = v; changed(false); renderInspector(); }))),
+          fChips("Road position", String(pl.road.side ?? 0), [["0","Front (Edge 1)"],["1","Edge 2"],["2","Edge 3"],["3","Edge 4"],["corner","Corner (2 Roads)"]], v => { pl.road.side = v === "corner" ? "corner" : +v; changed(false); }),
+          fChips("Road style", pl.road.style || "asphalt", [["asphalt","Asphalt (Dashed)"],["yellow","Survey Yellow"],["white","Survey White"],["lime","Lime Green"]], v => { pl.road.style = v; changed(false); })
+        ]) : ""
+      ]),
       el("div", { class:"row" }, [btn("Redraw corners", () => startPlotDraw(clip, pl)), btn("Back to clip", () => select("clip", clip)), btn("Delete", () => deleteSelected())]));
     renderInspectorArea();
     return;
@@ -4961,21 +5777,64 @@ let dragO = null, drawing = null, dragV = null;
 function activeClipAt(t){ let cur = null; for (const c of SEQ) if (c._start <= t + 1e-6) cur = c; return cur; }
 function startPlotDraw(clip, existing){
   pause();
-  const t0 = clip._start + Math.min(clip.dur - .3, (existing ? existing.at : 0.4) + 1.6);
-  seek(Math.max(clip._start + .05, t0));
-  drawing = { clip, pts:[], existing };
+  let t0;
+  if (existing){
+    t0 = clip._start + Math.min(clip.dur - .1, (existing.at || 0) + 0.1);
+  } else {
+    if (playT >= clip._start && playT <= clip._start + clip.dur){
+      t0 = playT;
+    } else {
+      t0 = clip._start + Math.min(clip.dur - .3, 0.4);
+    }
+  }
+  seek(clamp(t0, clip._start, clip._start + clip.dur));
+  drawing = { clip, pts:[], existing, drawAt: clamp(t0 - clip._start, 0, clip.dur) };
   $("drawBar").hidden = false; updateDrawBar(); renderFrame(playT);
 }
 function updateDrawBar(){ if (!drawing) return; $("drawMsg").textContent = drawing.pts.length < 3 ? `Click each corner of the plot on the preview (${drawing.pts.length} placed). 4 corners gives width and length.` : `${drawing.pts.length} corners placed. Click Finish, or keep adding corners.`; $("drawDone").disabled = drawing.pts.length < 3; }
 function cancelDraw(){ drawing = null; $("drawBar").hidden = true; if (!playing) renderFrame(playT); }
 function finishDraw(){
   if (!drawing || drawing.pts.length < 3) return;
-  const { clip, pts, existing } = drawing;
+  const { clip, pts, existing, drawAt } = drawing;
   let pl = existing;
   if (pl) pl.pts = pts;
-  else { pl = { id:uid++, pts, name:"", front:"", w:"", l:"", unit:"ft", areaUnit:"sqyd", areaText:"", color:"red", at:.3, dur:2, motion:true }; (clip.plots = clip.plots || []).push(pl); }
+  else {
+    const curLocal = typeof drawAt === "number" ? drawAt : clamp(now() - clip._start, 0, Math.max(0, clip.dur - 0.5));
+    const at = +Math.max(0, curLocal).toFixed(2);
+    pl = {
+      id: uid++,
+      pts,
+      name: "",
+      front: "",
+      w: "",
+      l: "",
+      unit: "ft",
+      areaUnit: "sqyd",
+      areaText: "",
+      color: "red",
+      at,
+      dur: 3,
+      motion: false,
+      droneMotion: clip.kind === "video" ? "track" : "none",
+      trackMethod: "psr",
+      orbitSpeed: 6,
+      orbitZoom: 0,
+      zoomRate: 0.08,
+      driftX: 0,
+      driftY: 0,
+      stickMode: clip.kind === "video" ? "track" : "stick",
+      stickToPlace: true,
+      dimRest: true,
+      dimAlpha: 0.65,
+      freezeVideo: false
+    };
+    (clip.plots = clip.plots || []).push(pl);
+  }
   drawing = null; $("drawBar").hidden = true;
   changed(); select("plot", pl, clip);
+  if (clip.kind === "video"){
+    toast("🎯 Outline placed! Click '▶▶ Track Entire Video' to lock it to the drone camera.");
+  }
 }
 function canvasPt(e){ const r = cv.getBoundingClientRect(), k = cv.width / r.width; return [(e.clientX - r.left) * k, (e.clientY - r.top) * k, k]; }
 cv.addEventListener("pointerdown", e => {
@@ -4987,8 +5846,12 @@ cv.addEventListener("pointerdown", e => {
   }
   if (proPointerDown(e, px, py)) return;
   if (selected && selected.type === "plot"){
-    const clip = selected.clip, X = clipXform(clip, now() - clip._start), { u } = geo();
-    if (X){ const idx = selected.item.pts.findIndex(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
+    const clip = selected.clip, local = now() - clip._start;
+    const useFixedX = (selected.item.stickMode === "screen");
+    const X = useFixedX ? (clipXform(clip, selected.item.at || 0) || clipXform(clip, local)) : clipXform(clip, local);
+    const { u } = geo();
+    const curPts = plotPtsAt(selected.item, local);
+    if (X){ const idx = curPts.findIndex(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
       if (idx >= 0){ dragV = { pl:selected.item, idx, clip }; cv.setPointerCapture(e.pointerId); return; } }
   }
   if (stageHandleDown(e, px, py)) return;
@@ -5000,7 +5863,42 @@ cv.addEventListener("pointerdown", e => {
 });
 cv.addEventListener("pointermove", e => {
   if (proPointerMove(e)) return;
-  if (dragV){ const [px, py] = canvasPt(e), X = clipXform(dragV.clip, now() - dragV.clip._start); if (X){ dragV.pl.pts[dragV.idx] = invPt(X, px, py); renderFrame(playT); } return; }
+  if (dragV){
+    const [px, py] = canvasPt(e), local = now() - dragV.clip._start;
+    const useFixedX = (dragV.pl && dragV.pl.stickMode === "screen");
+    const X = useFixedX ? (clipXform(dragV.clip, dragV.pl.at || 0) || clipXform(dragV.clip, local)) : clipXform(dragV.clip, local);
+    if (X){
+      const pl = dragV.pl, newPt = invPt(X, px, py);
+      if (pl.kf && pl.kf.length){
+        let k = pl.kf.find(x => Math.abs(x.t - local) < 0.25);
+        if (k){
+          k.pts[dragV.idx] = newPt;
+          if (Math.abs(local - (pl.at || 0)) < 0.2){
+            pl.pts[dragV.idx] = newPt;
+          }
+        } else {
+          const currentPts = plotPtsAt(pl, local).map((p, i) => i === dragV.idx ? newPt : [...p]);
+          pl.kf.push({ t: +local.toFixed(2), pts: currentPts });
+          pl.kf.sort((a, b) => a.t - b.t);
+        }
+      } else if (pl.droneMotion === "track"){
+        // In tracking mode without keyframes yet, seed start keyframe and current keyframe
+        const startT = +(pl.at || 0).toFixed(2);
+        if (Math.abs(local - startT) > 0.2){
+          pl.kf = [
+            { t: startT, pts: pl.pts.map(p => [...p]) },
+            { t: +local.toFixed(2), pts: pl.pts.map((p, i) => i === dragV.idx ? newPt : [...p]) }
+          ];
+        } else {
+          pl.pts[dragV.idx] = newPt;
+        }
+      } else {
+        pl.pts[dragV.idx] = newPt;
+      }
+      renderFrame(playT);
+    }
+    return;
+  }
   if (stagePointerMove(e)) return;
   if (!dragO){
     if (SE.drag && SE.drag.kind === "word") cv.style.cursor = "grabbing";
@@ -5416,7 +6314,7 @@ function updateLen(){
 }
 /* ---------- undo / redo (snapshots of the timeline) ---------- */
 const HIST = { stack:[], idx:-1, t:0, lock:false };
-const SKIP = new Set(["el","gain","poster","thumb","buffer","wave","a","b","_start","_td","segs","imgs","raw","_map","_rect","_trect","_lrect"]);
+const SKIP = new Set(["el","gain","poster","thumb","buffer","wave","a","b","_start","_td","segs","imgs","raw","_map","_rect","_trect","_lrect","_srects","_roadRect"]);
 function snapshot(){
   return { clips:P.clips.map(cloneClipData), overlays:P.overlays.map(o => ({ ...o, ws:wsCopy(o.ws) })), captions:P.captions.map(c => ({ ...c, o:c.o ? JSON.parse(JSON.stringify(c.o)) : c.o, ws:wsCopy(c.ws) })), intro:{ ...P.intro, titleWs:wsCopy(P.intro.titleWs) }, outro:{ ...P.outro }, logo:{ ...P.logo }, cap:JSON.parse(JSON.stringify(P.cap)), watermark:P.watermark, progressBar:P.progressBar, audiogram:P.audiogram ? JSON.parse(JSON.stringify(P.audiogram)) : null, music2:P.music ? { fadeIn:P.music.fadeIn, fadeOut:P.music.fadeOut } : null, vo:P.vo ? { ...P.vo } : null, music:P.music ? { ...P.music } : null };
 }
@@ -6139,7 +7037,13 @@ function openSection(key){ const d = document.querySelector(`.acc[data-key="${ke
 /* ---------- clip data helpers (deep copies for split, duplicate, undo) ---------- */
 function cloneClipData(c){
   return { ...c, labels:c.labels ? [...c.labels] : c.labels,
-    plots:(c.plots || []).map(p => ({ ...p, pts:p.pts.map(q => [...q]) })),
+    plots:(c.plots || []).map(p => ({
+      ...p,
+      pts: (p.pts || []).map(q => [...q]),
+      side: p.side ? p.side.map(q => [...q]) : undefined,
+      road: p.road ? { ...p.road } : undefined,
+      kf: p.kf ? p.kf.map(k => ({ t:k.t, pts:k.pts.map(q => [...q]) })) : undefined
+    })),
     kf:c.kf ? c.kf.map(k => ({ ...k })) : c.kf,
     spots:c.spots ? c.spots.map(x => ({ ...x })) : c.spots,
     punches:c.punches ? c.punches.map(x => ({ ...x })) : c.punches,
@@ -6150,7 +7054,10 @@ function shiftItems(list, dt){
   return (list || []).map(x => { const at = (x.at || 0) + dt; return at < 0 ? { ...x, at:0, dur:x.dur + at } : { ...x, at }; }).filter(x => x.dur > .25);
 }
 function shiftClipItems(c, dt){
-  (c.plots || []).forEach(p => { p.at = Math.max(0, (p.at || 0) + dt); });
+  (c.plots || []).forEach(p => {
+    p.at = Math.max(0, (p.at || 0) + dt);
+    if (p.kf) p.kf.forEach(k => { k.t += dt; });
+  });
   c.spots = shiftItems(c.spots, dt); c.punches = shiftItems(c.punches, dt);
   (c.kf || []).forEach(k => { k.t += dt; });
 }
@@ -6192,12 +7099,19 @@ function recalcDur(c){
 }
 function srcTime(c, local){
   if (!c || c.kind !== "video") return local;
+  const freezePl = isPlotFrozen(c, local);
+  if (freezePl) local = freezePl.at || 0;
   const M = speedMap(c), u = clamp(local / (c.dur || 1)), f = u * M.N, i = Math.floor(f);
   const a = M.cum[Math.min(i, M.N)], b = M.cum[Math.min(i + 1, M.N)];
   const off = c.dur * (c.speed || 1) * (a + (b - a) * (f - i));
   return c.reverse ? Math.max(c.trimIn, c.trimOut - off - .001) : Math.min(c.trimOut - .001, c.trimIn + off);
 }
-function rateAt(c, local){ if (!c || c.kind !== "video") return 1; return (c.speed || 1) * rampAt(c.ramp || "none", clamp(local / (c.dur || 1))) * (c.reverse ? -1 : 1); }
+function rateAt(c, local){
+  if (!c || c.kind !== "video") return 1;
+  const freezePl = isPlotFrozen(c, local);
+  if (freezePl) return 0;
+  return (c.speed || 1) * rampAt(c.ramp || "none", clamp(local / (c.dur || 1))) * (c.reverse ? -1 : 1);
+}
 function speedTag(c){
   if (c.kind !== "video") return "";
   const bits = []; if ((c.speed || 1) !== 1) bits.push(`${+(c.speed).toFixed(2)}x`); if (c.ramp && c.ramp !== "none") bits.push("ramp"); if (c.reverse) bits.push("reverse");
@@ -6757,11 +7671,19 @@ $("drawCancel").addEventListener("click", () => { if (placing) endPlace(); });
 document.addEventListener("keydown", e => { if (placing && e.key === "Escape" && !e.defaultPrevented){ e.preventDefault(); endPlace(); } });
 function editingPunch(c){ return selected && selected.type === "punch" && selected.clip === c && !playing && !exporting; }
 function proPointerDown(e, px, py){
-  if (!placing && !playing && selected && selected.type === "plot" && (selected.item._lrect || selected.item._srects)){
-    const pl = selected.item, clip = selected.clip, X = clipXform(clip, now() - clip._start), { u } = geo(), r = pl._lrect || { x:-1e9, y:-1e9, w:0, h:0 };
-    const nearCorner = X && pl.pts.some(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
+  if (!placing && !playing && selected && selected.type === "plot" && (selected.item._lrect || selected.item._srects || selected.item._roadRect)){
+    const pl = selected.item, clip = selected.clip;
+    const local = now() - clip._start;
+    const useFixedX = (pl.stickMode === "screen");
+    const X = useFixedX ? (clipXform(clip, pl.at || 0) || clipXform(clip, local)) : clipXform(clip, local);
+    const { u } = geo(), r = pl._lrect || { x:-1e9, y:-1e9, w:0, h:0 };
+    const curPts = plotPtsAt(pl, local);
+    const nearCorner = X && curPts.some(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
     const sk = X && !nearCorner && pl._srects ? pl._srects.findIndex(q => q && px >= q.x - 8 * u && px <= q.x + q.w + 8 * u && py >= q.y - 8 * u && py <= q.y + q.h + 8 * u) : -1;
     if (sk >= 0){ const q = pl._srects[sk]; dragL = { pl, clip, k:sk, dx:px - q.cx, dy:py - q.cy }; cv.setPointerCapture(e.pointerId); return true; }
+    if (X && !nearCorner && pl._roadRect && px >= pl._roadRect.x - 8 * u && px <= pl._roadRect.x + pl._roadRect.w + 8 * u && py >= pl._roadRect.y - 8 * u && py <= pl._roadRect.y + pl._roadRect.h + 8 * u){
+      dragL = { pl, clip, isRoad:true, dx:px - pl._roadRect.cx, dy:py - pl._roadRect.cy }; cv.setPointerCapture(e.pointerId); return true;
+    }
     if (X && !nearCorner && px >= r.x - 10 * u && px <= r.x + r.w + 10 * u && py >= r.y - 10 * u && py <= r.y + r.h + 10 * u){
       dragL = { pl, clip, dx:px - r.cx, dy:py - r.cy }; cv.setPointerCapture(e.pointerId); return true;
     }
@@ -6804,7 +7726,20 @@ function proPointerDown(e, px, py){
 }
 function proPointerMove(e){
   if (dragA){ const [px, py] = canvasPt(e); gfxArrowMove(dragA, px, py); renderFrame(playT); return true; }
-  if (dragL){ const [px, py] = canvasPt(e), X = clipXform(dragL.clip, now() - dragL.clip._start); if (X){ const [lu, lv] = invPt(X, px - dragL.dx, py - dragL.dy); if (dragL.k != null){ const sd = dragL.pl.side = (dragL.pl.side || []).slice(); sd[dragL.k] = [lu, lv]; } else { dragL.pl.lu = lu; dragL.pl.lv = lv; } renderFrame(playT); } return true; }
+  if (dragL){
+    const [px, py] = canvasPt(e);
+    const local = now() - dragL.clip._start;
+    const useFixedX = (dragL.clip && dragL.clip.kind === "image") || (dragL.pl && dragL.pl.stickMode === "screen");
+    const X = useFixedX ? (clipXform(dragL.clip, dragL.pl.at || 0) || clipXform(dragL.clip, local)) : clipXform(dragL.clip, local);
+    if (X){
+      const [lu, lv] = invPt(X, px - dragL.dx, py - dragL.dy);
+      if (dragL.isRoad){ if (!dragL.pl.road) dragL.pl.road = {}; dragL.pl.road.ru = lu; dragL.pl.road.rv = lv; }
+      else if (dragL.k != null){ const sd = dragL.pl.side = (dragL.pl.side || []).slice(); sd[dragL.k] = [lu, lv]; }
+      else { dragL.pl.lu = lu; dragL.pl.lv = lv; }
+      renderFrame(playT);
+    }
+    return true;
+  }
   if (dragTX){ const [px, py] = canvasPt(e), { W, H } = geo(), c = dragTX.c; if (Math.hypot(px - dragTX.x, py - dragTX.y) > 3){ c.textPos = "custom"; c.textX = clamp(dragTX.ox + (px - dragTX.x) / W, .05, .95); c.textY = clamp(dragTX.oy + (py - dragTX.y) / H, .04, .96); renderFrame(playT); } return true; }
   if (dragTA){ const [px, py] = canvasPt(e), { W, H } = geo(); dragTA.c.arrowX = clamp(px / W); dragTA.c.arrowY = clamp(py / H); renderFrame(playT); return true; }
   if (dragP){ const [px, py] = canvasPt(e), X = clipXform(dragP.clip, now() - dragP.clip._start); if (X){ const [uu, vv] = invPt(X, px, py); dragP.item.u = clamp(uu); dragP.item.v = clamp(vv); renderFrame(playT); } return true; }
@@ -8011,12 +8946,27 @@ function clipDragSpec(c){
 }
 /* items that live inside a clip (spotlight, zoom, plot): times are relative to the clip */
 function relSpec(it, c, hasDur){
-  const begin = () => ({ at:it.at || 0, dur:it.dur || 0 });
+  const begin = () => {
+    const curDur = (it.dur > 0 ? it.dur : (c.dur - (it.at || 0)));
+    return { at: it.at || 0, dur: curDur };
+  };
   const spec = { begin,
-    body:(dt, s) => { const lim = Math.max(0, c.dur - (hasDur ? .4 : 1)); it.at = +clamp(snapT(c._start + s.at + dt) - c._start, 0, lim).toFixed(2); } };
+    body:(dt, s) => {
+      const lim = Math.max(0, c.dur - .4);
+      it.at = +clamp(snapT(c._start + s.at + dt) - c._start, 0, lim).toFixed(2);
+      if (it.dur > 0 && it.at + it.dur > c.dur) it.dur = +(c.dur - it.at).toFixed(2);
+    }
+  };
   if (hasDur){
-    spec.left = (dt, s) => { const end = s.at + s.dur, at = clamp(snapT(c._start + s.at + dt) - c._start, 0, end - .4); it.at = +at.toFixed(2); it.dur = +(end - at).toFixed(2); };
-    spec.right = (dt, s) => { it.dur = +clamp(snapT(c._start + s.at + s.dur + dt) - c._start - s.at, .4, c.dur - s.at).toFixed(2); };
+    spec.left = (dt, s) => {
+      const end = s.at + s.dur, at = clamp(snapT(c._start + s.at + dt) - c._start, 0, end - .4);
+      it.at = +at.toFixed(2);
+      it.dur = +(end - at).toFixed(2);
+    };
+    spec.right = (dt, s) => {
+      const newDur = snapT(c._start + s.at + s.dur + dt) - c._start - s.at;
+      it.dur = +clamp(newDur, .4, c.dur - s.at).toFixed(2);
+    };
   } else spec.left = spec.body;
   return spec;
 }
@@ -8151,7 +9101,26 @@ requestAnimationFrame(loop);
 <script src="caption-presets.js"></script>
 <script src="drone.js"></script>
 <style id="rs-pro-css">
-.blk.sfxb{background:#3F6E66}
+.tl-labels .lbl-plots{color:#2dd4bf;font-weight:700}
+.tl-labels .lbl-ovl{color:#c084fc;font-weight:700}
+.blk.plotb{background:linear-gradient(135deg,#0d9488,#0f766e);border:1px solid rgba(45,212,191,.5);box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 4px rgba(0,0,0,.25)}
+.blk.plotb.roadb{background:linear-gradient(135deg,#1e293b,#334155);border:1.5px solid #FFD700;box-shadow:inset 0 1px 0 rgba(255,215,0,.35),0 2px 5px rgba(0,0,0,.35)}
+.blk.plotb.sel{border-color:#5eead4 !important;box-shadow:0 0 0 2px rgba(45,212,191,.5),0 0 12px rgba(45,212,191,.4) !important}
+.blk.plotb.roadb.sel{border-color:#FDE047 !important;box-shadow:0 0 0 2px rgba(255,215,0,.6),0 0 14px rgba(255,215,0,.5) !important}
+.blk.spotb{background:linear-gradient(135deg,#4338ca,#6366f1);border:1px solid rgba(165,180,252,.5)}
+.blk.punchb{background:linear-gradient(135deg,#9a3412,#c2410c);border:1px solid rgba(253,186,116,.5)}
+.blk.textb{background:linear-gradient(135deg,#6b21a8,#7e22ce);border:1px solid rgba(216,180,254,.5)}
+.blk.sfxb{background:linear-gradient(135deg,#b45309,#d97706);border:1px solid rgba(251,191,36,.55);box-shadow:inset 0 1px 0 rgba(255,255,255,.25),0 2px 4px rgba(0,0,0,.3);font-weight:700;display:flex;align-items:center;padding:2px 7px;gap:4px;letter-spacing:0.2px}
+.blk.sfxb.sel{border-color:#fef08a !important;box-shadow:0 0 0 2px rgba(234,179,8,.6),0 0 12px rgba(251,191,36,.5) !important}
+.sfx-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:6px 10px;background:var(--surface);border:1px solid var(--line);border-radius:8px;font-size:12px;transition:border-color .15s}
+.sfx-item:hover{border-color:var(--deodar)}
+.sfx-item.active{border-color:#f59e0b;background:rgba(245,158,11,.08)}
+.sfx-item-info{display:flex;align-items:center;gap:6px;min-width:0;flex:1;cursor:pointer}
+.sfx-item-time{color:var(--muted);font-variant-numeric:tabular-nums;font-size:11px}
+.sfx-btn-icon{background:none;border:none;cursor:pointer;padding:3px;border-radius:4px;color:var(--muted);display:inline-flex;align-items:center}
+.sfx-btn-icon:hover{color:var(--heading);background:var(--soft)}
+.sfx-quick-chip{border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:5px 10px;font-weight:600;font-size:11px;cursor:pointer;color:var(--heading);display:inline-flex;align-items:center;gap:5px;transition:all .15s}
+.sfx-quick-chip:hover{background:var(--slate);color:#fff;border-color:var(--slate);transform:translateY(-1px)}
 .ms-banner{margin:0 0 10px;padding:8px 10px;border-radius:8px;background:var(--soft);color:var(--heading);font:600 12px/1.4 var(--sans)}
 .kb-help{position:fixed;inset:0;z-index:120;background:rgba(0,0,0,.45);display:grid;place-items:center;padding:16px}
 .kb-card{width:min(520px,100%);max-height:86vh;overflow:auto;background:var(--surface);color:var(--text);border:1px solid var(--line);border-radius:14px;padding:18px 20px;box-shadow:0 20px 50px rgba(0,0,0,.3)}
@@ -8177,8 +9146,35 @@ requestAnimationFrame(loop);
   const status = $("status"), STATUS0 = "Photos and videos stay on this computer";
 
   /* ---------------- 1. sound effects (made with code, no downloads) ---------------- */
-  const SFX_TYPES = [["whoosh","Whoosh"],["riser","Riser"],["impact","Boom"],["pop","Pop"],["swipe","Swipe"],["shutter","Shutter"],["ding","Ding"],["cash","Cha-ching"]];
-  const SFX_LEN = { whoosh:1, riser:2.2, impact:1.8, pop:.16, swipe:.42, shutter:.3, ding:1.6, cash:1.4 };
+  const SFX_TYPES = [
+    ["zoomin","Zoom In"],
+    ["zoomout","Zoom Out"],
+    ["whoosh","Whoosh"],
+    ["thud","Bass Hit"],
+    ["impact","Boom"],
+    ["glitch","Glitch"],
+    ["riser","Riser"],
+    ["ding","Ding"],
+    ["pop","Pop"],
+    ["shutter","Shutter"],
+    ["cash","Cha-ching"],
+    ["swipe","Swipe"]
+  ];
+  const SFX_ICONS = {
+    zoomin: "🔍",
+    zoomout: "🔎",
+    whoosh: "💨",
+    thud: "🥁",
+    impact: "💥",
+    glitch: "⚡",
+    riser: "📈",
+    ding: "🔔",
+    pop: "✨",
+    shutter: "📷",
+    cash: "💰",
+    swipe: "↔️"
+  };
+  const SFX_LEN = { zoomin:0.75, zoomout:0.8, whoosh:1, thud:1.2, impact:1.8, glitch:0.35, riser:2.2, pop:.16, swipe:.42, shutter:.3, ding:1.6, cash:1.4 };
   const sfxName = t => (SFX_TYPES.find(x => x[0] === t) || [t, "Sound"])[1];
   function rng(seed){ let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296 * 2 - 1; }; }
   /* state variable filter, safe to sweep every sample */
@@ -8194,6 +9190,43 @@ requestAnimationFrame(loop);
       if (type === "whoosh"){
         const env = Math.pow(Math.sin(Math.PI * Math.pow(p, .8)), 2), fc = 300 + 2600 * Math.pow(Math.sin(Math.PI * p), 1.6);
         const v = f1(x, fc, 1.1, sr).bp * env * 2.2, pan = .15 + .7 * p; l = v * Math.cos(pan * Math.PI / 2); r = v * Math.sin(pan * Math.PI / 2);
+      } else if (type === "zoomin"){
+        const env = Math.pow(p, 1.8) * Math.sin(Math.PI * Math.pow(p, 0.7));
+        const fc = 180 + 2600 * Math.pow(p, 2.2);
+        ph += TAU * (55 + 75 * Math.sin(Math.PI * p)) / sr;
+        const sub = Math.sin(ph) * Math.pow(Math.sin(Math.PI * p), 2) * 0.45;
+        const sweep = f1(x, fc, 2.0, sr).bp * env * 2.8;
+        const snap = t > dur * 0.7 ? Math.sin(TAU * 120 * (t - dur * 0.7)) * Math.exp(-(t - dur * 0.7) * 25) * 0.4 : 0;
+        const v = Math.tanh((sweep + sub + snap) * 1.6);
+        const pan = 0.2 + 0.6 * p;
+        l = v * Math.cos(pan * Math.PI / 2); r = v * Math.sin(pan * Math.PI / 2);
+      } else if (type === "zoomout"){
+        const env = Math.pow(1 - p, 1.4) * Math.min(1, t / 0.04);
+        const fc = 2800 * Math.pow(1 - p, 1.8) + 120;
+        ph += TAU * (140 * Math.exp(-t * 3.5) + 40) / sr;
+        const sweep = f1(x, fc, 1.6, sr).lp * env * 2.5;
+        const air = f2(x, 4200 * (1 - p) + 800, 1.2, sr).bp * env * 0.8;
+        const body = Math.sin(ph) * Math.exp(-t * 2.2) * 0.4;
+        const v = Math.tanh((sweep + air + body) * 1.5);
+        const pan = 0.8 - 0.6 * p;
+        l = v * Math.cos(pan * Math.PI / 2); r = v * Math.sin(pan * Math.PI / 2);
+      } else if (type === "thud"){
+        ph += TAU * (46 + 180 * Math.exp(-t * 32)) / sr;
+        const click = f1(x, 1800 * Math.exp(-t * 40) + 120, 1.0, sr).bp * Math.exp(-t * 35) * 1.8;
+        const bass = Math.sin(ph) * Math.exp(-t * 3.2);
+        const v = Math.tanh((bass + click) * 2.2) * 0.95;
+        l = v; r = v * 0.98;
+      } else if (type === "glitch"){
+        const step = Math.floor(t * 32);
+        const stepSeed = rng((step + 1) * 31337)();
+        const gfc = 800 + Math.abs(stepSeed) * 3600;
+        const mod = Math.sin(TAU * (300 + stepSeed * 800) * t);
+        const burst = (Math.sin(step * 3.7) > 0.1 ? 1 : 0.15) * Math.exp(-t * 4);
+        const nzS = f1(x, gfc, 3.5, sr).bp * burst * 2.4;
+        const tone = mod * Math.exp(-t * 6) * 0.35;
+        const v = Math.tanh((nzS + tone) * 1.8);
+        const pan = (step % 2 === 0) ? 0.3 : 0.7;
+        l = v * Math.cos(pan * Math.PI / 2); r = v * Math.sin(pan * Math.PI / 2);
       } else if (type === "riser"){
         const env = Math.pow(p, 2.2) * Math.min(1, (1 - p) / .02), fc = 200 * Math.pow(2, p * 5);
         ph += TAU * (120 * Math.pow(2, p * 3.3)) / sr;
@@ -8260,13 +9293,72 @@ requestAnimationFrame(loop);
     }
     return buf;
   }
+  function updateSfxSidebarUI(){
+    const phEl = $("sfxPlayheadT");
+    if (phEl) phEl.textContent = now().toFixed(1) + "s";
+    const chipBox = $("sfxQuickChips");
+    if (chipBox && !chipBox.children.length){
+      chipBox.innerHTML = "";
+      SFX_TYPES.forEach(([k, l]) => {
+        const ic = SFX_ICONS[k] || "🔊";
+        const btn = el("button", { type:"button", class:"sfx-quick-chip", title:`Add ${l} at playhead (${now().toFixed(1)}s)` });
+        btn.innerHTML = `<span>${ic}</span><span>${l}</span>`;
+        btn.onclick = () => sfxAdd(k);
+        chipBox.appendChild(btn);
+      });
+    }
+    const titleEl = $("sfxListTitle");
+    const listEl = $("sfxActiveList");
+    if (!listEl) return;
+    const n = (P.sfx || []).length;
+    if (titleEl) titleEl.textContent = `Sounds in video (${n})`;
+    listEl.innerHTML = "";
+    if (!n){
+      listEl.innerHTML = '<p class="hint" style="margin:2px 0 6px">No sound effects added yet. Click any sound above to add one at the playhead position.</p>';
+      return;
+    }
+    P.sfx.forEach(s => {
+      const isSel = selected && selected.type === "sfx" && selected.item === s;
+      const ic = SFX_ICONS[s.type] || "🔊";
+      const item = el("div", { class:"sfx-item" + (isSel ? " active" : "") });
+      const info = el("div", { class:"sfx-item-info", title:"Click to jump to sound & edit in inspector" });
+      info.innerHTML = `<span>${ic}</span><span style="font-weight:600;color:var(--heading)">${sfxName(s.type)}</span><span class="sfx-item-time">@ ${s.start.toFixed(1)}s</span>`;
+      info.onclick = () => { select("sfx", s); seek(s.start); };
+      const acts = el("div", { style:"display:flex;align-items:center;gap:3px" });
+      const playBtn = el("button", { type:"button", class:"sfx-btn-icon", title:"Audition sound" });
+      playBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>';
+      playBtn.onclick = e => { e.stopPropagation(); sfxAudition(s); };
+      const delBtn = el("button", { type:"button", class:"sfx-btn-icon", title:"Delete sound" });
+      delBtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>';
+      delBtn.onclick = e => {
+        e.stopPropagation();
+        const i = P.sfx.indexOf(s);
+        if (i >= 0){
+          P.sfx.splice(i, 1);
+          if (selected && selected.item === s) selected = null;
+          refresh();
+          toast(`Removed "${sfxName(s.type)}" sound.`);
+        }
+      };
+      acts.append(playBtn, delBtn);
+      item.append(info, acts);
+      listEl.appendChild(item);
+    });
+  }
+
   function sfxAdd(type, at, opts){
     const s = { id:uid++, type, start:+Math.max(0, at == null ? now() : at).toFixed(2), vol:.8, rate:1 };
     P.sfx.push(s); P.sfx.sort((a, b) => a.start - b.start); refresh();
-    if (!(opts && opts.quiet)){ select("sfx", s); sfxAudition(s); }
+    updateSfxSidebarUI();
+    if (!(opts && opts.quiet)){
+      select("sfx", s);
+      sfxAudition(s);
+      const ic = SFX_ICONS[type] || "🔊";
+      toast(`${ic} Added "${sfxName(type)}" at ${s.start.toFixed(1)}s on Sound FX track.`);
+    }
     return s;
   }
-  window.RS_SFX = { types:SFX_TYPES, add:sfxAdd, data:sfxData, mix:sfxMixInto, playing:() => SFXP.nodes.length, replace:(c, f) => replaceMedia(c, f) };
+  window.RS_SFX = { types:SFX_TYPES, icons:SFX_ICONS, add:sfxAdd, data:sfxData, mix:sfxMixInto, playing:() => SFXP.nodes.length, replace:(c, f) => replaceMedia(c, f), updateUI:updateSfxSidebarUI };
 
   const _play = play;
   play = async function(){ const tok = ++SFXP.tok; const r = await _play.apply(this, arguments); if (tok === SFXP.tok && playing) sfxSchedule(startT); return r; };
@@ -8336,7 +9428,7 @@ requestAnimationFrame(loop);
   const _del = deleteSelected;
   function delOne(){
     const s = selected; if (!s) return;
-    if (s.type === "sfx"){ const i = P.sfx.indexOf(s.item); if (i >= 0) P.sfx.splice(i, 1); selected = null; refresh(); return; }
+    if (s.type === "sfx"){ const i = P.sfx.indexOf(s.item); if (i >= 0) P.sfx.splice(i, 1); selected = null; refresh(); updateSfxSidebarUI(); return; }
     const main = s.type === "clip" && (P.clips.includes(s.item) || s.item.kind === "intro");
     if (!main || !rippleOn){ _del(); return; }
     layoutSeq(); const cut = s.item._start, t0 = TOTAL;
@@ -8355,7 +9447,7 @@ requestAnimationFrame(loop);
   };
   const _dup = dupSelected;
   dupSelected = function(){
-    if (selected && selected.type === "sfx"){ const s = selected.item, d = { ...s, id:uid++, start:+(s.start + sfxDur(s)).toFixed(2) }; P.sfx.push(d); refresh(); select("sfx", d); return; }
+    if (selected && selected.type === "sfx"){ const s = selected.item, d = { ...s, id:uid++, start:+(s.start + sfxDur(s)).toFixed(2) }; P.sfx.push(d); refresh(); updateSfxSidebarUI(); select("sfx", d); return; }
     return _dup.apply(this, arguments);
   };
 
@@ -8363,20 +9455,20 @@ requestAnimationFrame(loop);
   const _snap = snapshot;
   snapshot = function(){ const s = _snap.apply(this, arguments); s.sfx = P.sfx.map(x => ({ ...x })); return s; };
   const _restore = restore;
-  restore = function(i){ const h = HIST.stack[i]; if (h && h.s) P.sfx = (h.s.sfx || []).map(x => ({ ...x })); MS.list = []; const r = _restore.apply(this, arguments); msStatus(); return r; };
+  restore = function(i){ const h = HIST.stack[i]; if (h && h.s) P.sfx = (h.s.sfx || []).map(x => ({ ...x })); MS.list = []; const r = _restore.apply(this, arguments); msStatus(); updateSfxSidebarUI(); return r; };
   const _ser = serializeProject;
   serializeProject = async function(){ const r = await _ser.apply(this, arguments); r.doc.sfx = P.sfx.map(({ id, type, start, vol, rate }) => ({ id, type, start, vol, rate })); return r; };
   const _load = loadProjectData;
   loadProjectData = async function(meta){
     P.sfx = ((meta && meta.doc && meta.doc.sfx) || []).filter(s => s && SFX_LEN[s.type]).map(s => ({ id:s.id || uid++, type:s.type, start:+s.start || 0, vol:s.vol ?? .8, rate:s.rate || 1 }));
-    MS.list = []; return _load.apply(this, arguments);
+    MS.list = []; updateSfxSidebarUI(); return _load.apply(this, arguments);
   };
   const _tpl = applyReelTemplate;
-  applyReelTemplate = async function(){ const c0 = P.clips; const r = await _tpl.apply(this, arguments); if (P.clips !== c0){ P.sfx = []; renderTimeline(); } return r; };
+  applyReelTemplate = async function(){ const c0 = P.clips; const r = await _tpl.apply(this, arguments); if (P.clips !== c0){ P.sfx = []; renderTimeline(); updateSfxSidebarUI(); } return r; };
 
   /* ---------------- timeline track ---------------- */
   function sfxSpec(s){
-    return groupSpec(s, { begin:() => ({ a:s.start }), body:(dt, st) => { s.start = +Math.max(0, snapT(st.a + dt)).toFixed(2); } });
+    return groupSpec(s, { begin:() => ({ a:s.start }), body:(dt, st) => { s.start = +Math.max(0, snapT(st.a + dt)).toFixed(2); updateSfxSidebarUI(); } });
   }
   const _rt = renderTimeline;
   renderTimeline = function(){
@@ -8386,16 +9478,21 @@ requestAnimationFrame(loop);
     const pps = P.pps;
     P.sfx.forEach(s => {
       const isSel = (selected && selected.item === s) || msHas(s);
-      const b = blk("sfxb", s.start * pps, sfxDur(s) * pps, sfxName(s.type), () => { select("sfx", s); seek(s.start); }, isSel);
-      b.dataset.sfx = s.id; addHandles(b, sfxSpec(s)); tr.appendChild(b);
+      const ic = SFX_ICONS[s.type] || "🔊";
+      const b = blk("sfxb", s.start * pps, sfxDur(s) * pps, `${ic} ${sfxName(s.type)} (${s.start.toFixed(1)}s)`, () => { select("sfx", s); seek(s.start); }, isSel);
+      b.dataset.sfx = s.id;
+      b.title = `${sfxName(s.type)} at ${s.start.toFixed(2)}s - Click to edit, drag to move`;
+      addHandles(b, sfxSpec(s));
+      tr.appendChild(b);
     });
     layoutLanes(tr, document.querySelector(".tl-labels .lbl-sfx"));
+    updateSfxSidebarUI();
     return r;
   };
 
   /* ---------------- inspector: sound effect, replace media, end card ---------------- */
   function sfxInspector(box, s){
-    const ch = (full = true) => { changed(full); };
+    const ch = (full = true) => { changed(full); updateSfxSidebarUI(); };
     box.append(el("p", { class:"insp-title", text:"Sound effect" }),
       fSelect("Sound", s.type, SFX_TYPES, v => { s.type = v; ch(); sfxAudition(s); }),
       fSlider("Volume", s.vol ?? .8, 0, 1.5, .01, v => { s.vol = v; ch(false); }),
@@ -8620,7 +9717,7 @@ requestAnimationFrame(loop);
   openAddMenu = function(anchor){
     const r = _oam.apply(this, arguments);
     if (!addPop) return r;
-    const g = el("div", { class:"add-grid2" }, SFX_TYPES.map(([k, l]) => el("button", { type:"button", class:"btn sm", role:"menuitem", text:l, onclick:() => { closeAddMenu(); sfxAdd(k); } })));
+    const g = el("div", { class:"add-grid2" }, SFX_TYPES.map(([k, l]) => el("button", { type:"button", class:"btn sm", role:"menuitem", text:`${SFX_ICONS[k] || "🔊"} ${l}`, onclick:() => { closeAddMenu(); sfxAdd(k); } })));
     addPop.append(el("h3", { text:"Sound effect" }), g);
     const rr = (anchor || $("stAddMenu") || document.body).getBoundingClientRect(), ph = addPop.offsetHeight;
     let top = rr.bottom + 6; if (top + ph > window.innerHeight - 8) top = Math.max(8, rr.top - ph - 6); addPop.style.top = top + "px";
@@ -8667,6 +9764,14 @@ requestAnimationFrame(loop);
     e.preventDefault(); openHelp();
   }, true);
 
+  const _uph = updatePlayhead;
+  updatePlayhead = function(){
+    _uph.apply(this, arguments);
+    const phEl = $("sfxPlayheadT");
+    if (phEl) phEl.textContent = now().toFixed(1) + "s";
+  };
+
+  updateSfxSidebarUI();
   if (typeof updateUndoUI === "function") try { renderTimeline(); } catch(e) { console.warn(e); }
 })();
 </script>

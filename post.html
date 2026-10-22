@@ -6,7 +6,15 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Reel Studio Post Editor</title>
-<meta name="description" content="Girika Homes studio for posts, stories, reels and shorts across Instagram, Facebook, X and YouTube.">
+<meta name="description" content="Reel Studio Post Editor: Create real estate social media posts, carousel flyers, property dimensions, and plot highlights across Instagram, Facebook, and YouTube.">
+<link rel="canonical" href="https://devlopersfield.github.io/video-editor-app/post.html">
+<meta property="og:title" content="Reel Studio Post Editor">
+<meta property="og:description" content="Design real estate social posts, flyers, plot dimensions, and spotlight graphics easily in your browser.">
+<meta property="og:url" content="https://devlopersfield.github.io/video-editor-app/post.html">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Reel Studio Post Editor">
+<meta name="twitter:description" content="Design real estate social posts, flyers, plot dimensions, and spotlight graphics easily in your browser.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;1,9..144,500&family=Manrope:wght@400;500;600;700&family=Noto+Sans+Devanagari:wght@400;600&family=Noto+Serif+Devanagari:wght@500&display=swap" rel="stylesheet">
@@ -951,6 +959,108 @@ function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
   c.restore();
 }
 
+function drawRoadCorridor(c, A, B, cx, cy, cfg, u, opt = {}){
+  const dx = B[0] - A[0], dy = B[1] - A[1];
+  const L = Math.hypot(dx, dy) || 1;
+  const ux = dx / L, uy = dy / L;
+  let nx = -uy, ny = ux;
+  const mx = (A[0] + B[0]) / 2, my = (A[1] + B[1]) / 2;
+  if ((mx - cx) * nx + (my - cy) * ny < 0){ nx = -nx; ny = -ny; }
+  const wFt = parseFloat(cfg.width) || 30;
+  const frontFt = parseFloat(cfg.front) || 40;
+  let roadPx = L * (wFt / Math.max(15, frontFt));
+  roadPx = Math.max(46 * u, Math.min(230 * u, roadPx));
+  const ext = Math.max(28 * u, L * 0.22);
+  const R0 = [A[0] - ux * ext, A[1] - uy * ext];
+  const R1 = [B[0] + ux * ext, B[1] + uy * ext];
+  const R2 = [R1[0] + nx * roadPx, R1[1] + ny * roadPx];
+  const R3 = [R0[0] + nx * roadPx, R0[1] + ny * roadPx];
+
+  c.save();
+  // 1. Asphalt corridor base
+  c.beginPath();
+  c.moveTo(...R0); c.lineTo(...R1); c.lineTo(...R2); c.lineTo(...R3); c.closePath();
+  const roadStyle = cfg.style || "asphalt";
+  if (roadStyle === "yellow") c.fillStyle = "rgba(255, 215, 0, 0.28)";
+  else if (roadStyle === "white") c.fillStyle = "rgba(255, 255, 255, 0.24)";
+  else if (roadStyle === "lime") c.fillStyle = "rgba(0, 230, 118, 0.24)";
+  else c.fillStyle = "rgba(18, 22, 28, 0.92)";
+  c.fill();
+
+  // 2. Curbs / Boundary lines
+  c.beginPath(); c.moveTo(...R0); c.lineTo(...R1);
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 3.5 * u; c.lineCap = "round"; c.stroke();
+
+  const curbCol = roadStyle === "yellow" ? "#FFD700" : roadStyle === "lime" ? "#00E676" : roadStyle === "white" ? "#FFFFFF" : "#FFC107";
+  c.beginPath(); c.moveTo(...R3); c.lineTo(...R2);
+  c.strokeStyle = curbCol; c.lineWidth = 4.5 * u;
+  c.shadowColor = curbCol; c.shadowBlur = 10 * u;
+  c.stroke();
+  c.shadowColor = "transparent";
+
+  // 3. Center road divider dashed line
+  const C0 = [(R0[0] + R3[0]) / 2, (R0[1] + R3[1]) / 2];
+  const C1 = [(R1[0] + R2[0]) / 2, (R1[1] + R2[1]) / 2];
+  c.beginPath(); c.moveTo(...C0); c.lineTo(...C1);
+  c.strokeStyle = "#FFFFFF"; c.lineWidth = 3.5 * u;
+  c.setLineDash([20 * u, 16 * u]);
+  if (opt.time != null && opt.isVideo){
+    c.lineDashOffset = -opt.time * 50 * u;
+  }
+  c.stroke();
+  c.setLineDash([]);
+
+  // 4. Subtle road width dimension lines across edges
+  c.strokeStyle = "rgba(255,255,255,0.4)";
+  c.lineWidth = 1.5 * u;
+  c.beginPath();
+  c.moveTo(...R0); c.lineTo(...R3);
+  c.moveTo(...R1); c.lineTo(...R2);
+  c.stroke();
+
+  // 5. Road Badge
+  const unit = (cfg.unit === "m") ? "M" : "FT";
+  const rawW = String(cfg.width || 30).trim();
+  const wLabel = /ft|m|gaj|yd/i.test(rawW) ? rawW : `${rawW} ${unit}`;
+  let roadText = cfg.text && cfg.text.trim() ? cfg.text.trim() : `${wLabel} ROAD`;
+  if (!/road/i.test(roadText)) roadText = `${roadText} ROAD`;
+
+  let bx = (C0[0] + C1[0]) / 2;
+  let by = (C0[1] + C1[1]) / 2;
+  if (opt.bx != null && opt.by != null){
+    bx = opt.bx; by = opt.by;
+  }
+
+  const badgeText = `🛣️ ${roadText.toUpperCase()}`;
+  const fs = 24 * u;
+  c.font = `800 ${fs}px sans-serif`;
+  const tw = c.measureText(badgeText).width + 36 * u, th = fs + 22 * u;
+
+  c.save();
+  c.translate(bx, by);
+  c.shadowColor = "rgba(0,0,0,0.7)";
+  c.shadowBlur = 14 * u;
+  c.fillStyle = "#0A0D12";
+  c.beginPath();
+  c.roundRect(-tw / 2, -th / 2, tw, th, th / 2);
+  c.fill();
+  c.shadowColor = "transparent";
+
+  c.strokeStyle = curbCol;
+  c.lineWidth = 2.5 * u;
+  c.stroke();
+
+  c.fillStyle = "#FFD700";
+  c.textAlign = "center";
+  c.textBaseline = "middle";
+  c.fillText(badgeText, 0, 1 * u);
+  c.restore();
+
+  c.restore();
+
+  return { x: bx - tw / 2, y: by - th / 2, w: tw, h: th, cx: bx, cy: by };
+}
+
 function drawPlotPost(c, pl, L){
   const u = L.u, ov = elOv("x" + pl.id);
   const dx = (ov && ov.dx) ? ov.dx * L.W : 0, dy = (ov && ov.dy) ? ov.dy * L.H : 0;
@@ -961,6 +1071,38 @@ function drawPlotPost(c, pl, L){
   const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]);
   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length;
   const cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
+
+  // 0. Road highlight corridor (if enabled)
+  pl._roadRect = null;
+  if (closed && pl.road && pl.road.on){
+    const roadCfg = { ...pl.road, front: pl.front || pl.w || 40, unit: pl.unit || "ft" };
+    const sideMode = pl.road.side ?? 0;
+    const edgesToDraw = (sideMode === "corner") ? [0, 1] : [+sideMode || 0];
+    edgesToDraw.forEach((ei, idx) => {
+      if (segs[ei]){
+        const opt = { isVideo: false };
+        if (pl.road.rx != null && pl.road.ry != null && idx === 0){
+          opt.bx = pl.road.rx * L.W;
+          opt.by = pl.road.ry * L.H;
+        }
+        const rRect = drawRoadCorridor(c, segs[ei][0], segs[ei][1], cx, cy, roadCfg, u, opt);
+        if (idx === 0) pl._roadRect = rRect;
+      }
+    });
+  }
+
+  // Spotlight: Dim everything outside the plot so only the plot is highlighted
+  if (closed && pl.dimRest !== false){
+    const dimAlpha = typeof pl.dimAlpha === "number" ? pl.dimAlpha : 0.55;
+    c.save();
+    c.fillStyle = `rgba(0,0,0,${dimAlpha})`;
+    c.beginPath();
+    c.rect(0, 0, L.W, L.H);
+    pts.forEach(([px, py], i) => i ? c.lineTo(px, py) : c.moveTo(px, py));
+    c.closePath();
+    c.fill("evenodd");
+    c.restore();
+  }
 
   // 1. Interior fill
   const fillKey = pl.fill === undefined ? (pl.color || "red") : pl.fill;
@@ -1172,7 +1314,9 @@ function edAddPlot(){
     fillK: 0.35,
     labelSize: 1,
     labelStyle: "pill",
-    labelColor: "auto"
+    labelColor: "auto",
+    dimRest: true,
+    dimAlpha: 0.55
   };
   p.extras = p.extras || [];
   p.extras.push(pl);
@@ -2301,7 +2445,144 @@ function updatePlotSidebarUI(){
   host.appendChild(styleRow);
   fillChips("sideBadgeStyleList", pl.labelStyle || "pill", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], v => { pl.labelStyle = v; });
 
-  // 6. Reset badges button
+  // 5b. Spotlight (Dim surroundings so only plot is highlighted)
+  const spotBox = document.createElement("div");
+  spotBox.className = "field";
+  spotBox.style.background = "var(--surface)";
+  spotBox.style.padding = "10px";
+  spotBox.style.borderRadius = "8px";
+  spotBox.style.border = "1px solid var(--line)";
+  spotBox.style.marginTop = "10px";
+  spotBox.innerHTML = `
+    <div class="row" style="justify-content:space-between;align-items:center">
+      <span class="lbl" style="margin:0;font-weight:700">🔦 Spotlight (highlight ONLY plot)</span>
+      <label class="toggle" style="margin:0"><input type="checkbox" id="sideSpotOn" ${pl.dimRest ? "checked" : ""}> Dim photo</label>
+    </div>
+    <div id="sideSpotBody" style="display:${pl.dimRest ? "block" : "none"};margin-top:8px">
+      <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:4px">Darkens surroundings so only the plot stands out</small>
+      <div class="slider"><span>Darken</span><input type="range" id="sideSpotK" min="0.2" max="0.9" step="0.05" value="${pl.dimAlpha ?? 0.55}"><output id="sideSpotKOut">${Math.round((pl.dimAlpha ?? 0.55) * 100)}%</output></div>
+    </div>
+  `;
+  const spotOn = spotBox.querySelector("#sideSpotOn");
+  const spotBody = spotBox.querySelector("#sideSpotBody");
+  const spotK = spotBox.querySelector("#sideSpotK");
+  const spotKOut = spotBox.querySelector("#sideSpotKOut");
+  spotOn.addEventListener("change", e => {
+    pl.dimRest = e.target.checked;
+    spotBody.style.display = pl.dimRest ? "block" : "none";
+    redo();
+  });
+  spotK.addEventListener("input", e => {
+    pl.dimAlpha = +e.target.value;
+    spotKOut.textContent = Math.round(pl.dimAlpha * 100) + "%";
+    fgDirty = true; requestRender(); persist();
+  });
+  host.appendChild(spotBox);
+
+  // 6. Road Highlight Controls
+  pl.road = pl.road || { on:false, width:"30", text:"", side:0, style:"asphalt" };
+  const roadBox = document.createElement("div");
+  roadBox.className = "field";
+  roadBox.style.background = "var(--surface)";
+  roadBox.style.padding = "10px";
+  roadBox.style.borderRadius = "8px";
+  roadBox.style.border = "1px solid var(--line)";
+  roadBox.style.marginTop = "10px";
+
+  const roadHead = document.createElement("div");
+  roadHead.className = "row";
+  roadHead.style.justifyContent = "space-between";
+  roadHead.style.alignItems = "center";
+  roadHead.innerHTML = `
+    <span class="lbl" style="margin:0;font-weight:700">🛣️ Road highlight</span>
+    <label class="toggle" style="margin:0"><input type="checkbox" id="sideRoadOn" ${pl.road.on ? "checked" : ""}> Show road</label>
+  `;
+  roadBox.appendChild(roadHead);
+
+  const roadBody = document.createElement("div");
+  roadBody.id = "sideRoadBody";
+  roadBody.style.display = pl.road.on ? "block" : "none";
+  roadBody.style.marginTop = "8px";
+  roadBody.innerHTML = `
+    <div style="margin-bottom:8px">
+      <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Road width (feet)</small>
+      <input type="text" id="sideRoadW" value="${pl.road.width || "30"}" placeholder="30" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+      <div class="row" style="gap:5px;flex-wrap:wrap;margin-top:5px" id="sideRoadWChips">
+        <button class="btn sm" type="button" data-w="20">20 ft</button>
+        <button class="btn sm" type="button" data-w="25">25 ft</button>
+        <button class="btn sm" type="button" data-w="30">30 ft</button>
+        <button class="btn sm" type="button" data-w="40">40 ft</button>
+        <button class="btn sm" type="button" data-w="50">50 ft</button>
+        <button class="btn sm" type="button" data-w="60">60 ft</button>
+        <button class="btn sm" type="button" data-w="80">80 ft</button>
+        <button class="btn sm" type="button" data-w="100">100 ft</button>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Road badge text (optional)</small>
+      <input type="text" id="sideRoadText" value="${pl.road.text || ""}" placeholder="e.g. 30 ft Road or 40 ft Main Road" style="width:100%;padding:6px;border-radius:6px;border:1px solid var(--line);background:var(--surface)">
+      <div class="row" style="gap:5px;flex-wrap:wrap;margin-top:5px" id="sideRoadTxtChips">
+        <button class="btn sm" type="button" data-t="25 ft Road">25 ft Road</button>
+        <button class="btn sm" type="button" data-t="30 ft Road">30 ft Road</button>
+        <button class="btn sm" type="button" data-t="40 ft Wide Road">40 ft Wide Road</button>
+        <button class="btn sm" type="button" data-t="60 ft Main Road">60 ft Main Road</button>
+      </div>
+    </div>
+    <div style="margin-bottom:8px">
+      <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Road position</small>
+      <div class="chips" id="sideRoadSideList"></div>
+    </div>
+    <div>
+      <small style="display:block;font-size:11px;color:var(--muted);margin-bottom:2px">Road style</small>
+      <div class="chips" id="sideRoadStyleList"></div>
+    </div>
+  `;
+  roadBox.appendChild(roadBody);
+
+  const roadOnCb = roadHead.querySelector("#sideRoadOn");
+  roadOnCb.addEventListener("change", e => {
+    pl.road.on = e.target.checked;
+    roadBody.style.display = pl.road.on ? "block" : "none";
+    redo();
+  });
+
+  const roadWInp = roadBody.querySelector("#sideRoadW");
+  roadWInp.addEventListener("input", e => {
+    pl.road.width = e.target.value;
+    fgDirty = true; requestRender(); persist();
+  });
+  roadBody.querySelectorAll("#sideRoadWChips button[data-w]").forEach(b => {
+    b.addEventListener("click", () => {
+      pl.road.width = b.dataset.w;
+      roadWInp.value = b.dataset.w;
+      redo();
+    });
+  });
+
+  const roadTxtInp = roadBody.querySelector("#sideRoadText");
+  roadTxtInp.addEventListener("input", e => {
+    pl.road.text = e.target.value;
+    fgDirty = true; requestRender(); persist();
+  });
+  roadBody.querySelectorAll("#sideRoadTxtChips button[data-t]").forEach(b => {
+    b.addEventListener("click", () => {
+      pl.road.text = b.dataset.t;
+      roadTxtInp.value = b.dataset.t;
+      redo();
+    });
+  });
+
+  fillChips("sideRoadSideList", String(pl.road.side ?? 0), [["0","Front (Edge 1)"],["1","Edge 2"],["2","Edge 3"],["3","Edge 4"],["corner","Corner (2 Roads)"]], v => {
+    pl.road.side = v === "corner" ? "corner" : +v;
+  });
+
+  fillChips("sideRoadStyleList", pl.road.style || "asphalt", [["asphalt","Asphalt (Dashed)"],["yellow","Survey Yellow"],["white","Survey White"],["lime","Lime Green"]], v => {
+    pl.road.style = v;
+  });
+
+  host.appendChild(roadBox);
+
+  // 7. Reset badges button
   const btmRow = document.createElement("div");
   btmRow.className = "row";
   btmRow.style.marginTop = "8px";
@@ -2309,7 +2590,7 @@ function updatePlotSidebarUI(){
   rstBtn.type = "button";
   rstBtn.className = "btn sm block";
   rstBtn.textContent = "Put badges back to default";
-  rstBtn.addEventListener("click", () => { delete pl.lx; delete pl.ly; delete pl.side; redo(); });
+  rstBtn.addEventListener("click", () => { delete pl.lx; delete pl.ly; delete pl.side; if (pl.road){ delete pl.road.rx; delete pl.road.ry; } redo(); });
   btmRow.appendChild(rstBtn);
   host.appendChild(btmRow);
 }
@@ -3406,6 +3687,14 @@ cv.addEventListener("pointerdown", e => {
       try { cv.setPointerCapture(e.pointerId); } catch(err) {}
       return;
     }
+    const rr = curPlot._roadRect;
+    if (rr && px >= rr.x - 10 * u && px <= rr.x + rr.w + 10 * u && py >= rr.y - 10 * u && py <= rr.y + rr.h + 10 * u){
+      histCut();
+      ED.pts.set(e.pointerId, [px, py]);
+      ED.drag = { kind:"plotRoadBadge", plot:curPlot, dx:px - rr.cx, dy:py - rr.cy };
+      try { cv.setPointerCapture(e.pointerId); } catch(err) {}
+      return;
+    }
   }
   if (!ED.pts.size) histCut();
   ED.pts.set(e.pointerId, [px, py]);
@@ -3481,6 +3770,15 @@ cv.addEventListener("pointermove", e => {
     if (D.plot){
       D.plot.lx = +clampN((px - D.dx) / L.W, 0, 1).toFixed(4);
       D.plot.ly = +clampN((py - D.dy) / L.H, 0, 1).toFixed(4);
+      fgDirty = true;
+      requestRender();
+    }
+    return;
+  }
+  if (D.kind === "plotRoadBadge"){
+    if (D.plot && D.plot.road){
+      D.plot.road.rx = +clampN((px - D.dx) / L.W, 0, 1).toFixed(4);
+      D.plot.road.ry = +clampN((py - D.dy) / L.H, 0, 1).toFixed(4);
       fgDirty = true;
       requestRender();
     }
