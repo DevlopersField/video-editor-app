@@ -347,12 +347,12 @@
     });
   };
 
-  // Optional: Dynamic OpenCV.js loader if user wants full OpenCV WASM
+  // Optional: Local OpenCV.js loader if user provides local opencv.js in folder
   MaskTracker.loadOpenCV = function(){
     return new Promise((resolve, reject) => {
       if (global.cv && global.cv.Mat){ resolve(global.cv); return; }
       const s = document.createElement("script");
-      s.src = "https://docs.opencv.org/4.x/opencv.js";
+      s.src = "opencv.js";
       s.async = true;
       s.onload = () => {
         if (global.cv){

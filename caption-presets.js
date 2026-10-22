@@ -31,6 +31,26 @@
       { font:"DM Sans", weight:700, hl:"#FFE7A3", bg:"block", bgColor:"#000000", bgOpacity:.38, radius:22, padX:.45, padY:.22 },
       { enter:"up", enterDur:.25, exit:"fade", anim:"word", size:1.05, pos:"lower" }),
 
+    /* Glassmorphism */
+    P("glass-frost", "Frosted Crystal", "Glassmorphism",
+      { font:"Inter", weight:700, bg:"block", bgShape:"glass", bgColor:"#FFFFFF", bgOpacity:.24, radius:20, padX:.45, padY:.2, hl:"#FFE500", shadow:true, shadowBlur:16, shadowY:4 },
+      { enter:"up", enterDur:.24, exit:"fade", anim:"word", size:1.05, pos:"lower" }),
+    P("glass-dark", "Liquid Dark Glass", "Glassmorphism",
+      { font:"Montserrat", weight:800, bg:"block", bgShape:"glass", bgColor:"#0B111E", bgOpacity:.52, radius:24, padX:.48, padY:.22, hl:"#00F5D4", shadow:true, shadowBlur:20, shadowY:5 },
+      { enter:"pop", enterDur:.24, exit:"fade", anim:"word", size:1.1, pos:"lower" }),
+    P("glass-neon", "Cyber Neon Glass", "Glassmorphism",
+      { font:"Kanit", weight:700, case:"upper", bg:"line", bgShape:"glass", bgColor:"#101524", bgOpacity:.58, radius:16, padX:.35, padY:.14, hl:"#FF007F", shadow:true, shadowColor:"#00F0FF", shadowBlur:24, shadowY:0 },
+      { enter:"wpop", enterDur:.26, exit:"blur", anim:"word", size:1.2, pos:"lowmid" }),
+    P("glass-aurora", "Aurora Frosted Pill", "Glassmorphism",
+      { font:"Poppins", weight:700, bg:"word", bgShape:"glass", bgColor:"#0D2A2A", bgOpacity:.48, radius:40, padX:.36, padY:.16, hl:"#52FFB8", hlMode:"box", shadow:true, shadowBlur:14, shadowY:3 },
+      { enter:"wpop", enterDur:.22, exit:"fade", anim:"word", size:1.05, pos:"lower" }),
+    P("glass-luxury", "Luxury Gold Glass", "Glassmorphism",
+      { font:"Playfair Display", weight:600, italic:true, bg:"block", bgShape:"glass", bgColor:"#1A1614", bgOpacity:.48, radius:16, padX:.44, padY:.2, hl:"#F3C68F", shadow:true, shadowBlur:18, shadowY:4 },
+      { enter:"fade", enterDur:.28, exit:"fade", anim:"word", size:1.05, pos:"lower" }),
+    P("glass-pop", "Glass Pop", "Glassmorphism",
+      { font:"Montserrat", weight:800, case:"upper", bg:"none", fx:"glasspop", hl:"#FFE700", shadow:true, shadowBlur:12, shadowY:3 },
+      { enter:"pop", enterDur:.22, exit:"none", anim:"word", size:1.2, pos:"middle" }),
+
     /* Bold */
     P("impact", "Impact yellow", "Bold",
       { font:"Montserrat", weight:900, case:"upper", hl:"#FFE14D", outline:true, outlineColor:"#000000", outlineW:.17, shadow:true, shadowBlur:10, shadowY:5, lineHeight:1.02 },

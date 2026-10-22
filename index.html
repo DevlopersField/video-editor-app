@@ -230,6 +230,8 @@ var done=function(){if(!s.isConnected)return;s.classList.add("out");setTimeout(f
     <button type="button" data-v="home" aria-pressed="true">Home</button>
     <button type="button" data-v="post" aria-pressed="false">Post editor</button>
     <button type="button" data-v="video" aria-pressed="false">Video editor</button>
+    <button type="button" data-v="photo" aria-pressed="false">📸 Photo Studio</button>
+    <button type="button" data-v="bgremover" aria-pressed="false">✂️ BG Remover</button>
     <button type="button" data-v="settings" aria-pressed="false">Brand settings</button>
   </nav>
   <button type="button" id="tabPopout" class="btn sm" title="Open active editor in a new browser tab" style="margin-left:4px;padding:3px 8px;font-size:11px;display:none;align-items:center;gap:4px" aria-label="Open editor in new tab">
@@ -336,6 +338,8 @@ var done=function(){if(!s.isConnected)return;s.classList.add("out");setTimeout(f
 
 <iframe class="view" id="f-post" src="post.html" title="Post editor" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
 <iframe class="view" id="f-video" src="video.html" title="Video editor" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
+<iframe class="view" id="f-photo" src="photo-editor.html" title="Photo Studio Pro" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
+<iframe class="view" id="f-bgremover" src="bg-remover.html" title="Background Remover" allow="fullscreen; clipboard-read; clipboard-write" hidden></iframe>
 
 <script src="rs-store.js"></script>
 <script>RS.theme.mount(document.querySelector(".theme-slot"));</script>
@@ -347,12 +351,21 @@ const C = window.GIRIKA ? GIRIKA.C : {}, LOGO = window.GIRIKA ? GIRIKA.LOGO : nu
 $("brandMark").innerHTML = `<svg viewBox="0 0 32 38" width="100%" height="100%"><rect x="2" y="4" width="28" height="30" rx="8" fill="#F4F1EC"/><path d="M13 13.5v11l9-5.5z" fill="#C98B6E"/></svg>`;
 
 /* ---------- views ---------- */
-const FR = { post:$("f-post"), video:$("f-video") }, READY = { post:false, video:false }, QUEUE = { post:[], video:[] }, TPL = { post:[], video:[] };
+const FR = { post:$("f-post"), video:$("f-video"), photo:$("f-photo"), bgremover:$("f-bgremover") },
+      READY = { post:false, video:false, photo:true, bgremover:true },
+      QUEUE = { post:[], video:[], photo:[], bgremover:[] },
+      TPL = { post:[], video:[] };
 let view = "home";
 function show(v){
-  view = v; $("home").hidden = v !== "home"; $("settings").hidden = v !== "settings"; FR.post.hidden = v !== "post"; FR.video.hidden = v !== "video";
+  view = v;
+  $("home").hidden = v !== "home";
+  $("settings").hidden = v !== "settings";
+  FR.post.hidden = v !== "post";
+  FR.video.hidden = v !== "video";
+  if (FR.photo) FR.photo.hidden = v !== "photo";
+  if (FR.bgremover) FR.bgremover.hidden = v !== "bgremover";
   const pop = $("tabPopout");
-  if (pop) pop.style.display = (v === "post" || v === "video") ? "inline-flex" : "none";
+  if (pop) pop.style.display = (v === "post" || v === "video" || v === "photo" || v === "bgremover") ? "inline-flex" : "none";
   if (v === "settings") openSettings();
   document.querySelectorAll(".tabs button").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.v === v)));
   if (location.hash !== "#" + v) history.replaceState(null, "", v === "home" ? location.pathname : "#" + v);
@@ -363,6 +376,8 @@ $("goHome").addEventListener("click", () => show("home"));
 const popBtn = $("tabPopout");
 if (popBtn) popBtn.addEventListener("click", () => {
   if (view === "post" || view === "video") window.open(view + ".html", "_blank");
+  else if (view === "photo") window.open("photo-editor.html", "_blank");
+  else if (view === "bgremover") window.open("bg-remover.html", "_blank");
 });
 function send(app, msg){ if (READY[app]) FR[app].contentWindow.postMessage(msg, "*"); else QUEUE[app].push(msg); }
 
@@ -398,10 +413,13 @@ const ICON = {
   video:'<rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2v8l-4-2"/>',
   drone:'<circle cx="5" cy="6" r="2.2"/><circle cx="19" cy="6" r="2.2"/><path d="M7 6h10M12 6v4"/><rect x="9" y="10" width="6" height="4" rx="1"/><path d="M4 21l4-5h8l4 5"/>',
   star:'<path d="M12 3l2.4 5 5.6.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.6-.8z"/>',
+  cut:'<circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/>',
   open:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
 };
 const QUICK = [
-  { k:"highlights", star:true, icon:"star", title:"Drone footage to highlight reel", sub:"Pick long drone or walkthrough videos. The best shots are found and cut into a reel with cinematic colour.", accept:"video/*", multi:true, app:"video" },
+  { k:"photo", star:true, icon:"photos", title:"Photo Studio & Generative Expand", sub:"Background replacement (colors & photos), Adobe-style aspect ratio expander, and 4K export.", accept:"image/*", multi:false, app:"photo" },
+  { k:"bgremover", icon:"cut", title:"AI Background Remover", sub:"Instant subject cutout (remove.bg / Photoshop style) with manual brush, lasso & magic wand.", accept:"image/*", multi:false, app:"bgremover" },
+  { k:"highlights", icon:"star", title:"Drone footage to highlight reel", sub:"Pick long drone or walkthrough videos. The best shots are found and cut into a reel with cinematic colour.", accept:"video/*", multi:true, app:"video" },
   { k:"photos", icon:"photos", title:"Reel from photos", sub:"Several photos become a property tour with smooth camera moves and transitions.", accept:"image/*", multi:true, app:"video" },
   { k:"post", icon:"post", title:"Post from a photo", sub:"One photo plus your text for Instagram, Facebook or X. Add pages for a carousel.", accept:"image/*,video/*", multi:false, app:"post" },
   { k:"videos", icon:"video", title:"Edit a video", sub:"Trim clips, add captions, voiceover, music and your brand intro and outro.", accept:"video/*", multi:true, app:"video" },
@@ -419,12 +437,29 @@ QUICK.forEach(q => {
   b.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${ICON[q.icon]}</svg><span><b></b><small></small></span>`;
   b.querySelector("b").textContent = q.title; b.querySelector("small").textContent = q.sub;
   b.addEventListener("click", async () => {
+    if (q.app === "bgremover"){
+      show("bgremover");
+      return;
+    }
+    if (q.app === "photo"){
+      const files = await pickFiles(q.accept, q.multi);
+      show("photo");
+      if (files.length) send("photo", { girika:"start", files });
+      return;
+    }
     const files = await pickFiles(q.accept, q.multi); if (!files.length) return;
     show(q.app);
     if (q.app === "post") send("post", { girika:"start", files });
     else send("video", { girika:"start", action:q.k, files, format:vsize });
   });
   $("quick").appendChild(b);
+});
+window.addEventListener("message", e => {
+  const m = e.data; if (!m || !m.girika) return;
+  if (m.girika === "cutout"){
+    if (m.target === "post"){ show("post"); send("post", { girika:"cutout", dataUrl:m.dataUrl }); }
+    else if (m.target === "video"){ show("video"); send("video", { girika:"cutout", dataUrl:m.dataUrl }); }
+  }
 });
 
 /* ---------- template library ---------- */
@@ -464,9 +499,9 @@ $("q").addEventListener("input", e => { query = e.target.value; buildGrid(); });
 /* ---------- messages from the editors ---------- */
 window.addEventListener("message", e => {
   const m = e.data; if (!m || !m.girika) return;
-  const app = e.source === FR.post.contentWindow ? "post" : e.source === FR.video.contentWindow ? "video" : null; if (!app) return;
+  const app = e.source === FR.post.contentWindow ? "post" : e.source === FR.video.contentWindow ? "video" : e.source === (FR.photo && FR.photo.contentWindow) ? "photo" : null; if (!app) return;
   if (m.girika === "ready"){
-    READY[app] = true; TPL[app] = m.templates || [];
+    READY[app] = true; if (m.templates) TPL[app] = m.templates;
     FR[app].contentWindow.postMessage({ girika:"mode", mode }, "*");
     QUEUE[app].splice(0).forEach(x => FR[app].contentWindow.postMessage(x, "*"));
     buildCats(); buildGrid();
@@ -739,7 +774,7 @@ $("setupDemo").addEventListener("click", () => { G.setActive("girika"); location
 buildCats(); buildGrid();
 try { const fl = sessionStorage.getItem("reelstudio-flash"); if (fl){ sessionStorage.removeItem("reelstudio-flash"); status(fl); } } catch(e) {}
 const start = location.hash.slice(1);
-if (GIRIKA.isFirstRun()) show("settings"); else show(["post","video","settings"].includes(start) ? start : "home");
+if (GIRIKA.isFirstRun()) show("settings"); else show(["post","video","photo","bgremover","settings"].includes(start) ? start : "home");
 </script>
 </body>
 </html>

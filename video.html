@@ -556,6 +556,8 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       <div id="progBarPanel" style="margin:4px 0 10px;padding:8px;background:var(--soft);border-radius:8px" hidden></div>
       <label class="toggle"><input type="checkbox" id="audiogramOn"> 🎵 Dynamic audiogram (Adobe / Veed)</label>
       <div id="audiogramPanel" style="margin:4px 0 10px;padding:8px;background:var(--soft);border-radius:8px" hidden></div>
+      <label class="toggle"><input type="checkbox" id="droneHudOn"> 🛰️ Drone Telemetry HUD (Adobe AE MOGRT)</label>
+      <label class="toggle"><input type="checkbox" id="cinemascopeOn"> 🎬 Cinemascope 2.39:1 (Adobe Premiere)</label>
       <div id="wmPanel" style="margin:4px 0 12px"></div>
       <div class="row" style="margin-top:4px"><button class="btn sm" id="editIntro">Edit intro</button><button class="btn sm" id="editOutro">Edit outro</button></div>
     </div>
@@ -621,6 +623,12 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       </div>
     </div>
 
+    <div class="group" id="plotsGroup">
+      <h2>📍 Plots &amp; 3D Markers</h2>
+      <p class="hint" style="margin:0 0 10px">Highlight land or buildings with 3D floating location pins, house/villa badges, and tracking borders.</p>
+      <div id="plotsSidebarContent"></div>
+    </div>
+
     <div class="group">
       <h2>Captions</h2>
       <span class="lbl">Style</span>
@@ -678,6 +686,10 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
         <button class="btn sm" id="capSubIn">Import SRT/VTT</button>
       </div>
       <div class="cs-ask" id="capImportAsk" role="group" aria-label="Import captions" hidden></div>
+      <div class="row" style="margin:10px 0 6px;align-items:center;gap:6px">
+        <input type="search" id="capSearchInp" placeholder="🔍 Search captions / script (Adobe)..." style="flex:1;height:30px;padding:4px 8px;font-size:12px;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--text)">
+        <span class="hint" id="capSearchCount" style="margin:0;font-size:11px;white-space:nowrap"></span>
+      </div>
       <div class="caplist" id="capList"></div>
     </div>
   </aside>
@@ -1336,6 +1348,7 @@ const P = {
   intro:{ on:true, title:"Forest-view plots near *Sahastradhara Road*", sub:"Dehradun", dur:2.6, theme:"slate", transition:"fade", photoDim:.72 },
   outro:{ on:true, cta:"Book a free site visit", phoneLabel:"Call or WhatsApp", phone:"90585 37664", phone2:"", location:"Dehradun, Uttarakhand", web:"girikahomes.com", handle:"@girikahomes", dur:3.6, theme:"slate", photoDim:.72 },
   watermark:true, progressBar:false, progBar:{ pos:"bottom", color:"gradient", height:7, customColor:"#CCFF00" }, audiogram:{ on:false, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 },
+  droneHud:false, cinemascope:false,
   logo:{ wmKind:"lockup", wmTone:"dark", wmPos:"tr", wmSize:1, wmOpacity:.95, introKind:"stacked", introTone:"auto", introSize:1, outroKind:"lockup", outroTone:"auto", outroSize:1 },
   cap:{ v:2, style:"bold", pos:"lower", size:1.3, bg:"slate", accent:"clayLt", case:"normal", anim:"word", words:"short", enter:"none", enterDur:.3, exit:"none", exitDur:.25, font:"", presetId:"", custom:{ ...capDef() } }, lang:"en-IN", autoCaps:true, micId:"", voiceClean:true, voSrc:"mic", muteVideo:false, hearWhileRec:false,
   musicVol:.35, duckLevel:.22, voVol:1, td:.6, pps:50,
@@ -1705,6 +1718,13 @@ function drawClip(c, clip, local){
 }
 
 /* ---------- plot highlight: outline draws on, dimensions and total area pop in ---------- */
+function hexToRgb(h){
+  if (!h) return "230,59,46";
+  const str = String(h).replace("#", "");
+  const full = (str.length === 3) ? str[0]+str[0]+str[1]+str[1]+str[2]+str[2] : str.slice(0, 6);
+  const n = parseInt(full, 16) || 0;
+  return `${(n >> 16) & 255},${(n >> 8) & 255},${n & 255}`;
+}
 const PLOT_COLORS = {
   red: ["#E63B2E", "230,59,46"],
   yellow: ["#FFD700", "255,215,0"],
@@ -1954,20 +1974,23 @@ function plotPtsAt(pl, local){
 
 function drawPlot(c, X, pl, local, clip){
   const { u, W, H } = geo(), t = local - (pl.at || 0);
-  const editing = selected && selected.type === "plot" && selected.item === pl && !exporting && !playing;
-  if (t < 0 && !editing) return;
+  const isEditing = !exporting && !playing;
+  const isSelectedPlot = selected && selected.type === "plot" && selected.item === pl && isEditing;
+  if (t < 0 && !isSelectedPlot) return;
   const curPts = plotPtsAt(pl, local);
   if (!curPts || curPts.length < 2) return;
   /* life: shows for pl.dur seconds (0 or empty = until the clip ends), with a short fade out */
   const life = pl.dur > 0 ? pl.dur : Infinity;
-  if (!editing && t > life) return;
-  const out = editing ? 1 : clamp((life - t) / .35);
-  const T = editing ? Math.max(t, 1.6) : t;
+  if (!isSelectedPlot && t > life) return;
+  const out = isSelectedPlot ? 1 : clamp((life - t) / .35);
+  const T = isEditing ? Math.max(t, 1.6) : t;
   // For screen HUD pinning, use fixed transform at pl.at; for video sticking, use current clipXform X so it sticks to the video
   const useFixedX = (pl.stickMode === "screen");
   const X_plot = useFixedX ? (clip ? (clipXform(clip, pl.at || 0) || X) : X) : X;
   const pts = curPts.map(([a, b]) => mapPt(X_plot, a, b));
-  const [col, rgb] = PLOT_COLORS[pl.color] || PLOT_COLORS.red;
+  const [col, rgb] = (pl.color === "custom" && pl.lineHex) ?
+    [pl.lineHex, hexToRgb(pl.lineHex)] :
+    (PLOT_COLORS[pl.color] || PLOT_COLORS.red);
   const closed = curPts.length >= 3;
 
   // Spotlight effect: Dim the rest of the video outside the plot so ONLY that part is highlighted
@@ -2012,7 +2035,10 @@ function drawPlot(c, X, pl, local, clip){
   /* fill inside: comes in with clean fade, no pulsing or wiggling */
   const fillKey = pl.fill === undefined ? (pl.color || "red") : pl.fill;
   if (closed && fillKey !== "none"){
-    const frgb = (PLOT_COLORS[fillKey] || PLOT_COLORS.red)[1], k = pl.fillK ?? .35;
+    const frgb = (fillKey === "custom" && pl.fillHex) ?
+      hexToRgb(pl.fillHex) :
+      ((fillKey === "custom" && pl.lineHex) ? hexToRgb(pl.lineHex) : ((PLOT_COLORS[fillKey] || PLOT_COLORS[pl.color] || PLOT_COLORS.red)[1]));
+    const k = pl.fillK ?? .35;
     const fa = clamp(T / .2) * (k + (pl.motion ? .08 * Math.sin(T * 5) : 0));
     if (fa > 0){ c.fillStyle = `rgba(${frgb},${clamp(fa, 0, .9).toFixed(3)})`; path(); c.fill(); }
   }
@@ -2091,6 +2117,188 @@ function drawPlot(c, X, pl, local, clip){
     if (editing && r){ c.save(); c.strokeStyle = "#fff"; c.setLineDash([10 * u, 7 * u]); c.lineWidth = 3 * u; c.strokeRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u); c.restore(); }
   }
   sideQ.forEach(f => f());
+  // 3D Floating Location Pin & Marker
+  if (closed && pl.pin3d !== false){
+    drawPlot3DPin(c, X_plot, pl, pts, u, T, out, col, rgb);
+  }
+  c.restore();
+}
+
+/* ---------- 3D floating location pin & custom icon on top of plot ---------- */
+function drawPlot3DPin(c, X_plot, pl, pts, u, T, out, col, rgb){
+  if (!pts || pts.length < 3) return;
+  const n = pts.length;
+  const gx = pts.reduce((s, p) => s + p[0], 0) / n;
+  const gy = pts.reduce((s, p) => s + p[1], 0) / n;
+
+  const anim = clamp(T / 0.4);
+  const pop = backOut(anim);
+  const a = ease(anim) * out;
+  if (a <= 0) return;
+
+  const stalkH = (pl.pinHeight || 1.0) * 85 * u;
+  const bob = (pl.pinFloat !== false) ? Math.sin(T * 3.5) * 6 * u : 0;
+  const px = gx, py = gy - stalkH * pop + bob;
+  const bR = (pl.pinSize || 1.0) * 26 * u;
+
+  c.save();
+  c.globalAlpha = a;
+
+  // 1. Ground contact shadow (3D perspective disc on the ground surface)
+  c.save();
+  c.fillStyle = "rgba(0,0,0,0.45)";
+  c.beginPath();
+  c.ellipse(gx, gy + 3 * u, 22 * u * pop, 8 * u * pop, 0, 0, Math.PI * 2);
+  c.fill();
+
+  // Glowing beacon ring on ground
+  c.strokeStyle = col;
+  c.lineWidth = 3 * u;
+  c.shadowColor = `rgba(${rgb},0.8)`;
+  c.shadowBlur = 8 * u;
+  c.beginPath();
+  c.ellipse(gx, gy, 10 * u * pop, 4 * u * pop, 0, 0, Math.PI * 2);
+  c.stroke();
+  c.restore();
+
+  // 2. 3D Needle / Stalk (rising from ground to floating marker)
+  c.save();
+  const stalkGrad = c.createLinearGradient(gx, gy, px, py);
+  stalkGrad.addColorStop(0, `rgba(${rgb},0.3)`);
+  stalkGrad.addColorStop(0.3, "rgba(255,255,255,0.7)");
+  stalkGrad.addColorStop(1, "#FFFFFF");
+  c.strokeStyle = stalkGrad;
+  c.lineWidth = 3.5 * u;
+  c.lineCap = "round";
+  c.shadowColor = "rgba(0,0,0,0.5)";
+  c.shadowBlur = 6 * u;
+  c.beginPath();
+  c.moveTo(gx, gy);
+  c.lineTo(px, py + bR * 1.2);
+  c.stroke();
+  c.restore();
+
+  // 3. Floating 3D Badge / Icon
+  c.save();
+  c.translate(px, py);
+  c.scale(pop, pop);
+
+  // Drop shadow under the floating badge
+  c.shadowColor = "rgba(0,0,0,0.55)";
+  c.shadowBlur = 14 * u;
+  c.shadowOffsetY = 6 * u;
+
+  const iconType = pl.pinIcon || "pin";
+
+  if (iconType === "pin"){
+    // Classic 3D Google Maps / Real Estate Teardrop Pin
+    const pinR = bR * 0.9;
+    c.beginPath();
+    c.moveTo(0, pinR * 1.4);
+    c.quadraticCurveTo(-pinR * 1.15, pinR * 0.5, -pinR, 0);
+    c.arc(0, 0, pinR, Math.PI, 0, false);
+    c.quadraticCurveTo(pinR * 1.15, pinR * 0.5, 0, pinR * 1.4);
+    c.closePath();
+
+    // 3D Pin gradient
+    const pinGrad = c.createRadialGradient(-pinR * 0.3, -pinR * 0.3, pinR * 0.2, 0, 0, pinR * 1.5);
+    pinGrad.addColorStop(0, "#FFFFFF");
+    pinGrad.addColorStop(0.25, col);
+    pinGrad.addColorStop(1, `rgba(${rgb},0.85)`);
+    c.fillStyle = pinGrad;
+    c.fill();
+    c.strokeStyle = "#FFFFFF";
+    c.lineWidth = 2.5 * u;
+    c.stroke();
+
+    // Inner white circle
+    c.save();
+    c.shadowColor = "transparent";
+    c.fillStyle = "#FFFFFF";
+    c.beginPath();
+    c.arc(0, -pinR * 0.15, pinR * 0.42, 0, Math.PI * 2);
+    c.fill();
+
+    // Inner glyph / dot
+    c.fillStyle = col;
+    c.beginPath();
+    c.arc(0, -pinR * 0.15, pinR * 0.2, 0, Math.PI * 2);
+    c.fill();
+    c.restore();
+  } else if (iconType === "custom" && pl.pinImg){
+    // Custom user image / logo badge
+    const badgeR = bR;
+    c.beginPath();
+    c.arc(0, 0, badgeR, 0, Math.PI * 2);
+    c.fillStyle = "#1C2128";
+    c.fill();
+    c.strokeStyle = col;
+    c.lineWidth = 3.5 * u;
+    c.stroke();
+
+    // Draw clipped circular image
+    c.save();
+    c.shadowColor = "transparent";
+    c.beginPath();
+    c.arc(0, 0, badgeR - 2 * u, 0, Math.PI * 2);
+    c.clip();
+    const iw = pl.pinImg.naturalWidth || pl.pinImg.width || 100;
+    const ih = pl.pinImg.naturalHeight || pl.pinImg.height || 100;
+    const sc = (badgeR * 2) / Math.min(iw, ih);
+    const dw = iw * sc, dh = ih * sc;
+    c.drawImage(pl.pinImg, -dw / 2, -dh / 2, dw, dh);
+    c.restore();
+  } else {
+    // 3D Glossy Icon Shield Badge (House 🏠, Building 🏢, Land 🌾, Star ⭐)
+    const badgeR = bR;
+    c.beginPath();
+    c.arc(0, 0, badgeR, 0, Math.PI * 2);
+
+    const bGrad = c.createLinearGradient(0, -badgeR, 0, badgeR);
+    bGrad.addColorStop(0, "#252B35");
+    bGrad.addColorStop(1, "#12161C");
+    c.fillStyle = bGrad;
+    c.fill();
+
+    c.strokeStyle = col;
+    c.lineWidth = 3.5 * u;
+    c.stroke();
+
+    // Inner Emoji glyph
+    c.shadowColor = "transparent";
+    const glyph = { house:"🏠", building:"🏢", land:"🌾", star:"⭐" }[iconType] || "📍";
+    c.font = `${Math.round(bR * 1.15)}px sans-serif`;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    c.fillText(glyph, 0, 1 * u);
+  }
+
+  // Optional badge mini-title below or above
+  if (pl.pinLabel || pl.name){
+    const labelTxt = (pl.pinLabel || pl.name).toUpperCase();
+    c.font = `800 ${13 * u}px var(--sans, sans-serif)`;
+    c.textAlign = "center";
+    c.textBaseline = "middle";
+    const tw = c.measureText(labelTxt).width + 14 * u;
+    const th = 20 * u;
+    const ly = -bR - 14 * u;
+
+    c.shadowColor = "rgba(0,0,0,0.5)";
+    c.shadowBlur = 8 * u;
+    c.fillStyle = "rgba(20,24,30,0.92)";
+    c.beginPath();
+    c.roundRect(-tw / 2, ly - th / 2, tw, th, 6 * u);
+    c.fill();
+    c.strokeStyle = col;
+    c.lineWidth = 1.5 * u;
+    c.stroke();
+
+    c.shadowColor = "transparent";
+    c.fillStyle = "#FFFFFF";
+    c.fillText(labelTxt, 0, ly);
+  }
+
+  c.restore();
   c.restore();
 }
 
@@ -2290,7 +2498,7 @@ function drawWatermark(c){
   c.save(); c.globalAlpha = L.wmOpacity; c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 12 * u;
   drawLogo(c, L.wmKind, L.wmTone, x, y, w); c.restore();
 }
-const CAP_STYLES = [["giant","Giant (1 word)"],["bold","Bold pop"],["linebox","Line boxes"],["wordbox","Word box"],["classic","Classic box"],["lower","Lower third"],["cinema","Cinematic"]];
+const CAP_STYLES = [["giant","Giant (1 word)"],["bold","Bold pop"],["glass","Glassmorphism"],["linebox","Line boxes"],["wordbox","Word box"],["classic","Classic box"],["lower","Lower third"],["cinema","Cinematic"]];
 const CAP_SIZES = [[.85,"S"],[1.05,"M"],[1.3,"L"],[1.65,"XL"]];
 const CAP_BGS = [["slate","Mountain slate"],["ink","Ink"],["white","White"],["clay","Earth clay"],["deodar","Deodar green"]];
 const CAP_ACCENTS = [["clayLt","Clay light"],["sage","Light sage"],["lime","Limestone"],["clay","Earth clay"]];
@@ -2380,6 +2588,19 @@ const CAP_FX = {
     }
   },
   popup:{ name:"Pop up", group:"active", word(e, i){ if (i !== e.k) return null; const b = backOut(e.wq(i, .22)); return { sc:1 + .14 * e.amt * b, dy:-e.size * .12 * e.amt * b }; } },
+  glasspop:{ name:"Glass pop", group:"active",
+    pre(e){
+      const r1 = e.pos[e.k]; if (!r1) return;
+      const c = e.c, s = e.size, u = e.u;
+      const bw = r1.ww + s * .42, bh = s * 1.25;
+      const bx = r1.x - s * .21, by = r1.ly - bh / 2;
+      drawGlassmorphismBackdrop(c, bx, by, bw, bh, bh / 2, { bgColor: e.S.bgColor || "#0B111E", bgOpacity: 0.55 }, u);
+    },
+    word(e, i){
+      if (i !== e.k) return null;
+      return { color: e.hlCol(i) || "#FFFFFF", sc: 1.06 };
+    }
+  },
   bounce:{ name:"Bounce", group:"active", word(e, i){ if (i !== e.k) return null; const q = e.wq(i, .5); return { dy:-Math.abs(Math.sin(q * Math.PI * 2.5)) * e.size * .2 * e.amt * (1 - q) }; } },
   punch:{ name:"Scale punch", group:"active", word(e, i){ if (i !== e.k) return null; const q = e.wq(i, .2); return { sc:1.08 + .32 * e.amt * (1 - easeOutC(q)) }; } },
   shake:{ name:"Shake", group:"active", word(e, i){ if (i !== e.k) return null; const q = e.wq(i, .45), f = (1 - q) * e.amt, s = (e.t - e.ws(i)) * 60;
@@ -2481,7 +2702,7 @@ function capProps(p){
   if (!o.fx || !Object.prototype.hasOwnProperty.call(CAP_FX, o.fx)) o.fx = "";
   if (!["solid","gradient"].includes(o.fill)) o.fill = "solid";
   if (!["single","double","gradient"].includes(o.outlineStyle)) o.outlineStyle = "single";
-  if (!["box","pill","sticker","marker"].includes(o.bgShape)) o.bgShape = "box";
+  if (!["box","pill","glass","sticker","marker"].includes(o.bgShape)) o.bgShape = "box";
   o.fxAmt = clamp(+o.fxAmt || 1, .2, 2.5); o.gradAngle = clamp(+o.gradAngle || 0, 0, 360); o.outline2W = clamp(+o.outline2W || 0, 0, .3);
   o.tilt = clamp(+o.tilt || 0, 0, 20); o.track = clamp(+o.track || 0, 0, .6); o.longLen = clamp(+o.longLen || 0, 0, .6);
   if (!["show","dim","hide"].includes(o.upcoming)) o.upcoming = "show";
@@ -2550,7 +2771,7 @@ function parseWords(text){
   });
   return out;
 }
-const CAP_FONT = { bold:[800, "sans", 72, 1.1], linebox:[700, "sans", 54, 1.36], wordbox:[800, "sans", 62, 1.32], classic:[700, "sans", 50, 1.28], lower:[500, "serif", 50, 1.22], cinema:[500, "serif", 58, 1.16] };
+const CAP_FONT = { bold:[800, "sans", 72, 1.1], glass:[700, "sans", 66, 1.22], linebox:[700, "sans", 54, 1.36], wordbox:[800, "sans", 62, 1.32], classic:[700, "sans", 50, 1.28], lower:[500, "serif", 50, 1.22], cinema:[500, "serif", 58, 1.16] };
 /* entrance and exit motion. Short captions: enter + exit never take more than 60% of the caption. */
 const easeOutC = p => 1 - Math.pow(1 - clamp(p), 3), easeInC = p => Math.pow(clamp(p), 3);
 const elasticOut = p => { p = clamp(p); return p === 0 || p === 1 ? p : Math.pow(2, -10 * p) * Math.sin((p * 10 - .75) * 2 * Math.PI / 3) + 1; };
@@ -2683,6 +2904,7 @@ function drawCaption(c, cap, t){
   /* backgrounds wrap only the inline words */
   if (inlineWords.length){
     if (style === "classic"){ c.fillStyle = bg; c.globalAlpha = life * .92; c.beginPath(); c.roundRect(cx - wide / 2 - padX, y0, wide + padX * 2, blockH, 18 * u); c.fill(); c.globalAlpha = life; }
+    if (style === "glass"){ drawGlassmorphismBackdrop(c, cx - wide / 2 - padX, y0, wide + padX * 2, blockH, 20 * u, { bgColor: bg, bgOpacity: 0.45 }, u); }
     if (style === "lower"){
       const bw = wide + padX * 2 + 12 * u; c.fillStyle = bg; c.globalAlpha = life * .9; c.beginPath(); c.roundRect(lx0, y0, bw, blockH, [4 * u, 14 * u, 14 * u, 4 * u]); c.fill();
       c.globalAlpha = life; c.fillStyle = C.clayLt; c.fillRect(lx0, y0, 10 * u, blockH);
@@ -2791,9 +3013,70 @@ function capLetterInfo(c, LY, w, ls){
   c.letterSpacing = ls0;
   return LY.lt[w.gi] = { parts, xs, ws };
 }
-/* background shapes: box (corner radius), pill, sticker (tilted, soft shadow), marker (hand drawn highlighter) */
-function capShape(c, shape, x, y, w, h, rad, seed, u){
+/* Frosted glass backdrop with specular sheen, ambient shadow, and luminous rim light */
+function drawGlassmorphismBackdrop(c, x, y, w, h, rad, opt, u){
   if (w <= 0 || h <= 0) return;
+  c.save();
+  const r = Math.min(rad || 16 * u, h / 2, w / 2);
+  const bgCol = opt && opt.bgColor ? opt.bgColor : "#0F172A";
+  const op = clamp(typeof (opt && opt.bgOpacity) === "number" ? opt.bgOpacity : 0.45, 0.05, 0.95);
+  const rgb = hexToRgb(bgCol);
+
+  // 1. Soft Ambient Float Shadow
+  c.shadowColor = "rgba(0,0,0,0.45)";
+  c.shadowBlur = 18 * u;
+  c.shadowOffsetY = 6 * u;
+
+  // 2. Translucent Frosted Gradient Body
+  const bgGrad = c.createLinearGradient(x, y, x + w * 0.3, y + h);
+  bgGrad.addColorStop(0, `rgba(${rgb},${Math.min(0.95, op * 1.2)})`);
+  bgGrad.addColorStop(1, `rgba(${rgb},${Math.max(0.1, op * 0.72)})`);
+  c.fillStyle = bgGrad;
+  c.beginPath();
+  c.roundRect(x, y, w, h, r);
+  c.fill();
+
+  // Reset shadow for inner specular and rim stroke
+  c.shadowColor = "transparent";
+  c.shadowBlur = 0;
+  c.shadowOffsetY = 0;
+
+  // 3. Specular Highlight (Reflection across top half)
+  c.save();
+  c.beginPath();
+  c.roundRect(x, y, w, h, r);
+  c.clip();
+  const specH = Math.max(8 * u, h * 0.5);
+  const specGrad = c.createLinearGradient(x, y, x, y + specH);
+  specGrad.addColorStop(0, "rgba(255,255,255,0.26)");
+  specGrad.addColorStop(0.35, "rgba(255,255,255,0.08)");
+  specGrad.addColorStop(1, "rgba(255,255,255,0)");
+  c.fillStyle = specGrad;
+  c.fillRect(x, y, w, specH);
+  c.restore();
+
+  // 4. Luminous Frosted Rim Light Border
+  const rimGrad = c.createLinearGradient(x, y, x + w, y + h);
+  rimGrad.addColorStop(0, "rgba(255,255,255,0.65)");
+  rimGrad.addColorStop(0.28, "rgba(255,255,255,0.18)");
+  rimGrad.addColorStop(0.72, "rgba(255,255,255,0.08)");
+  rimGrad.addColorStop(1, "rgba(255,255,255,0.38)");
+  c.strokeStyle = rimGrad;
+  c.lineWidth = Math.max(1.5 * u, 1.2);
+  c.beginPath();
+  c.roundRect(x + 0.5 * u, y + 0.5 * u, w - 1 * u, h - 1 * u, Math.max(0, r - 0.5 * u));
+  c.stroke();
+
+  c.restore();
+}
+
+/* background shapes: box (corner radius), pill, glass (frosted glassmorphism), sticker, marker */
+function capShape(c, shape, x, y, w, h, rad, seed, u, opt){
+  if (w <= 0 || h <= 0) return;
+  if (shape === "glass"){
+    drawGlassmorphismBackdrop(c, x, y, w, h, rad, opt, u);
+    return;
+  }
   if (shape === "pill"){ c.beginPath(); c.roundRect(x, y, w, h, h / 2); c.fill(); return; }
   if (shape === "sticker"){
     c.save(); const cx = x + w / 2, cy = y + h / 2; c.translate(cx, cy); c.rotate((capRand(seed) - .5) * .1); c.translate(-cx, -cy);
@@ -2904,8 +3187,14 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   if (FX && FX.block) FX.block(e);
   const bgA = S.bgOpacity, shape = S.bgShape;
   if (inlineWords.length > 0){
-    if (bgMode === "block" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; capShape(c, shape, bx, y0, bw, blockH, rad, seed, u); c.globalAlpha = life; }
-    if (bgMode === "line" && bgA > 0){ c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; lines.forEach((ln, i) => capShape(c, shape, lineX(lineW[i]) - px, rows[i].y, lineW[i] + px * 2, rows[i].h, rad, seed + i * 5, u)); c.globalAlpha = life; }
+    if (bgMode === "block" && bgA > 0){
+      if (shape === "glass"){ drawGlassmorphismBackdrop(c, bx, y0, bw, blockH, rad || 18 * u, { bgColor: S.bgColor, bgOpacity: bgA }, u); }
+      else { c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; capShape(c, shape, bx, y0, bw, blockH, rad, seed, u, { bgColor: S.bgColor, bgOpacity: bgA }); c.globalAlpha = life; }
+    }
+    if (bgMode === "line" && bgA > 0){
+      if (shape === "glass"){ lines.forEach((ln, i) => drawGlassmorphismBackdrop(c, lineX(lineW[i]) - px, rows[i].y, lineW[i] + px * 2, rows[i].h, rad || 12 * u, { bgColor: S.bgColor, bgOpacity: bgA }, u)); }
+      else { c.globalAlpha = life * bgA; c.fillStyle = S.bgColor; lines.forEach((ln, i) => capShape(c, shape, lineX(lineW[i]) - px, rows[i].y, lineW[i] + px * 2, rows[i].h, rad, seed + i * 5, u, { bgColor: S.bgColor, bgOpacity: bgA })); c.globalAlpha = life; }
+    }
   }
   c.font = fontAt(size); c.letterSpacing = (S.spacing * size + ex) + "px"; c.textBaseline = "middle"; c.textAlign = "left";
   const shadowOn = S.shadow && (S.shadowBlur > 0 || S.shadowY > 0), sh = on => { if (on && shadowOn){ c.shadowColor = hexA(S.shadowColor, .6); c.shadowBlur = S.shadowBlur * u; c.shadowOffsetY = S.shadowY * u; } else { c.shadowColor = "transparent"; c.shadowBlur = 0; c.shadowOffsetY = 0; } };
@@ -2952,7 +3241,11 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
       capFxWord(c, fx, x1, ly, ww, () => {
         if (st) c.font = wsFont(fontAt(size), st);
         if (hl && big > 1){ const mx = x1 + ww / 2; c.translate(mx, ly); c.scale(big, big); c.translate(-mx, -ly); }
-        if (bgMode === "word" && bgA > 0){ sh(false); c.save(); c.globalAlpha *= bgA; c.fillStyle = S.bgColor; capShape(c, shape, x1 - px, ly - sz * .5 - py, ww + px * 2, sz + py * 2, rad, seed + gi * 3, u); c.restore(); }
+        if (bgMode === "word" && bgA > 0){
+          sh(false);
+          if (shape === "glass"){ drawGlassmorphismBackdrop(c, x1 - px, ly - sz * .5 - py, ww + px * 2, sz + py * 2, rad || 14 * u, { bgColor: S.bgColor, bgOpacity: bgA }, u); }
+          else { c.save(); c.globalAlpha *= bgA; c.fillStyle = S.bgColor; capShape(c, shape, x1 - px, ly - sz * .5 - py, ww + px * 2, sz + py * 2, rad, seed + gi * 3, u, { bgColor: S.bgColor, bgOpacity: bgA }); c.restore(); }
+        }
         if (st && st.bg){ sh(false); wsBgBox(c, st, x1, ly, ww, sz); }
         if (st && st.stroke){
           c.save();
@@ -3582,6 +3875,8 @@ function renderFrame(t){
   drawDrawing(ctx);
   drawAudiogram(ctx, t);
   drawProgressBar(ctx, t);
+  drawDroneTelemetryHUD(ctx, t, cur);
+  drawCinematicLetterbox(ctx);
 }
 function drawProgressBar(c, t){
   if (!P.progressBar || !(TOTAL > 0)) return;
@@ -3649,6 +3944,153 @@ function drawProgressBar(c, t){
     c.shadowBlur = 8 * u;
     c.fillRect(fx, fy, fw, fh);
   }
+  c.restore();
+}
+
+/* ---------------- Adobe After Effects Drone Telemetry HUD (MOGRT) ---------------- */
+function drawDroneTelemetryHUD(c, t, cur){
+  if (!P.droneHud) return;
+  const { W, H, u } = geo();
+  c.save();
+
+  const hudColor = "rgba(0, 240, 255, 0.88)";
+  const dimColor = "rgba(0, 240, 255, 0.4)";
+  const white = "rgba(255, 255, 255, 0.95)";
+  c.strokeStyle = hudColor;
+  c.fillStyle = hudColor;
+  c.lineWidth = 1.5 * u;
+  c.font = `600 ${11 * u}px monospace, sans-serif`;
+
+  // 1. Top Bar Telemetry
+  const topY = 28 * u;
+  c.textAlign = "left";
+  c.fillText(`🛰️ GPS: 30°19'42"N 78°02'38"E  SATS: 18`, 24 * u, topY);
+
+  c.textAlign = "center";
+  c.fillText(`4K 60FPS · 1/120s · ISO 100 · F2.8 · D-LOG`, W / 2, topY);
+
+  c.textAlign = "right";
+  const recBlink = Math.floor(t * 2) % 2 === 0;
+  if (recBlink){
+    c.fillStyle = "#FF3B30";
+    c.beginPath();
+    c.arc(W - 95 * u, topY - 3 * u, 4.5 * u, 0, Math.PI * 2);
+    c.fill();
+  }
+  c.fillStyle = white;
+  const mins = Math.floor(t / 60).toString().padStart(2, "0");
+  const secs = Math.floor(t % 60).toString().padStart(2, "0");
+  c.fillText(`REC ${mins}:${secs}`, W - 24 * u, topY);
+
+  // 2. Left Altitude Gauge
+  const altBase = 120 + Math.sin(t * 0.4) * 8.5;
+  const altX = 36 * u, altY = H / 2;
+  c.textAlign = "left";
+  c.fillStyle = white;
+  c.fillText(`ALT`, altX, altY - 55 * u);
+  c.font = `700 ${14 * u}px monospace, sans-serif`;
+  c.fillStyle = hudColor;
+  c.fillText(`${altBase.toFixed(1)}m`, altX, altY - 38 * u);
+  c.strokeStyle = dimColor;
+  c.beginPath();
+  for (let i = -3; i <= 3; i++){
+    const ly = altY + i * 16 * u;
+    const len = i === 0 ? 18 * u : 10 * u;
+    c.moveTo(altX, ly);
+    c.lineTo(altX + len, ly);
+  }
+  c.stroke();
+  c.fillStyle = hudColor;
+  c.beginPath();
+  c.moveTo(altX + 22 * u, altY);
+  c.lineTo(altX + 27 * u, altY - 4 * u);
+  c.lineTo(altX + 27 * u, altY + 4 * u);
+  c.closePath();
+  c.fill();
+
+  // 3. Right Speed Gauge
+  const spdBase = 28 + Math.cos(t * 0.35) * 4.2;
+  const spdX = W - 36 * u, spdY = H / 2;
+  c.textAlign = "right";
+  c.font = `600 ${11 * u}px monospace, sans-serif`;
+  c.fillStyle = white;
+  c.fillText(`SPD`, spdX, spdY - 55 * u);
+  c.font = `700 ${14 * u}px monospace, sans-serif`;
+  c.fillStyle = hudColor;
+  c.fillText(`${spdBase.toFixed(1)}km/h`, spdX, spdY - 38 * u);
+  c.strokeStyle = dimColor;
+  c.beginPath();
+  for (let i = -3; i <= 3; i++){
+    const ly = spdY + i * 16 * u;
+    const len = i === 0 ? 18 * u : 10 * u;
+    c.moveTo(spdX, ly);
+    c.lineTo(spdX - len, ly);
+  }
+  c.stroke();
+  c.fillStyle = hudColor;
+  c.beginPath();
+  c.moveTo(spdX - 22 * u, spdY);
+  c.lineTo(spdX - 27 * u, spdY - 4 * u);
+  c.lineTo(spdX - 27 * u, spdY + 4 * u);
+  c.closePath();
+  c.fill();
+
+  // 4. Center Horizon Reticle & Crosshairs
+  const cx = W / 2, cy = H / 2;
+  c.strokeStyle = "rgba(0, 240, 255, 0.65)";
+  c.lineWidth = 1.2 * u;
+  const rSize = 22 * u;
+  c.strokeRect(cx - rSize, cy - rSize, rSize * 2, rSize * 2);
+  c.beginPath();
+  c.moveTo(cx - 8 * u, cy); c.lineTo(cx + 8 * u, cy);
+  c.moveTo(cx, cy - 8 * u); c.lineTo(cx, cy + 8 * u);
+  c.moveTo(cx - 50 * u, cy); c.lineTo(cx - 28 * u, cy);
+  c.moveTo(cx + 28 * u, cy); c.lineTo(cx + 50 * u, cy);
+  c.stroke();
+
+  // 5. Bottom Compass Ribbon
+  const compassY = H - 32 * u;
+  const hdg = ((340 + Math.sin(t * 0.2) * 25) % 360 + 360) % 360;
+  c.textAlign = "center";
+  c.font = `700 ${12 * u}px monospace, sans-serif`;
+  c.fillStyle = hudColor;
+  const dirs = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"];
+  const dirName = dirs[Math.round(hdg / 45) % 8];
+  c.fillText(`▲ ${Math.round(hdg).toString().padStart(3, "0")}° ${dirName}`, cx, compassY - 14 * u);
+
+  c.strokeStyle = dimColor;
+  c.lineWidth = 1.2 * u;
+  c.beginPath();
+  for (let i = -5; i <= 5; i++){
+    const tx = cx + i * 22 * u;
+    const hTick = i === 0 ? 12 * u : 6 * u;
+    c.moveTo(tx, compassY);
+    c.lineTo(tx, compassY + hTick);
+  }
+  c.stroke();
+
+  c.restore();
+}
+
+/* ---------------- Adobe Premiere Pro Cinemascope 2.39:1 Letterbox ---------------- */
+function drawCinematicLetterbox(c){
+  if (!P.cinemascope) return;
+  const { W, H } = geo();
+  const targetH = W / 2.39;
+  if (H <= targetH) return;
+  const barH = (H - targetH) / 2;
+
+  c.save();
+  c.fillStyle = "#000000";
+  c.fillRect(0, 0, W, barH);
+  c.fillRect(0, H - barH, W, barH);
+
+  c.strokeStyle = "rgba(255, 255, 255, 0.12)";
+  c.lineWidth = 1;
+  c.beginPath();
+  c.moveTo(0, barH); c.lineTo(W, barH);
+  c.moveTo(0, H - barH); c.lineTo(W, H - barH);
+  c.stroke();
   c.restore();
 }
 function drawEmpty(){
@@ -4578,7 +5020,7 @@ $("tlZoom").addEventListener("input", e => { P.pps = +e.target.value; renderTime
 /* =========================================================
    UI: inspector (right panel)
    ========================================================= */
-function select(type, item, clip){ selected = item ? { type, item, clip } : null; if (drawing && type !== "plot") cancelDraw(); renderInspector(); renderTimeline(); renderCaptionList(); if ((selected && selected.type === "caption" ? selected.item.id : null) !== csLastSel) renderCapExtras(); if (!playing) renderFrame(playT); }
+function select(type, item, clip){ selected = item ? { type, item, clip } : null; if (drawing && type !== "plot") cancelDraw(); renderInspector(); renderTimeline(); renderCaptionList(); if (typeof renderPlotsSidebar === "function") renderPlotsSidebar(); if ((selected && selected.type === "caption" ? selected.item.id : null) !== csLastSel) renderCapExtras(); if (!playing) renderFrame(playT); }
 const el = (tag, attrs = {}, kids = []) => { const e = document.createElement(tag); Object.entries(attrs).forEach(([k, v]) => { if (k === "text") e.textContent = v; else if (k.startsWith("on")) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v); }); kids.forEach(k => k && e.appendChild(k)); return e; };
 function fText(label, value, on, area){ const id = "i" + uid++; const inp = el(area ? "textarea" : "input", area ? { id, rows:"2" } : { id, type:"text" }); inp.value = value || ""; inp.addEventListener("input", () => on(inp.value)); return el("div", { class:"field" }, [el("label", { for:id, text:label }), inp]); }
 function fNum(label, value, on, step = .1, min = 0, max = 999){ const id = "i" + uid++; const inp = el("input", { id, type:"number", step, min, max }); inp.value = (+value).toFixed(2); inp.addEventListener("change", () => on(clamp(+inp.value || 0, min, max))); return el("div", { class:"field" }, [el("label", { for:id, text:label }), inp]); }
@@ -5064,87 +5506,43 @@ function renderInspector(){
   }
   if (type === "plot"){
     const pl = it, clip = selected.clip;
-    box.append(el("p", { class:"insp-title", text:"Plot highlight" }),
-      el("p", { class:"hint", text:"Drag the white corner dots to adjust the outline. Drag the size label to move it. Press play to see it move." }),
-      fText("Size to show (type it, e.g. 250 sq yd)", pl.areaText, v => { pl.areaText = v; changed(false); renderInspectorArea(); }),
-      el("div", { class:"row field" }, ["100 sq yd","200 sq yd","250 sq yd","1 bigha"].map(v => btn(v, () => { pl.areaText = v; changed(false); renderInspector(); }))),
-      fText("Name (optional, e.g. Plot 14)", pl.name, v => { pl.name = v; changed(); }),
-      fSlider("Size label", pl.labelSize || 1, .6, 2, .01, v => { pl.labelSize = v; changed(false); }),
-      fChips("Label style", pl.labelStyle || "pill", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], v => { pl.labelStyle = v; changed(false); }),
-      fChips("Label colour", pl.labelColor || "auto", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["white","White"],["dark","Dark"],["custom","Custom"]], v => { pl.labelColor = v === "auto" ? undefined : v; if (v === "custom" && !pl.labelHex) pl.labelHex = "#1F3D2E"; changed(false); renderInspector(); }),
-      pl.labelColor === "custom" ? plotColorField("Label colour", pl.labelHex || "#1F3D2E", v => { pl.labelHex = v; changed(false); }) : "",
-      plotColorField("Text colour", pl.labelText || "", v => { pl.labelText = v || undefined; changed(false); }, true),
-      fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"]], v => { pl.labelFont = v; changed(false); }),
-      el("div", { class:"row field" }, [btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; if (pl.road){ delete pl.road.ru; delete pl.road.rv; } changed(false); }), toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })]),
-      fChips("Line colour", pl.color || "red", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"]], v => { pl.color = v; changed(false); }),
-      fChips("Fill inside (after the line draws)", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["none","No fill"]], v => { pl.fill = v; changed(false); renderInspector(); }),
-      (pl.fill ?? "x") !== "none" ? fSlider("Fill strength", pl.fillK ?? .35, .1, .8, .01, v => { pl.fillK = v; changed(false); }) : "",
-      el("div", { class:"cs-panel", style:"margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
-        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:8px" }, [
-          el("span", { class:"lbl", text:"⏱️ Layer timing & duration", style:"margin:0;font-weight:700" }),
-          el("span", { class:"hint", style:"margin:0;font-variant-numeric:tabular-nums;font-size:11px", text:`Video: ${(clip._start + (pl.at || 0)).toFixed(1)}s – ${(clip._start + (pl.at || 0) + (pl.dur > 0 ? pl.dur : (clip.dur - (pl.at || 0)))).toFixed(1)}s` })
-        ]),
-        el("div", { class:"grid2" }, [
-          fNum("Starts at (s in clip)", pl.at || 0, v => { pl.at = clamp(v, 0, Math.max(0, clip.dur - .4)); changed(); renderInspector(); }, .1, 0, clip.dur),
-          fNum("Duration (s)", pl.dur > 0 ? pl.dur : +(clip.dur - (pl.at || 0)).toFixed(1), v => { pl.dur = clamp(v, .4, clip.dur - (pl.at || 0)); changed(); renderInspector(); }, .1, .4, clip.dur)
-        ]),
-        el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap;margin-top:6px" }, [
-          btn("Start at playhead", () => {
-            const rel = clamp(now() - clip._start, 0, clip.dur - .4);
-            pl.at = +rel.toFixed(2);
-            changed();
-            renderInspector();
-            toast(`Plot starts at ${pl.at.toFixed(1)}s in clip.`);
-          }),
-          btn("End at playhead", () => {
-            const rel = clamp(now() - clip._start, (pl.at || 0) + .4, clip.dur);
-            pl.dur = +(rel - (pl.at || 0)).toFixed(2);
-            changed();
-            renderInspector();
-            toast(`Plot ends at ${rel.toFixed(1)}s (duration: ${pl.dur.toFixed(1)}s).`);
-          }),
-          btn("Full clip", () => {
-            pl.at = 0;
-            pl.dur = 0;
-            changed();
-            renderInspector();
-            toast("Plot now shows for the full clip duration.");
-          })
-        ]),
-        fChips("Duration preset", String(pl.dur > 0 ? (pl.dur === 2 || pl.dur === 3 || pl.dur === 4 || pl.dur === 5 || pl.dur === 8 ? pl.dur : "custom") : 0), [
-          ["2","2s"],["3","3s"],["4","4s"],["5","5s"],["8","8s"],["0","Full clip"],["custom","Custom"]
-        ], v => {
-          if (v !== "custom"){
-            pl.dur = +v;
-            changed();
-            renderInspector();
-          }
-        }),
-        toggleRow("Moving animated dashes on outline", !!pl.motion, v => { pl.motion = v; changed(false); })
-      ]),
-      el("div", { class:"cs-panel", style:"margin:10px 0;padding:12px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
-        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
-          el("span", { class:"lbl", text:"🔦 Spotlight (highlight ONLY this plot)", style:"margin:0;font-weight:700" }),
-          toggleRow("Dim surroundings", pl.dimRest !== false, v => { pl.dimRest = v; changed(false); renderInspector(); })
-        ]),
-        pl.dimRest !== false ? el("div", {}, [
-          el("p", { class:"hint", text:"Darkens the entire video outside this plot so only the plot is highlighted." }),
-          fSlider("Darken strength", pl.dimAlpha ?? 0.65, 0.2, 0.9, 0.05, v => { pl.dimAlpha = v; changed(false); }, v => Math.round(v * 100) + "%")
-        ]) : el("p", { class:"hint", text:"Turn on to darken the surrounding video and shine spotlight on only this plot." })
-      ]),
-      el("div", { class:"cs-panel pro-video-tool", style:"margin:12px 0;padding:14px;border:1.5px solid var(--deodar,#2ea44f);border-radius:10px;background:var(--surface,#161b22)" }, [
-        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:8px" }, [
-          el("span", { class:"lbl", text:"🚁 Drone Camera & Motion Match", style:"margin:0;font-weight:800;font-size:14px;color:var(--deodar,#2ea44f)" }),
-          el("span", { class:"hint", style:"margin:0;font-weight:700;padding:2px 8px;border-radius:12px;background:rgba(46,164,79,0.15);color:var(--deodar,#2ea44f)", text:"ADOBE MASK TRACKER" })
-        ]),
 
-        /* Fast-track banner for video clips */
-        clip.kind === "video" && (!pl.kf || !pl.kf.length) && pl.droneMotion !== "track" ? el("div", { style:"margin-bottom:12px;padding:10px;background:rgba(46,164,79,0.08);border:1px solid rgba(46,164,79,0.25);border-radius:8px" }, [
+    function makeAccCard(title, children, { open = false, icon = "", badge = "" } = {}){
+      const d = el("details", { class: "cs-panel", style: "margin:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)" });
+      if (open) d.open = true;
+      const sm = el("summary", { style: "display:flex;align-items:center;gap:8px;padding:11px 12px;font-weight:700;font-size:12px;cursor:pointer;user-select:none;color:var(--heading)" });
+      sm.append(
+        el("span", { text: (icon ? icon + " " : "") + title, style: "font-weight:700" }),
+        badge ? el("span", { class: "hint", style: "margin:0 0 0 auto;font-size:10px;padding:2px 7px;border-radius:10px;background:var(--soft);color:var(--deodar);font-weight:700", text: badge }) : "",
+        el("span", { class: "chev", style: badge ? "" : "margin-left:auto" })
+      );
+      const body = el("div", { class: "cs-body", style: "padding:4px 12px 12px" }, children);
+      d.append(sm, body);
+      return d;
+    }
+
+    box.append(
+      el("p", { class:"insp-title", text:"Plot highlight" }),
+      el("p", { class:"hint", text:"Drag corner dots on preview to shape outline. Drag size label to move it." }),
+
+      /* PRIMARY ESSENTIALS (ALWAYS VISIBLE) */
+      fText("Size to show (type it, e.g. 250 sq yd)", pl.areaText, v => { pl.areaText = v; changed(false); renderInspectorArea(); }),
+      el("div", { class:"row field", style:"margin-bottom:8px" }, ["100 sq yd","200 sq yd","250 sq yd","1 bigha"].map(v => btn(v, () => { pl.areaText = v; changed(false); renderInspector(); }))),
+      fText("Name (optional, e.g. Plot 14)", pl.name, v => { pl.name = v; changed(); }),
+      fChips("Line colour", pl.color || "red", [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["custom","Custom"]], v => { pl.color = v; if (v === "custom" && !pl.lineHex) pl.lineHex = "#E63B2E"; changed(false); renderInspector(); renderFrame(playT); }),
+      pl.color === "custom" ? plotColorField("Custom line colour", pl.lineHex || "#E63B2E", v => { pl.lineHex = v; changed(false); renderFrame(playT); }) : "",
+      fChips("Fill inside", pl.fill === undefined ? (pl.color || "red") : pl.fill, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["lime","White"],["custom","Custom"],["none","No fill"]], v => { pl.fill = v; if (v === "custom" && !pl.fillHex) pl.fillHex = pl.lineHex || "#E63B2E"; changed(false); renderInspector(); renderFrame(playT); }),
+      pl.fill === "custom" ? plotColorField("Custom fill colour", pl.fillHex || "#E63B2E", v => { pl.fillHex = v; changed(false); renderFrame(playT); }) : "",
+      (pl.fill ?? "x") !== "none" ? fSlider("Fill strength", pl.fillK ?? .35, .1, .8, .01, v => { pl.fillK = v; changed(false); renderFrame(playT); }) : "",
+
+      /* ACCORDION 1: DRONE CAMERA TRACKING (ADOBE MASK TRACKER) */
+      makeAccCard("Drone Camera Tracking (Adobe Mask Tracker)", [
+        clip.kind === "video" && (!pl.kf || !pl.kf.length) && pl.droneMotion !== "track" ? el("div", { style:"margin-bottom:10px;padding:10px;background:rgba(46,164,79,0.08);border:1px solid rgba(46,164,79,0.25);border-radius:8px" }, [
           el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:4px" }, [
             el("b", { style:"font-size:12px;color:var(--deodar,#2ea44f)", text:"🎯 Adobe Premiere Pro Mask Tracking" }),
             el("span", { class:"hint", style:"margin:0;font-size:11px", text:"Lock to Ground" })
           ]),
-          el("p", { class:"hint", style:"margin:0 0 8px;font-size:11px;line-height:1.4", text:"Stick this plot outline to the real moving video. Tracks drone circular orbits, zoom-ins, and flyovers across the entire video so the highlight never leaves the property." }),
+          el("p", { class:"hint", style:"margin:0 0 8px;font-size:11px;line-height:1.4", text:"Stick this plot outline to the moving drone video. Tracks circular orbits, zoom-ins, and flyovers across the entire video so the highlight never leaves the property." }),
           el("div", { class:"row field", style:"gap:6px;flex-wrap:wrap" }, [
             btn("▶▶ Track Mask across Entire Video", () => { pl.droneMotion = "track"; pl.stickMode = "track"; autoTrackPlot(pl, clip, { scope:"entire" }); }, "btn sm primary"),
             btn("▶ Track Forward to End", () => { pl.droneMotion = "track"; pl.stickMode = "track"; autoTrackPlot(pl, clip, { scope:"forward" }); }, "btn sm dark")
@@ -5153,7 +5551,7 @@ function renderInspector(){
 
         fChips("Drone flight trajectory", pl.droneMotion || "none", [
           ["none", "🔒 Fixed (Still)"],
-          ["track", "🎯 Adobe Mask Tracker (AI)"],
+          ["track", "🎯 Adobe Mask Tracker (Computer Vision)"],
           ["orbit-cw", "🔄 Circular Orbit (Clockwise ↻)"],
           ["orbit-ccw", "🔄 Circular Orbit (Counter-Clockwise ↺)"],
           ["zoom-in", "🦅 Drone Zoom In (Fly-In)"],
@@ -5161,7 +5559,6 @@ function renderInspector(){
           ["screen", "📌 Pin to Screen (HUD)"]
         ], v => { pl.droneMotion = v; pl.stickMode = (v === "screen" ? "screen" : (v === "track" ? "track" : "stick")); changed(false); renderInspector(); renderFrame(playT); }),
 
-        /* MULTI-POINT KEYFRAME TRACKING (ADOBE PREMIERE PRO MASK TRACKER) */
         (pl.droneMotion === "track" || (clip.kind === "video" && pl.kf && pl.kf.length)) ? el("div", { style:"margin-top:10px;padding:12px;background:rgba(255,255,255,0.03);border:1px solid rgba(46,164,79,0.25);border-radius:8px" }, [
           el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
             el("b", { style:"color:var(--deodar,#2ea44f);font-size:12px", text:"🎯 Adobe Premiere Pro Mask Tracking" }),
@@ -5215,7 +5612,6 @@ function renderInspector(){
           ]) : ""
         ]) : "",
 
-        /* CIRCULAR ORBIT SETTINGS */
         (pl.droneMotion === "orbit-cw" || pl.droneMotion === "orbit-ccw") ? el("div", { style:"margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px" }, [
           el("p", { class:"hint", style:"color:var(--deodar,#2ea44f);font-weight:700;margin-bottom:6px", text:"🔄 Matches drone flying in a 360° circle around the property. Adjust rotation speed to lock onto the footage." }),
           fSlider("Orbit rotation speed", pl.orbitSpeed ?? 6, 1, 30, 0.5, v => { pl.orbitSpeed = v; changed(false); renderFrame(playT); }, v => v.toFixed(1) + "°/s"),
@@ -5228,7 +5624,6 @@ function renderInspector(){
           ])
         ]) : "",
 
-        /* ZOOM IN / ZOOM OUT SETTINGS */
         (pl.droneMotion === "zoom-in" || pl.droneMotion === "zoom-out") ? el("div", { style:"margin-top:10px;padding:10px;background:rgba(255,255,255,0.03);border-radius:8px" }, [
           el("p", { class:"hint", style:"color:var(--deodar,#2ea44f);font-weight:700;margin-bottom:6px", text: pl.droneMotion === "zoom-in" ? "🦅 Matches drone flying forward/downward toward the plot. Highlight scales in exact lockstep." : "🚀 Matches drone flying backward/upward revealing the surroundings. Highlight scales down." }),
           fSlider("Zoom speed", pl.zoomRate ?? 0.08, 0.01, 0.35, 0.01, v => { pl.zoomRate = v; changed(false); renderFrame(playT); }, v => Math.round(v * 100) + "%/s"),
@@ -5240,29 +5635,162 @@ function renderInspector(){
           ])
         ]) : "",
 
-        /* FIXED STILL SETTINGS */
-        (pl.droneMotion === "none" || !pl.droneMotion) ? el("p", { class:"hint", style:"margin-top:8px;color:var(--deodar,#2ea44f);font-weight:600", text:"🔒 Highlight stays firmly locked in place with zero drift while footage plays at 100% full speed." }) : "",
+        (pl.droneMotion === "none" || !pl.droneMotion) ? el("p", { class:"hint", style:"margin-top:8px;color:var(--deodar,#2ea44f);font-weight:600", text:"🔒 Highlight stays firmly locked in place on the frame." }) : "",
         (pl.droneMotion === "screen") ? el("p", { class:"hint", style:"margin-top:8px", text:"📌 Highlight is pinned to the screen as a fixed HUD overlay." }) : "",
 
         clip.kind === "video" ? el("div", { style:"margin-top:10px;border-top:1px dashed var(--line);padding-top:8px" }, [
           toggleRow("Freeze video frame (hold still on this shot)", !!pl.freezeVideo, v => { pl.freezeVideo = v; changed(); renderInspector(); }),
           pl.freezeVideo ? el("p", { class:"hint", style:"color:var(--deodar);font-weight:600", text:"📌 Video holds still on this frame while the plot is shown." }) : ""
         ]) : ""
-      ]),
-      el("div", {}, [el("h2", { text:"Side lengths and area (optional)", style:"margin-top:10px" }),
+      ], { open: clip.kind === "video" && (pl.droneMotion === "track" || (pl.kf && pl.kf.length)), icon: "🚁", badge: clip.kind === "video" ? "MOTION LOCK" : "" }),
+
+      /* ACCORDION 2: 3D FLOATING LOCATION PIN & MARKER ICON */
+      makeAccCard("3D Floating Location Pin & Marker", [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"Enable 3D Pin", style:"margin:0;font-weight:700" }),
+          toggleRow("Show 3D pin on plot", !!pl.pin3d, v => { pl.pin3d = v; changed(false); renderInspector(); renderFrame(playT); })
+        ]),
+        pl.pin3d ? el("div", {}, [
+          el("p", { class:"hint", text:"Displays a 3D location marker hovering above the plot with a perspective stalk and ground shadow, tracking seamlessly with camera movement." }),
+          fChips("Marker style", pl.pinIcon || "pin", [
+            ["pin", "📍 3D Location Pin"],
+            ["house", "🏠 Villa / House"],
+            ["building", "🏢 Commercial"],
+            ["land", "🌾 Land / Plot"],
+            ["star", "⭐ Star Highlight"],
+            ["custom", "🖼️ Custom Image / Logo"]
+          ], v => { pl.pinIcon = v; changed(false); renderInspector(); renderFrame(playT); }),
+
+          pl.pinIcon === "custom" ? el("div", { style:"margin:8px 0;padding:8px;background:var(--soft);border-radius:8px" }, [
+            el("div", { class:"row", style:"align-items:center;gap:8px" }, [
+              btn("Upload Marker Icon / Logo", () => {
+                const inp = document.createElement("input");
+                inp.type = "file";
+                inp.accept = "image/*";
+                inp.onchange = e => {
+                  const file = e.target.files && e.target.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = ev => {
+                    const img = new Image();
+                    img.onload = () => {
+                      pl.pinImg = img;
+                      pl.pinImgSrc = ev.target.result;
+                      changed(false);
+                      renderInspector();
+                      renderFrame(playT);
+                      toast("Custom marker icon loaded!");
+                    };
+                    img.src = ev.target.result;
+                  };
+                  reader.readAsDataURL(file);
+                };
+                inp.click();
+              }, "btn sm dark"),
+              pl.pinImg ? el("span", { class:"hint", style:"color:var(--deodar);font-weight:700", text:"✓ Image loaded" }) : ""
+            ])
+          ]) : "",
+
+          fText("Marker label (optional)", pl.pinLabel || "", v => { pl.pinLabel = v; changed(false); renderFrame(playT); }),
+          fSlider("Floating elevation", pl.pinHeight || 1.0, 0.4, 2.5, 0.1, v => { pl.pinHeight = v; changed(false); renderFrame(playT); }, v => v.toFixed(1) + "x"),
+          fSlider("Marker size", pl.pinSize || 1.0, 0.5, 2.2, 0.1, v => { pl.pinSize = v; changed(false); renderFrame(playT); }, v => v.toFixed(1) + "x"),
+          toggleRow("Gentle floating hover motion", pl.pinFloat !== false, v => { pl.pinFloat = v; changed(false); renderFrame(playT); })
+        ]) : el("p", { class:"hint", text:"Add a hovering 3D location pin or icon marker on top of the plot." })
+      ], { open: !!pl.pin3d, icon: "📍" }),
+
+      /* ACCORDION 3: LAYER TIMING & DURATION */
+      makeAccCard("Layer Timing & Duration", [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:8px" }, [
+          el("span", { class:"lbl", text:"⏱️ Start and duration", style:"margin:0;font-weight:700" }),
+          el("span", { class:"hint", style:"margin:0;font-variant-numeric:tabular-nums;font-size:11px", text:`Video: ${(clip._start + (pl.at || 0)).toFixed(1)}s – ${(clip._start + (pl.at || 0) + (pl.dur > 0 ? pl.dur : (clip.dur - (pl.at || 0)))).toFixed(1)}s` })
+        ]),
+        el("div", { class:"grid2" }, [
+          fNum("Starts at (s in clip)", pl.at || 0, v => { pl.at = clamp(v, 0, Math.max(0, clip.dur - .4)); changed(); renderInspector(); }, .1, 0, clip.dur),
+          fNum("Duration (s)", pl.dur > 0 ? pl.dur : +(clip.dur - (pl.at || 0)).toFixed(1), v => { pl.dur = clamp(v, .4, clip.dur - (pl.at || 0)); changed(); renderInspector(); }, .1, .4, clip.dur)
+        ]),
+        el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap;margin-top:6px" }, [
+          btn("Start at playhead", () => {
+            const rel = clamp(now() - clip._start, 0, clip.dur - .4);
+            pl.at = +rel.toFixed(2);
+            changed();
+            renderInspector();
+            toast(`Plot starts at ${pl.at.toFixed(1)}s in clip.`);
+          }),
+          btn("End at playhead", () => {
+            const rel = clamp(now() - clip._start, (pl.at || 0) + .4, clip.dur);
+            pl.dur = +(rel - (pl.at || 0)).toFixed(2);
+            changed();
+            renderInspector();
+            toast(`Plot ends at ${rel.toFixed(1)}s (duration: ${pl.dur.toFixed(1)}s).`);
+          }),
+          btn("Full clip", () => {
+            pl.at = 0;
+            pl.dur = 0;
+            changed();
+            renderInspector();
+            toast("Plot now shows for the full clip duration.");
+          })
+        ]),
+        fChips("Duration preset", String(pl.dur > 0 ? (pl.dur === 2 || pl.dur === 3 || pl.dur === 4 || pl.dur === 5 || pl.dur === 8 ? pl.dur : "custom") : 0), [
+          ["2","2s"],["3","3s"],["4","4s"],["5","5s"],["8","8s"],["0","Full clip"],["custom","Custom"]
+        ], v => {
+          if (v !== "custom"){
+            pl.dur = +v;
+            changed();
+            renderInspector();
+          }
+        }),
+        toggleRow("Moving animated dashes on outline", !!pl.motion, v => { pl.motion = v; changed(false); })
+      ], { open: false, icon: "⏱️" }),
+
+      /* ACCORDION 4: SPOTLIGHT (DIM SURROUNDINGS) */
+      makeAccCard("Spotlight (Dim Surroundings)", [
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"Spotlight mode", style:"margin:0;font-weight:700" }),
+          toggleRow("Dim surroundings", pl.dimRest !== false, v => { pl.dimRest = v; changed(false); renderInspector(); })
+        ]),
+        pl.dimRest !== false ? el("div", {}, [
+          el("p", { class:"hint", text:"Darkens the entire video outside this plot so only the plot is highlighted." }),
+          fSlider("Darken strength", pl.dimAlpha ?? 0.65, 0.2, 0.9, 0.05, v => { pl.dimAlpha = v; changed(false); }, v => Math.round(v * 100) + "%")
+        ]) : el("p", { class:"hint", text:"Turn on to darken the surrounding video and shine spotlight on only this plot." })
+      ], { open: pl.dimRest === false || (pl.dimAlpha != null && pl.dimAlpha !== 0.65), icon: "🔦" }),
+
+      /* ACCORDION 5: SIZE LABEL STYLE & TYPOGRAPHY */
+      makeAccCard("Size Label Style & Typography", [
+        fSlider("Size label scale", pl.labelSize || 1, .6, 2, .01, v => { pl.labelSize = v; changed(false); }),
+        fChips("Label style", pl.labelStyle || "pill", [["pill","Solid pill"],["box","Box"],["outline","Outline"],["glass","Dark glass"],["text","Text only"],["tag","Tag"],["stamp","Stamp"]], v => { pl.labelStyle = v; changed(false); }),
+        fChips("Label colour", pl.labelColor || "auto", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["white","White"],["dark","Dark"],["custom","Custom"]], v => { pl.labelColor = v === "auto" ? undefined : v; if (v === "custom" && !pl.labelHex) pl.labelHex = "#1F3D2E"; changed(false); renderInspector(); }),
+        pl.labelColor === "custom" ? plotColorField("Label colour", pl.labelHex || "#1F3D2E", v => { pl.labelHex = v; changed(false); }) : "",
+        plotColorField("Text colour", pl.labelText || "", v => { pl.labelText = v || undefined; changed(false); }, true),
+        fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"]], v => { pl.labelFont = v; changed(false); }),
+        el("div", { class:"row field", style:"margin-top:6px" }, [
+          btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; if (pl.road){ delete pl.road.ru; delete pl.road.rv; } changed(false); }),
+          toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })
+        ])
+      ], { open: false, icon: "🏷️" }),
+
+      /* ACCORDION 6: SIDE DIMENSIONS & CALCULATED AREA */
+      makeAccCard("Side Dimensions & Area Calculator", [
         el("div", { class:"grid3" }, [
           fText("Front side", pl.front, v => { pl.front = v; changed(false); renderInspectorArea(); }),
           fText("Width", pl.w, v => { pl.w = v; changed(false); renderInspectorArea(); }),
           fText("Length / Depth", pl.l, v => { pl.l = v; changed(false); renderInspectorArea(); })
         ]),
-        el("div", { class:"grid2" }, [plotColorField("Side badge colour", pl.sideBg || "#1C2128", v => { pl.sideBg = v || undefined; changed(false); }, true), plotColorField("Side text", pl.sideFg || "#FFFFFF", v => { pl.sideFg = v || undefined; changed(false); }, true)]),
-        el("p", { class:"hint", text:"Front, width, and length badges sit inside the outline. Select the plot, then drag any badge to move it." }),
+        el("div", { class:"grid2", style:"margin-top:6px" }, [
+          plotColorField("Side badge colour", pl.sideBg || "#1C2128", v => { pl.sideBg = v || undefined; changed(false); }, true),
+          plotColorField("Side text", pl.sideFg || "#FFFFFF", v => { pl.sideFg = v || undefined; changed(false); }, true)
+        ]),
+        el("p", { class:"hint", style:"margin:6px 0", text:"Front, width, and length badges sit inside the outline. Select the plot, then drag any badge to move it." }),
         fChips("Measured in", pl.unit, [["ft","Feet"],["m","Metres"]], v => { pl.unit = v; changed(false); renderInspectorArea(); }),
         fChips("Show area in", pl.areaUnit, AREA_UNITS, v => { pl.areaUnit = v; changed(false); renderInspectorArea(); }),
-        el("p", { class:"hint", id:"areaPreview", text:"" }), el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from front/width and length." })]),
-      el("div", { class:"cs-panel", style:"margin:10px 0;padding:10px;border:1px solid var(--line);border-radius:8px;background:var(--surface)" }, [
+        el("p", { class:"hint", id:"areaPreview", text:"" }),
+        el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from front/width and length." })
+      ], { open: !!(pl.front || pl.w || pl.l), icon: "📐" }),
+
+      /* ACCORDION 7: ROAD HIGHLIGHT CORRIDOR */
+      makeAccCard("Road Highlight Corridor", [
         el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
-          el("span", { class:"lbl", text:"🛣️ Road highlight", style:"margin:0;font-weight:700" }),
+          el("span", { class:"lbl", text:"🛣️ Show road next to plot", style:"margin:0;font-weight:700" }),
           toggleRow("Show road", pl.road && pl.road.on, v => {
             pl.road = pl.road || { width:"30", text:"", side:0, style:"asphalt" };
             pl.road.on = v;
@@ -5277,9 +5805,16 @@ function renderInspector(){
           el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap" }, ["25 ft Road","30 ft Road","40 ft Wide Road","60 ft Main Road"].map(v => btn(v, () => { pl.road.text = v; changed(false); renderInspector(); }))),
           fChips("Road position", String(pl.road.side ?? 0), [["0","Front (Edge 1)"],["1","Edge 2"],["2","Edge 3"],["3","Edge 4"],["corner","Corner (2 Roads)"]], v => { pl.road.side = v === "corner" ? "corner" : +v; changed(false); }),
           fChips("Road style", pl.road.style || "asphalt", [["asphalt","Asphalt (Dashed)"],["yellow","Survey Yellow"],["white","Survey White"],["lime","Lime Green"]], v => { pl.road.style = v; changed(false); })
-        ]) : ""
-      ]),
-      el("div", { class:"row" }, [btn("Redraw corners", () => startPlotDraw(clip, pl)), btn("Back to clip", () => select("clip", clip)), btn("Delete", () => deleteSelected())]));
+        ]) : el("p", { class:"hint", text:"Add an asphalt or survey road corridor along any edge of the plot." })
+      ], { open: !!(pl.road && pl.road.on), icon: "🛣️" }),
+
+      /* FOOTER ACTIONS (ALWAYS VISIBLE) */
+      el("div", { class:"row", style:"margin-top:14px;gap:8px" }, [
+        btn("Redraw corners", () => startPlotDraw(clip, pl), "btn sm dark"),
+        btn("Back to clip", () => select("clip", clip), "btn sm"),
+        btn("Delete", () => deleteSelected(), "btn sm")
+      ])
+    );
     renderInspectorArea();
     return;
   }
@@ -5755,20 +6290,39 @@ function wordStyler(key, getText, getWs, setWs, opts){
   }
   host.paint = paint; paint(); return host;
 }
-/* captions list (left panel) */
+/* captions list (left panel) with Adobe Premiere Text-Based Search */
+let capSearchTerm = "";
 function renderCaptionList(){
-  const host = $("capList"); host.innerHTML = "";
+  const host = $("capList"); if (!host) return;
+  host.innerHTML = "";
   if (!P.captions.length){ host.appendChild(el("p", { class:"hint", text:"No captions yet. Record a voiceover with auto captions on, or add one at the playhead." })); return; }
+
+  const q = (capSearchTerm || "").trim().toLowerCase();
+  let matchCount = 0;
+
   P.captions.forEach(cp => {
+    const txt = cp.text || "";
+    const isMatch = !!q && txt.toLowerCase().includes(q);
+    if (isMatch) matchCount++;
+
     const ta = el("textarea", { rows:"2", "aria-label":"Caption text" }); ta.value = cp.text;
     ta.addEventListener("input", () => { const m = wsRemap(cp.text, ta.value, cp.ws); if (m) cp.ws = m; else delete cp.ws; cp.text = ta.value; changed(false); });
     ta.addEventListener("change", () => renderTimeline());
-    const row = el("div", { class:"cap" + (selected && selected.item === cp ? " sel" : "") }, [
-      el("span", { class:"t", text:fmtT(cp.start), title:"Jump here", onclick:() => { select("caption", cp); seek(cp.start + .05); } }), ta,
+    const row = el("div", {
+      class: "cap" + (selected && selected.item === cp ? " sel" : "") + (isMatch ? " match" : ""),
+      style: isMatch ? "border:2px solid var(--clay);background:rgba(201,139,110,0.18)" : (q && !isMatch ? "opacity:0.4" : "")
+    }, [
+      el("span", { class:"t", text:fmtT(cp.start), title:"Jump here (Adobe Text-Based Nav)", onclick:() => { select("caption", cp); seek(cp.start + .05); } }), ta,
       el("button", { type:"button", "aria-label":"Delete caption", text:"x", onclick:() => { P.captions.splice(P.captions.indexOf(cp), 1); if (selected && selected.item === cp) selected = null; refresh(); } })]);
     host.appendChild(row);
   });
+
+  const countEl = $("capSearchCount");
+  if (countEl){
+    countEl.textContent = q ? (matchCount ? `${matchCount} match${matchCount > 1 ? "es" : ""}` : "0 matches") : "";
+  }
 }
+const _csInp = $("capSearchInp"); if (_csInp) _csInp.addEventListener("input", e => { capSearchTerm = e.target.value; renderCaptionList(); });
 
 /* =========================================================
    Overlay dragging on the preview
@@ -5826,7 +6380,13 @@ function finishDraw(){
       stickToPlace: true,
       dimRest: true,
       dimAlpha: 0.65,
-      freezeVideo: false
+      freezeVideo: false,
+      pin3d: true,
+      pinIcon: "pin",
+      pinHeight: 1.0,
+      pinSize: 1.0,
+      pinFloat: true,
+      pinLabel: ""
     };
     (clip.plots = clip.plots || []).push(pl);
   }
@@ -5972,6 +6532,7 @@ function frameSet(c, patch){
 function seTarget(){
   if (!selected) return null;
   const it = selected.item;
+  if (selected.type === "plot") return { get:() => it.pinHeight || 1.0, set:v => { it.pinHeight = clamp(v, 0.4, 2.5); }, label:"Pin height" };
   if (selected.type === "overlay" && it.kind === "gfx") return { get:() => it.size || 1, set:v => { it.size = clamp(v, .2, 5); }, label:"Size" };
   if (selected.type === "overlay") return it.kind === "text" ? { get:() => it.size || 1, set:v => { it.size = clamp(v, .3, 3.5); }, label:"Size" } : { get:() => it.w, set:v => { it.w = clamp(v, .05, 1.6); }, label:"Size" };
   if (selected.type === "caption"){
@@ -6188,8 +6749,49 @@ function seToolbar(){
     const ab = el("button", { type:"button", class:"st-btn", "data-addmenu":"1", title:"Add text, emoji, stickers, shapes, arrows or a badge", text:"Add more" }); ab.addEventListener("click", () => openAddMenu(ab)); bar.appendChild(ab); return; }
   const isBrand = selected.type === "clip" && (it.kind === "intro" || it.kind === "outro");
   if (isBrand && (!SE.part || SE.part.w !== it.kind)) SE.part = { w:it.kind, part:"text" };
-  const kind = selected.type === "clip" && it.kind === "scene" ? "Scene" : isBrand ? (it.kind === "intro" ? "Intro" : "Outro") : selected.type === "clip" ? (it.kind === "video" ? "Clip" : "Photo") : selected.type === "caption" ? "Caption" : it.kind === "text" ? "Text" : it.kind === "gfx" ? (GFX_NAMES[it.g] || "Graphic") : "Image";
+  const kind = selected.type === "clip" && it.kind === "scene" ? "Scene" : isBrand ? (it.kind === "intro" ? "Intro" : "Outro") : selected.type === "clip" ? (it.kind === "video" ? "Clip" : "Photo") : selected.type === "caption" ? "Caption" : selected.type === "plot" ? "Plot & 3D Pin" : it.kind === "text" ? "Text" : it.kind === "gfx" ? (GFX_NAMES[it.g] || "Graphic") : "Image";
   bar.appendChild(el("span", { class:"st-name", text:kind }));
+  if (selected.type === "plot"){
+    const pl = it;
+    const styles = [
+      ["pin", "📍 Pin"],
+      ["house", "🏠 Villa"],
+      ["building", "🏢 Commercial"],
+      ["land", "🌾 Land"],
+      ["star", "⭐ Star"],
+      ["custom", "🖼️ Logo"]
+    ];
+    styles.forEach(([val, label]) => {
+      b(label, () => {
+        pl.pin3d = true;
+        pl.pinIcon = val;
+        changed(false);
+        renderInspector();
+        if (typeof renderPlotsSidebar === "function") renderPlotsSidebar();
+        renderFrame(playT);
+      }, { on: pl.pin3d !== false && (pl.pinIcon || "pin") === val, title: label });
+    });
+    sep();
+    b("3D Pin", () => {
+      pl.pin3d = pl.pin3d === false ? true : false;
+      changed(false);
+      renderInspector();
+      if (typeof renderPlotsSidebar === "function") renderPlotsSidebar();
+      renderFrame(playT);
+    }, { on: pl.pin3d !== false, title: "Toggle 3D Floating Pin" });
+    b("Float", () => {
+      pl.pinFloat = pl.pinFloat === false ? true : false;
+      changed(false);
+      renderFrame(playT);
+    }, { on: pl.pinFloat !== false, title: "Floating hover motion" });
+    sep();
+    b("&minus;", () => seZoom(1 / 1.1), { title:"Pin height lower" });
+    bar.appendChild(el("span", { class:"st-val", text:Math.round((pl.pinHeight || 1.0) * 100) + "%" }));
+    b("+", () => seZoom(1.1), { title:"Pin height higher" });
+    sep();
+    b("Done", () => { selected = null; refresh(); }, { title:"Deselect plot" });
+    return;
+  }
   if (isBrand){
     const w = it.kind, B = P[w];
     [["text","Text"],["logo","Logo"],["bg","Background"]].forEach(([k, l]) => b(l, () => { SE.part = { w, part:k }; seToolbar(); if (!playing) renderFrame(playT); }, { on:SE.part.part === k, title:`Edit the ${l.toLowerCase()}` }));
@@ -6342,7 +6944,114 @@ function restore(i){
   selected = null; refresh(); HIST.lock = false; updateUndoUI();
 }
 function updateUndoUI(){ $("undoBtn").disabled = HIST.idx <= 0; $("redoBtn").disabled = HIST.idx >= HIST.stack.length - 1; }
-function refresh(){ commit(); layoutSeq(); if (typeof updateAccBadges === "function") updateAccBadges(); renderTimeline(); renderInspector(); renderCaptionList(); updateLen(); updateAudioUI(); if (!playing){ playT = clamp(playT, 0, TOTAL); syncVideos(playT, true); renderFrame(playT); } }
+function renderPlotsSidebar(){
+  const host = $("plotsSidebarContent");
+  if (!host) return;
+  host.innerHTML = "";
+  const curClip = activeClipAt(now());
+  const allPlots = [];
+  P.clips.forEach((cl, ci) => {
+    (cl.plots || []).forEach((pl, pi) => {
+      allPlots.push({ pl, clip: cl, ci, pi });
+    });
+  });
+
+  const glyphMap = { pin:"📍 Pin", house:"🏠 Villa", building:"🏢 Commercial", land:"🌾 Land", star:"⭐ Star", custom:"🖼️ Logo" };
+
+  if (allPlots.length === 0){
+    const p1 = el("p", { class:"hint", text:"No plot highlights yet. Move playhead over any clip and click below to place a plot with a 3D location pin." });
+    const bAdd = btn("📍 Mark Plot & 3D Pin", () => {
+      const cl = curClip || P.clips[0];
+      if (!cl){ toast("Add a photo or video clip first."); return; }
+      startDraw(cl);
+    }, "btn primary block");
+    host.append(p1, bAdd);
+    return;
+  }
+
+  // Active or selected plot
+  const selPl = (selected && selected.type === "plot") ? selected.item : null;
+  const curPlotObj = (selPl && allPlots.find(x => x.pl === selPl)) || (curClip && allPlots.find(x => x.clip === curClip)) || allPlots[0];
+
+  // List of plots
+  host.appendChild(el("span", { class:"lbl", text:`Plots in video (${allPlots.length})` }));
+  const listDiv = el("div", { class:"chips", style:"margin-bottom:10px;gap:6px" });
+  allPlots.forEach(({ pl, clip }) => {
+    const isSel = selected && selected.type === "plot" && selected.item === pl;
+    const g = glyphMap[pl.pinIcon || "pin"] || "📍";
+    const label = `${g.split(" ")[0]} ${pl.areaText || pl.name || "Plot"}`;
+    const b = el("button", {
+      type: "button",
+      class: "chip" + (isSel ? " on" : ""),
+      "aria-pressed": String(isSel),
+      text: label,
+      onclick: () => {
+        seek(clip._start + (pl.at || 0) + 0.5);
+        select("plot", pl, clip);
+        renderPlotsSidebar();
+      }
+    });
+    listDiv.appendChild(b);
+  });
+  host.appendChild(listDiv);
+
+  if (curPlotObj){
+    const pl = curPlotObj.pl, clip = curPlotObj.clip;
+    const isThisSelected = selected && selected.type === "plot" && selected.item === pl;
+
+    const quickCard = el("div", { style:"padding:10px;background:var(--soft);border-radius:10px;margin-bottom:10px;border:1px solid var(--line)" });
+    quickCard.append(
+      el("div", { style:"display:flex;align-items:center;justify-content:space-between;margin-bottom:8px" }, [
+        el("b", { text: (pl.name || pl.areaText || "Selected Plot"), style:"font-size:13px;color:var(--heading)" }),
+        btn(isThisSelected ? "Editing in Inspector" : "Select & Edit", () => {
+          seek(clip._start + (pl.at || 0) + 0.5);
+          select("plot", pl, clip);
+          renderPlotsSidebar();
+        }, isThisSelected ? "btn sm dark" : "btn sm")
+      ]),
+      el("span", { class:"lbl", text:"Marker style" }),
+      fChips("", pl.pinIcon || "pin", [
+        ["pin", "📍 3D Pin"],
+        ["house", "🏠 Villa"],
+        ["building", "🏢 Commercial"],
+        ["land", "🌾 Land"],
+        ["star", "⭐ Star"],
+        ["custom", "🖼️ Logo"]
+      ], v => {
+        pl.pinIcon = v;
+        pl.pin3d = true;
+        changed(false);
+        renderPlotsSidebar();
+        if (selected && selected.type === "plot" && selected.item === pl) renderInspector();
+        renderFrame(playT);
+      }),
+      toggleRow("3D Floating Pin & Marker", pl.pin3d !== false, v => {
+        pl.pin3d = v;
+        changed(false);
+        renderPlotsSidebar();
+        if (selected && selected.type === "plot" && selected.item === pl) renderInspector();
+        renderFrame(playT);
+      }),
+      pl.pin3d !== false ? toggleRow("Hover floating motion", pl.pinFloat !== false, v => {
+        pl.pinFloat = v;
+        changed(false);
+        renderFrame(playT);
+      }) : ""
+    );
+    host.appendChild(quickCard);
+  }
+
+  // Button to add another plot
+  host.appendChild(
+    btn("+ Mark another plot at playhead", () => {
+      const cl = curClip || P.clips[0];
+      if (!cl){ toast("Add a photo or video clip first."); return; }
+      startDraw(cl);
+    }, "btn sm block")
+  );
+}
+
+function refresh(){ commit(); layoutSeq(); if (typeof updateAccBadges === "function") updateAccBadges(); renderTimeline(); renderInspector(); renderCaptionList(); if (typeof renderPlotsSidebar === "function") renderPlotsSidebar(); updateLen(); updateAudioUI(); if (!playing){ playT = clamp(playT, 0, TOTAL); syncVideos(playT, true); renderFrame(playT); } }
 function updateTransport(){
   $("playBtn").innerHTML = playing ? '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 4h4v16H6zM14 4h4v16h-4z"/></svg>' : '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l13-7.5z"/></svg>';
   $("playBtn").setAttribute("aria-label", playing ? "Pause" : "Play");
@@ -6394,12 +7103,13 @@ $("voDel").addEventListener("click", () => { if (P.vo && P.vo.fromVideo) unmuteV
 $("musicDel").addEventListener("click", () => { P.music = null; if (selected && selected.type === "music") selected = null; refresh(); });
 $("recBtn").addEventListener("click", () => recording ? stopRecording() : startRecording());
 $("lang").value = P.lang; $("lang").addEventListener("change", e => { P.lang = e.target.value; persist(); });
-[["autoCaps","autoCaps"],["hearWhileRec","hearWhileRec"],["introOn",null],["outroOn",null],["wmOn","watermark"],["progBarOn","progressBar"],["audiogramOn","audiogram"]].forEach(([id, key]) => {
+[["autoCaps","autoCaps"],["hearWhileRec","hearWhileRec"],["introOn",null],["outroOn",null],["wmOn","watermark"],["progBarOn","progressBar"],["audiogramOn","audiogram"],["droneHudOn","droneHud"],["cinemascopeOn","cinemascope"]].forEach(([id, key]) => {
   const box = $(id);
+  if (!box) return;
   if (id === "introOn") box.checked = P.intro.on;
   else if (id === "outroOn") box.checked = P.outro.on;
   else if (id === "audiogramOn") box.checked = !!(P.audiogram && P.audiogram.on);
-  else box.checked = P[key];
+  else box.checked = !!P[key];
   box.addEventListener("change", () => {
     if (id === "introOn") P.intro.on = box.checked;
     else if (id === "outroOn") P.outro.on = box.checked;
@@ -6679,7 +7389,7 @@ function renderCustomPanel(){
     csSec("Shadow", [csToggle("Shadow", "shadow"), S.shadow ? csSub([csColor("Shadow colour", "shadowColor"), csSlider("Blur", "shadowBlur", 0, 40, 1, v => Math.round(v) + ""), csSlider("Offset", "shadowY", -10, 20, 1, v => Math.round(v) + "")]) : null,
       csToggle("Long shadow", "longShadow"), S.longShadow ? csSub([csColor("Long shadow colour", "longColor"), csSlider("Length", "longLen", .05, .5, .01)]) : null]),
     csSec("Background", [fChips("Box", S.bg, [["none","None"],["block","One box"],["line","Box per line"],["word","Box per word"]], v => csEdit("bg", v, true)),
-      S.bg !== "none" ? csSub([fChips("Shape", S.bgShape, [["box","Box"],["pill","Pill"],["sticker","Sticker"],["marker","Marker"]], v => csEdit("bgShape", v, true)), csColor("Box colour", "bgColor"), csSlider("Opacity", "bgOpacity", 0, 1, .05), csSlider("Corners", "radius", 0, 40, 1, v => Math.round(v) + ""),
+      S.bg !== "none" ? csSub([fChips("Shape", S.bgShape, [["box","Box"],["pill","Pill"],["glass","✨ Glassmorphism"],["sticker","Sticker"],["marker","Marker"]], v => csEdit("bgShape", v, true)), csColor("Box colour", "bgColor"), csSlider("Opacity", "bgOpacity", 0, 1, .05), csSlider("Corners", "radius", 0, 40, 1, v => Math.round(v) + ""),
         csSlider("Padding X", "padX", 0, 1, .01, v => v.toFixed(2)), csSlider("Padding Y", "padY", 0, 1, .01, v => v.toFixed(2))]) : null]),
     csSec("Layout", [fChips("Align", S.align, [["left","Left"],["center","Centre"],["right","Right"]], v => csEdit("align", v)),
       fChips("Max lines", S.maxLines, [[1,"1"],[2,"2"],[3,"3"]], v => csEdit("maxLines", v)),
@@ -9772,6 +10482,7 @@ requestAnimationFrame(loop);
   };
 
   updateSfxSidebarUI();
+  if (typeof renderPlotsSidebar === "function") try { renderPlotsSidebar(); } catch(e) { console.warn(e); }
   if (typeof updateUndoUI === "function") try { renderTimeline(); } catch(e) { console.warn(e); }
 })();
 </script>
