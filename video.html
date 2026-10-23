@@ -1794,6 +1794,35 @@ function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
   c.fillStyle = fg; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, 0, size * .04);
   c.restore();
 }
+/* Side-dimension label styles: "pill" keeps the original look; box/outline/text/glass/tag delegate to the
+   proven bigLabel() renderer; dimline/dimarrow/dimtick are survey/CAD-style dashed dimension lines drawn
+   flush along the edge itself, e.g. -------- Front: 45 ft --------, rotated to match the edge angle. */
+function drawSideLabel(c, text, x, y, u, a, sc, bg, fg, style, ang){
+  if (!text || a <= 0) return;
+  if (!style || style === "pill"){ labelPill(c, text, x, y, u, a, sc, bg, fg); return; }
+  if (style === "box" || style === "outline" || style === "glass" || style === "tag" || style === "text"){
+    bigLabel(c, text, x, y, u, 28 * u, a, sc, bg, style, "bold", fg);
+    return;
+  }
+  /* dimline / dimarrow / dimtick: dashed line split by a text gap, end caps per style */
+  const size = 26 * u; c.font = `700 ${size}px ${SANS}`;
+  const tw = c.measureText(text).width, gap = tw + 28 * u, half = Math.max(90 * u, tw * .9);
+  c.save(); c.globalAlpha = a; c.translate(x, y); c.rotate(ang || 0); c.scale(sc, sc);
+  c.strokeStyle = fg; c.lineWidth = 3 * u; c.lineCap = "round"; c.shadowColor = "rgba(0,0,0,.5)"; c.shadowBlur = 6 * u;
+  c.beginPath(); c.moveTo(-half, 0); c.lineTo(-gap / 2, 0); c.moveTo(gap / 2, 0); c.lineTo(half, 0); c.stroke();
+  if (style === "dimarrow"){
+    const cap = 10 * u;
+    [[-half, 1], [half, -1]].forEach(([ex, dir]) => {
+      c.beginPath(); c.moveTo(ex, 0); c.lineTo(ex + cap * dir, -cap * .55); c.moveTo(ex, 0); c.lineTo(ex + cap * dir, cap * .55); c.stroke();
+    });
+  } else if (style === "dimtick"){
+    const cap = 9 * u;
+    [-half, half].forEach(ex => { c.beginPath(); c.moveTo(ex, -cap); c.lineTo(ex, cap); c.stroke(); });
+  }
+  c.shadowColor = "transparent";
+  c.fillStyle = fg; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(text, 0, size * .04);
+  c.restore();
+}
 function drawRoadCorridor(c, A, B, cx, cy, cfg, u, opt = {}){
   const dx = B[0] - A[0], dy = B[1] - A[1];
   const L = Math.hypot(dx, dy) || 1;
@@ -2083,6 +2112,7 @@ function drawPlot(c, X, pl, local, clip){
     if (pl.w) sides.push({ ei:0, val:pl.w, role:"width" });
     if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
   }
+  const sideStyle = (SIDE_HOVER && isSelectedPlot) ? SIDE_HOVER : (pl.sideLabelStyle || "pill");
   sides.forEach(({ ei, val, role }, k) => {
     if (!val || !segs[ei]) return;
     const [a, b] = segs[ei], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = Math.hypot(mx - cx, my - cy) || 1;
@@ -2097,7 +2127,11 @@ function drawPlot(c, X, pl, local, clip){
     if (pl.side && pl.side[k]) [sx, sy] = mapPt(X_plot, pl.side[k][0], pl.side[k][1]);
     sx = clamp(sx, sw / 2 + 12 * u, CW - sw / 2 - 12 * u); sy = clamp(sy, sh / 2 + 12 * u, CH - sh / 2 - 12 * u);
     pl._srects[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
-    sideQ.push(() => labelPill(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff"));
+    /* dimension-line styles lie flush along the edge; normalize the angle so text never ends up upside down */
+    let edgeAng = Math.atan2(b[1] - a[1], b[0] - a[0]);
+    if (edgeAng > Math.PI / 2) edgeAng -= Math.PI; else if (edgeAng < -Math.PI / 2) edgeAng += Math.PI;
+    const isDimStyle = sideStyle === "dimline" || sideStyle === "dimarrow" || sideStyle === "dimtick";
+    sideQ.push(() => drawSideLabel(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff", sideStyle, isDimStyle ? edgeAng : 0));
   });
   /* name and the size you typed (or the calculated area) in the centre */
   const area = plotArea(pl), pa = clamp((T - .7) / .4);
@@ -5146,6 +5180,27 @@ function fText(label, value, on, area){ const id = "i" + uid++; const inp = el(a
 function fNum(label, value, on, step = .1, min = 0, max = 999){ const id = "i" + uid++; const inp = el("input", { id, type:"number", step, min, max }); inp.value = (+value).toFixed(2); inp.addEventListener("change", () => on(clamp(+inp.value || 0, min, max))); return el("div", { class:"field" }, [el("label", { for:id, text:label }), inp]); }
 function fSelect(label, value, options, on){ const id = "i" + uid++; const s = el("select", { id }); options.forEach(([v, l]) => s.appendChild(new Option(l, v))); s.value = value; s.addEventListener("change", () => on(s.value)); return el("div", { class:"field" }, [el("label", { for:id, text:label }), s]); }
 function fChips(label, value, options, on){ const wrap = el("div", { class:"chips" }); options.forEach(([v, l]) => { const b = el("button", { type:"button", class:"chip", "aria-pressed":String(v === value), text:l }); b.addEventListener("click", () => { on(v); [...wrap.children].forEach(x => x.setAttribute("aria-pressed", String(x === b))); }); wrap.appendChild(b); }); return el("div", { class:"field" }, [el("span", { class:"lbl", text:label }), wrap]); }
+/* Same as fChips, but hovering/focusing a chip also fires onPreview(v) for a live look, and leaving
+   restores the real state via onPreview(null). Nothing is saved on hover; only the click commits. */
+function fChipsPreview(label, value, options, on, onPreview){
+  const wrap = el("div", { class:"chips" });
+  options.forEach(([v, l]) => {
+    const b = el("button", { type:"button", class:"chip", "aria-pressed":String(v === value), text:l });
+    b.addEventListener("click", () => { on(v); [...wrap.children].forEach(x => x.setAttribute("aria-pressed", String(x === b))); });
+    if (onPreview){
+      b.addEventListener("mouseenter", () => onPreview(v)); b.addEventListener("mouseleave", () => onPreview(null));
+      b.addEventListener("focus", () => onPreview(v)); b.addEventListener("blur", () => onPreview(null));
+    }
+    wrap.appendChild(b);
+  });
+  return el("div", { class:"field" }, [el("span", { class:"lbl", text:label }), wrap]);
+}
+var SIDE_HOVER = null;
+function sideStylePreview(v){
+  if (playing || exporting) return;
+  SIDE_HOVER = v || null;
+  renderFrame(playT);
+}
 function fSlider(label, value, min, max, step, on, fmt = v => Math.round(v * 100) + "%"){ const inp = el("input", { type:"range", min, max, step, "aria-label":label }); inp.value = value; const out = el("output", { text:fmt(value) }); inp.addEventListener("input", () => { out.textContent = fmt(+inp.value); on(+inp.value); }); return el("div", { class:"slider" }, [el("span", { text:label }), inp, out]); }
 function fColorPicker(val, on){ const inp = el("input", { type:"color", value:val || "#00ff00", style:"width:38px;height:26px;padding:0;border:1px solid var(--line);border-radius:4px;cursor:pointer" }); inp.addEventListener("input", () => on(inp.value)); return inp; }
 const btn = (text, on, cls = "btn sm") => el("button", { type:"button", class:cls, text, onclick:on });
@@ -5905,6 +5960,11 @@ function renderInspector(){
           plotColorField("Side badge colour", pl.sideBg || "#1C2128", v => { pl.sideBg = v || undefined; changed(false); }, true),
           plotColorField("Side text", pl.sideFg || "#FFFFFF", v => { pl.sideFg = v || undefined; changed(false); }, true)
         ]),
+        fChipsPreview("Side label style", pl.sideLabelStyle || "pill",
+          [["pill","Solid pill"],["box","Box"],["outline","Outline"],["text","Text only"],["dimline","Dimension line"],["glass","Dark glass (Pro)"],["dimarrow","Arrow dimension (Pro)"],["dimtick","Tick dimension (Pro)"]],
+          v => { pl.sideLabelStyle = v === "pill" ? undefined : v; changed(false); },
+          v => sideStylePreview(v)),
+        el("p", { class:"hint", style:"margin:6px 0", text:"Hover a style to preview it on the plot. Dimension line puts the number on the edge itself, like a survey drawing: -------- 45 ft --------." }),
         el("p", { class:"hint", style:"margin:6px 0", text:"Front, width, and length badges sit inside the outline. Select the plot, then drag any badge to move it." }),
         fChips("Measured in", pl.unit, [["ft","Feet"],["m","Metres"]], v => { pl.unit = v; changed(false); renderInspectorArea(); }),
         fChips("Show area in", pl.areaUnit, AREA_UNITS, v => { pl.areaUnit = v; changed(false); renderInspectorArea(); }),
