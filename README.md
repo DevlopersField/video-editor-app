@@ -100,34 +100,37 @@ Professional, privacy-first real estate and social video editor that runs 100% i
 ---
 
 ### 8. ✂️ AI Background Remover Pro (`bg-remover.html`)
-Professional on-device AI background remover running 100% locally in your browser with zero cloud uploads and zero external API keys.
+Professional on-device AI photo and video background remover running 100% locally in your browser with zero cloud uploads and zero external API keys.
 
-- **⚡ Pro AI Neural Engine (`@imgly/background-removal`):**
-  - Industry-standard deep learning subject segmentation (ISNet / ONNX WebAssembly).
-  - Isolates people, portraits, real estate, vehicles, and products with hair-level edge precision.
-  - One-time model download (~40 MB) cached in the browser for instant, offline repeat use.
+- **⚡ Dual On-Device Neural Engines:**
+  - **Photos (ISNet / ONNX WebAssembly):** Deep learning subject segmentation isolating people, portraits, vehicles, and products with hair-level edge precision.
+  - **Videos (MediaPipe SelfieSegmentation):** Real-time neural video segmentation running at 30–60+ FPS via WebAssembly SIMD and WebGL hardware acceleration. Self-hosted offline in `js/mediapipe/`.
+  - **Chroma Key Engine:** High-performance green screen (`#00FF00`) and custom color screen removal with edge feathering and spill suppression.
 - **📁 Single & Batch Queue Processing:**
-  - Drop or browse multiple photos at once; processes the entire queue automatically.
-  - Interactive queue bar with live thumbnail statuses (`queued`, `working`, `done`, `error`) and single-click removal.
+  - Drop or browse multiple photos and videos at once; processes the entire queue automatically.
+  - Interactive queue bar with live thumbnail statuses (`queued`, `working`, `done`, `error`), `🎬 VIDEO` badges, and single-click removal.
   - Download individual cutouts or **Download All (Batch)** at once.
-- **🔍 Interactive Before / After Split Slider:**
-  - Responsive comparison curtain slider comparing the original photo against the cutout in real time.
+- **🔍 Interactive Before / After Split Slider & Live Video Player:**
+  - Responsive comparison curtain slider comparing the original photo or video against the cutout in real time.
+  - Full-featured video player (Play/Pause, scrub timeline, loop toggle, audio mute).
   - Stage zoom controls (`+`, `-`, `Fit`, percentage indicator).
 - **🎨 Backdrop Preview Modes:**
-  - 🏁 Transparent checkerboard.
+  - 🏁 Transparent checkerboard (alpha transparency).
   - ⚪ Solid white.
   - ⚫ Solid black.
-  - 🌫️ **Blurred Original Background:** DSLR-style cinematic portrait bokeh blur behind the subject.
+  - 🟢 Green screen (`#00FF00`) for universal chroma keying in other NLE software.
+  - 🌫️ **Blurred Original Background:** DSLR-style cinematic portrait bokeh blur behind the subject on photos and moving videos.
   - 🎨 Custom color picker.
 - **✨ Real-Time Edge Refinement:**
   - **Feather Slider (0–8px):** Softens and blends alpha edges.
   - **Expand / Shrink Slider (-6px to +6px):** Grows or tightens the cutout mask using GPU canvas compositing to eliminate halos or recover fine details.
+  - **AI Sensitivity / Threshold:** Adjusts subject detection confidence.
 - **💾 On-Device AI Storage Management:**
-  - Built-in storage auditor showing HTTP cache entries with one-click app storage cleanup.
+  - Built-in storage auditor showing cache entries with one-click app storage cleanup.
 - **📥 Multi-Format Export & App Integrations:**
-  - Export full-resolution transparent **PNG**, high-efficiency **WebP**, or flat **JPG**.
-  - 📋 **Copy transparent PNG** directly to system clipboard.
-  - 📲 **Send to Post Editor** or 🎬 **Send to Video Editor** as an image overlay sticker.
+  - **Photos:** Export full-resolution transparent **PNG**, high-efficiency **WebP**, or flat **JPG**, plus 📋 **Copy transparent PNG** to clipboard.
+  - **Videos:** Export transparent **WebM** (with alpha channel), or universal **MP4** (with green screen, blurred, or solid background).
+  - 📲 **Send to Post Editor** or 🎬 **Send to Video Editor** with direct timeline/overlay sticker integration.
 
 ---
 

@@ -1976,6 +1976,7 @@ function drawPlot(c, X, pl, local, clip){
   const { u, W, H } = geo(), t = local - (pl.at || 0);
   const isEditing = !exporting && !playing;
   const isSelectedPlot = selected && selected.type === "plot" && selected.item === pl && isEditing;
+  const editing = isSelectedPlot;
   if (t < 0 && !isSelectedPlot) return;
   const curPts = plotPtsAt(pl, local);
   if (!curPts || curPts.length < 2) return;
@@ -5233,18 +5234,19 @@ function renderInspector(){
     trackHUD.hidden = false;
 
     function updateTrackHUD(pct, label){
+      const p = Math.min(100, Math.max(0, Math.round(pct * 100)));
       trackHUD.innerHTML = `
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <span style="font-weight:700;font-size:13px;color:#2ea44f">🎯 Adobe Mask Tracker: ${Math.round(pct * 100)}%</span>
-          <button id="cancelTrackBtn" style="border:1px solid #ff6b6b;background:rgba(255,107,107,0.15);color:#ff6b6b;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:600;cursor:pointer">Cancel</button>
+          <span style="font-weight:700;font-size:13px;color:#2ea44f">🎯 Adobe Mask Tracker: ${p}%</span>
+          <button id="cancelTrackBtn" type="button" style="border:1px solid #ff6b6b;background:rgba(255,107,107,0.25);color:#ff6b6b;border-radius:6px;padding:3px 8px;font-size:11px;font-weight:700;cursor:pointer">Cancel</button>
         </div>
         <div style="background:rgba(255,255,255,0.15);height:6px;border-radius:3px;overflow:hidden">
-          <div style="width:${Math.round(pct * 100)}%;height:100%;background:#2ea44f;transition:width 0.1s linear"></div>
+          <div style="width:${p}%;height:100%;background:#2ea44f;transition:width 0.1s linear"></div>
         </div>
         <div style="font-size:11px;color:#8b949e;margin-top:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${label}</div>
       `;
       const btn = $("cancelTrackBtn");
-      if (btn) btn.onclick = () => { window._cancelMaskTracking = true; };
+      if (btn) btn.onclick = () => { window._cancelMaskTracking = true; trackHUD.hidden = true; toast("Tracking cancelled."); };
     }
 
     updateTrackHUD(0.02, "Initializing video frames & anchor features...");
@@ -5438,6 +5440,7 @@ function renderInspector(){
       while (curT + 0.04 < tEnd && !window._cancelMaskTracking){
         const nextT = Math.min(tEnd, curT + step);
         await seekTo(v, srcTime(clip, nextT));
+        if (window._cancelMaskTracking) break;
         const curLuma = getFrameLuma();
         curPts = trackStep(prevLuma, curLuma, curPts);
         prevLuma = curLuma;
@@ -5449,6 +5452,7 @@ function renderInspector(){
         pl.droneMotion = "track";
         pl.stickMode = "track";
         renderFrame(clip._start + curT);
+        await new Promise(r => setTimeout(r, 16));
       }
     }
 
@@ -5462,6 +5466,7 @@ function renderInspector(){
       while (curT - 0.04 > tStart && !window._cancelMaskTracking){
         const prevT = Math.max(tStart, curT - step);
         await seekTo(v, srcTime(clip, prevT));
+        if (window._cancelMaskTracking) break;
         const curLuma = getFrameLuma();
         curPts = trackStep(prevLuma, curLuma, curPts);
         prevLuma = curLuma;
@@ -5473,6 +5478,7 @@ function renderInspector(){
         pl.droneMotion = "track";
         pl.stickMode = "track";
         renderFrame(clip._start + curT);
+        await new Promise(r => setTimeout(r, 16));
       }
     }
 
@@ -8639,8 +8645,18 @@ function toCompare(it, after){
 /* ---------- freeze frame and one-click cinematic ---------- */
 function seekTo(v, t){
   return new Promise(res => {
-    let done = false; const fin = () => { if (done) return; done = true; v.removeEventListener("seeked", fin); clearTimeout(to); res(); };
-    const to = setTimeout(fin, 3000); v.addEventListener("seeked", fin); v.currentTime = Math.max(0, t);
+    t = Math.max(0, t);
+    if (Math.abs(v.currentTime - t) < 0.02){ res(); return; }
+    let done = false;
+    const fin = () => { if (done) return; done = true; v.removeEventListener("seeked", fin); clearTimeout(to); res(); };
+    const to = setTimeout(fin, 500);
+    v.addEventListener("seeked", fin, { once: true });
+    try {
+      if (typeof v.fastSeek === "function") v.fastSeek(t);
+      else v.currentTime = t;
+    } catch(e){
+      v.currentTime = t;
+    }
   });
 }
 async function freezeFrame(c){
@@ -9789,11 +9805,28 @@ if (EMBED){
       }
       feedInput({ photos:"startPhotos", videos:"startVideos", drone:"startDrone", highlights:"startHighlights", project:"projOpen" }[m.action], m.files || []);
     }
-    if (m.girika === "template"){
-      const [kind, key] = String(m.id).split(":");
-      if (m.format && FORMATS[m.format]){ P.format = m.format; setFormat(m.format); }
-      if (kind === "reel"){ closeStart(); await applyReelTemplate(REEL_TEMPLATES[+key], m.files || []); }
-      if (kind === "scene"){ closeStart(); addScene(key); toast("Motion scene added. Edit its text and photos on the right."); }
+    if (m.girika === "cutout" && m.dataUrl){
+      const img = new Image();
+      img.onload = () => {
+        const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
+        const o = { id:uid++, el:img, name:"cutout.png", start, end:Math.min(TOTAL || 4, start + 4), x:.5, y:.5, w:.45, shape:"none", border:false };
+        P.overlays.push(o); refresh(); select("overlay", o);
+        toast("✂️ AI Cutout added as overlay sticker.");
+      };
+      img.src = m.dataUrl;
+    }
+    if (m.girika === "video-cutout" && (m.dataUrl || m.blob)){
+      const srcUrl = m.dataUrl || URL.createObjectURL(m.blob);
+      const vid = document.createElement("video");
+      vid.crossOrigin = "anonymous"; vid.playsInline = true; vid.muted = true; vid.loop = true;
+      vid.onloadedmetadata = () => {
+        const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
+        const dur = Math.min(vid.duration || 4, 30);
+        const o = { id:uid++, el:vid, name:m.name || "video-cutout.webm", start, end:Math.min(TOTAL || dur, start + dur), x:.5, y:.5, w:.55, shape:"none", border:false };
+        P.overlays.push(o); refresh(); select("overlay", o);
+        toast("🎬 AI Video Cutout added as overlay.");
+      };
+      vid.src = srcUrl;
     }
   });
   const announce = () => parent.postMessage({ girika:"ready", app:"video", templates:studioTemplates() }, "*");

@@ -413,7 +413,7 @@ const ICON = {
   open:'<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>'
 };
 const QUICK = [
-  { k:"bgremover", star:true, icon:"cut", title:"AI Background Remover", sub:"Instant subject cutout (remove.bg / Photoshop style) with batch processing, edge polish & blurred backdrops.", accept:"image/*", multi:true, app:"bgremover" },
+  { k:"bgremover", star:true, icon:"cut", title:"AI Background Remover", sub:"Instant subject cutout for photos & videos with batch processing, live preview, edge polish & blurred backdrops.", accept:"image/*,video/*,.mp4,.webm,.mov,.m4v", multi:true, app:"bgremover" },
   { k:"highlights", icon:"star", title:"Drone footage to highlight reel", sub:"Pick long drone or walkthrough videos. The best shots are found and cut into a reel with cinematic colour.", accept:"video/*", multi:true, app:"video" },
   { k:"photos", icon:"photos", title:"Reel from photos", sub:"Several photos become a property tour with smooth camera moves and transitions.", accept:"image/*", multi:true, app:"video" },
   { k:"post", icon:"post", title:"Post from a photo", sub:"One photo plus your text for Instagram, Facebook or X. Add pages for a carousel.", accept:"image/*,video/*", multi:false, app:"post" },
@@ -450,6 +450,8 @@ window.addEventListener("message", e => {
   if (m.girika === "cutout"){
     if (m.target === "post"){ show("post"); send("post", { girika:"cutout", dataUrl:m.dataUrl }); }
     else if (m.target === "video"){ show("video"); send("video", { girika:"cutout", dataUrl:m.dataUrl }); }
+  } else if (m.girika === "video-cutout"){
+    show("video"); send("video", { girika:"video-cutout", dataUrl:m.dataUrl, blob:m.blob, name:m.name });
   }
 });
 

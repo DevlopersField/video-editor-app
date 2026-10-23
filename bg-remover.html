@@ -3,7 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BG Remover — AI Background Remover</title>
+<title>BG Remover — AI Photo &amp; Video Background Remover</title>
+<script src="js/mediapipe/selfie_segmentation.js"></script>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
@@ -75,6 +76,7 @@
   .swatch.active { border-color: #fff; }
   .swatch.checker { background: repeating-conic-gradient(#c9cede 0 25%, #8f96ad 0 50%) 0 0 / 15px 15px; }
   .swatch.white { background: #fff; } .swatch.black { background: #000; }
+  .swatch.green { background: #00ff00; }
   .swatch.blur { background: linear-gradient(135deg, #6c7bff55, #9d6bff55); }
   input[type=color].swatch { padding: 0; }
   .spacer { flex: 1; }
@@ -91,6 +93,11 @@
   .qitem img { width: 76px; height: 76px; object-fit: cover; display: block; opacity: .85; }
   .qitem.active { border-color: var(--acc); }
   .qitem.active img { opacity: 1; }
+  .qitem .vbadge {
+    position: absolute; top: 3px; left: 3px; font-size: 8px; font-weight: 800;
+    padding: 1px 4px; border-radius: 4px; background: rgba(239,68,68,0.92); color: #fff;
+    z-index: 2; pointer-events: none; letter-spacing: .04em;
+  }
   .qitem .st {
     position: absolute; inset: auto 0 0 0; font-size: 10px; font-weight: 800;
     text-align: center; padding: 2px 0; letter-spacing: .04em;
@@ -153,7 +160,21 @@
   }
   #result { display: block; max-width: 100%; }
   #beforeLayer { position: absolute; inset: 0; overflow: hidden; pointer-events: none; clip-path: inset(0 50% 0 0); }
-  #beforeLayer img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  #beforeLayer img, #beforeLayer video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; }
+  .video-bar {
+    display: flex; align-items: center; gap: 8px; margin-top: 10px;
+    background: var(--panel); border: 1px solid var(--line);
+    border-radius: 12px; padding: 8px 12px;
+  }
+  .vbtn {
+    background: #20263a; color: #fff; border: 1px solid var(--line); border-radius: 8px;
+    width: 32px; height: 32px; display: inline-flex; align-items: center; justify-content: center;
+    font-size: 13px; cursor: pointer; transition: all .15s; flex-shrink: 0;
+  }
+  .vbtn:hover { background: #2a3250; border-color: var(--acc); }
+  .vbtn.active { background: var(--acc); border-color: var(--acc); color: #fff; }
+  .video-bar input[type=range] { flex: 1; accent-color: var(--acc); cursor: pointer; height: 5px; }
+  .vtime { font-size: 11.5px; font-weight: 700; color: var(--muted); font-variant-numeric: tabular-nums; min-width: 80px; text-align: center; }
   #divider {
     position: absolute; top: 0; bottom: 0; left: 50%; width: 3px;
     background: #fff; box-shadow: 0 0 12px rgba(0,0,0,.6); pointer-events: none;
@@ -306,19 +327,20 @@
 <div id="appView">
 <header>
   <h1>BG <span>Remover</span></h1>
-  <p><b>100% free, private &amp; offline-capable.</b> Drop in one photo — or a whole batch. Your photos never leave this browser.</p>
+  <p><b>100% free, private &amp; offline-capable.</b> Remove backgrounds from photos &amp; videos — single or in batch. Everything runs locally on your device.</p>
 </header>
 
 <main>
   <div id="dropzone">
-    <div class="big">🖼️</div>
-    <h2>Drop images here, paste, or click to browse</h2>
-    <p>JPG, PNG, WEBP — single or <b>batch</b>. First run downloads the AI model once (~40&nbsp;MB), then it's instant and offline.</p>
+    <div class="big">🖼️ 🎬</div>
+    <h2>Drop photos or videos here, paste, or click to browse</h2>
+    <p>JPG, PNG, WEBP · MP4, WEBM, MOV — single or <b>batch</b>. On-device AI segmentation with instant offline processing.</p>
     <div class="row">
-      <button class="btn" id="btnBrowse">Choose images</button>
-      <button class="btn ghost" id="btnSample">Try a sample photo</button>
+      <button class="btn" id="btnBrowse">Choose photos / videos</button>
+      <button class="btn ghost" id="btnSample">Sample photo</button>
+      <button class="btn ghost" id="btnSampleVideo">Sample video</button>
     </div>
-    <input type="file" id="fileInput" accept="image/*" multiple />
+    <input type="file" id="fileInput" accept="image/*,video/*,.mp4,.webm,.mov,.m4v,.avi,.mkv" multiple />
   </div>
 
   <div id="workspace">
@@ -328,12 +350,13 @@
         <div class="swatch checker active" data-bg="transparent" title="Transparent"></div>
         <div class="swatch white" data-bg="white" title="White"></div>
         <div class="swatch black" data-bg="black" title="Black"></div>
+        <div class="swatch green" data-bg="green" title="Green screen (#00FF00)"></div>
         <div class="swatch blur" data-bg="blur" title="Blurred original"></div>
         <input type="color" class="swatch" id="bgColor" value="#6c7bff" title="Custom color" />
       </div>
       <div class="spacer"></div>
       <div class="group">
-        <button class="btn ghost sm" id="btnAdd">＋ Add images</button>
+        <button class="btn ghost sm" id="btnAdd">＋ Add media</button>
         <button class="btn ghost sm" id="btnNew">↺ Start over</button>
       </div>
     </div>
@@ -342,6 +365,29 @@
 
     <div class="editor">
       <aside id="panel">
+        <div id="videoEngineGroup" style="display:none">
+          <h3>Video Engine</h3>
+          <div class="ctl">
+            <select id="videoModeSelect">
+              <option value="ai">⚡ AI Subject (Person / Portrait / Action)</option>
+              <option value="chroma">🟢 Chroma Key (Green / Color Screen)</option>
+            </select>
+          </div>
+          <div id="chromaSettings" style="display:none;margin-top:4px">
+            <div class="ctl">
+              <label>Key color</label>
+              <div style="display:flex;gap:8px;align-items:center">
+                <input type="color" id="keyColorPicker" value="#00FF00" style="width:36px;height:28px;border-radius:6px;border:1px solid var(--line);cursor:pointer;padding:0" />
+                <span style="font-size:11.5px;color:var(--muted)">Green screen default</span>
+              </div>
+            </div>
+            <div class="ctl">
+              <label>Tolerance <b id="vTol">36%</b></label>
+              <input type="range" id="rTol" min="0.05" max="0.8" step="0.01" value="0.36" />
+            </div>
+          </div>
+        </div>
+
         <div>
           <h3>Refine edges <span class="refining" id="refiningTag">• refining…</span></h3>
           <div class="ctl">
@@ -352,8 +398,12 @@
             <label>Expand / shrink <b id="vExpand">0</b>px</label>
             <input type="range" id="rExpand" min="-6" max="6" step="0.5" value="0" />
           </div>
+          <div class="ctl" id="ctlThreshold" style="display:none">
+            <label>AI Sensitivity <b id="vThreshold">50%</b></label>
+            <input type="range" id="rThreshold" min="0.1" max="0.9" step="0.02" value="0.5" />
+          </div>
           <div class="ctl">
-            <span class="note">Feather softens the cutout edge. Expand (+) / shrink (−) fixes halos or eaten edges. Applies to the selected photo.</span>
+            <span class="note">Feather softens the cutout edge. Expand (+) / shrink (−) fixes halos or eaten edges.</span>
           </div>
         </div>
         <div>
@@ -364,6 +414,8 @@
               <option value="png">PNG — transparent / best quality</option>
               <option value="webp">WebP — small file, keeps transparency</option>
               <option value="jpeg">JPG — small file, flat background</option>
+              <option value="webm">WebM Video — transparent alpha channel</option>
+              <option value="mp4">MP4 Video — universal video with background</option>
             </select>
           </div>
           <div class="ctl" style="flex-direction:row;gap:8px">
@@ -376,7 +428,7 @@
           </div>
           <div class="ctl" style="margin-top:4px">
             <button class="btn ghost sm" id="btnDownloadAll">⬇ Download all (batch)</button>
-            <span class="note">Batch download triggers one save per photo — your browser may ask for permission.</span>
+            <span class="note">Batch download triggers saves per item — your browser may ask for permission.</span>
           </div>
         </div>
       </aside>
@@ -390,12 +442,22 @@
         <div id="zoomScroll">
           <div class="compare" id="compareBox">
             <canvas id="result"></canvas>
-            <div id="beforeLayer"><img id="beforeImg" alt="original" /></div>
+            <div id="beforeLayer">
+              <img id="beforeImg" alt="original" />
+              <video id="beforeVid" playsinline muted loop style="display:none"></video>
+            </div>
             <div class="tag before">BEFORE</div>
             <div class="tag after">AFTER</div>
             <div id="divider"></div>
             <input type="range" id="cmpRange" min="0" max="100" value="50" />
           </div>
+        </div>
+        <div id="videoControls" class="video-bar" style="display:none">
+          <button class="vbtn" id="btnPlayPause" title="Play / Pause">▶</button>
+          <input type="range" id="vSeek" min="0" max="100" step="0.05" value="0" />
+          <span id="vTime" class="vtime">00:00 / 00:00</span>
+          <button class="vbtn active" id="btnLoop" title="Loop playback">🔁</button>
+          <button class="vbtn" id="btnMute" title="Mute/Unmute audio">🔊</button>
         </div>
         <div class="meta" id="metaLine"></div>
       </div>
@@ -476,7 +538,11 @@
       <tr><th>Piece</th><th>What it is</th></tr>
       <tr>
         <td><code>@imgly/background-removal</code> v1.7.0</td>
-        <td>Open-source library (MIT license) that runs the segmentation model in the browser. Loaded from the jsDelivr CDN.</td>
+        <td>Open-source library (MIT license) for high-accuracy neural image segmentation in the browser.</td>
+      </tr>
+      <tr>
+        <td>MediaPipe SelfieSegmentation</td>
+        <td>On-device real-time AI neural network for video subject segmentation running at 30–60+ FPS via WebAssembly SIMD and WebGL. Self-hosted locally in <code>js/mediapipe/</code>.</td>
       </tr>
       <tr>
         <td>ISNet model</td>
@@ -537,22 +603,40 @@ const $ = (id) => document.getElementById(id);
 const dropzone = $('dropzone'), fileInput = $('fileInput');
 const workspace = $('workspace'), compareBox = $('compareBox'), zoomScroll = $('zoomScroll');
 const canvas = $('result'), ctx = canvas.getContext('2d');
-const beforeImg = $('beforeImg'), beforeLayer = $('beforeLayer');
+const beforeImg = $('beforeImg'), beforeVid = $('beforeVid'), beforeLayer = $('beforeLayer');
 const divider = $('divider'), cmpRange = $('cmpRange');
 const overlay = $('overlay'), ovBar = $('ovBar'), ovStatus = $('ovStatus'),
       ovTitle = $('ovTitle'), ovFile = $('ovFile');
 const queueEl = $('queue');
 
+// Video UI elements
+const videoControls = $('videoControls');
+const btnPlayPause = $('btnPlayPause'), vSeek = $('vSeek'), vTime = $('vTime'),
+      btnLoop = $('btnLoop'), btnMute = $('btnMute');
+const videoEngineGroup = $('videoEngineGroup'), videoModeSelect = $('videoModeSelect'),
+      chromaSettings = $('chromaSettings');
+const keyColorPicker = $('keyColorPicker'), rTol = $('rTol'), vTol = $('vTol');
+const ctlThreshold = $('ctlThreshold'), rThreshold = $('rThreshold'), vThreshold = $('vThreshold');
+
 /* ================= state ================= */
-let items = [];            // {id,file,name,thumbUrl,status,img,rawCanvas,refCanvas,beforeUrl,error,w,h}
+let items = [];            // {id, type:'image'|'video', file, name, thumbUrl, status, ...}
 let activeId = null;
 let seq = 0;
 let processing = false;
 let bgMode = 'transparent';
 let customColor = '#6c7bff';
 let zoom = 1;
-let refine = { feather: 0, expand: 0 };
+let refine = { feather: 0, expand: 0, threshold: 0.5 };
 let refineTimer = null;
+let animFrameId = null;
+
+// MediaPipe Video AI Engine state
+let selfieSeg = null;
+let selfieSegReady = false;
+let currentSegmentationMask = null;
+let isProcessingVideoFrame = false;
+let tempVidCanvas = null, tempVidCtx = null;
+let _vckCv = null, _vckCtx = null;
 
 const active = () => items.find(i => i.id === activeId);
 
@@ -569,13 +653,86 @@ function progress(key, current, total) {
   const pct = total ? Math.round((current / total) * 100) : 0;
   ovBar.style.width = pct + '%';
   if (key.startsWith('fetch:')) ovStatus.textContent = `Downloading AI model (one-time) — ${pct}%`;
-  else if (key.startsWith('compute:')) ovStatus.textContent = `Analyzing image — ${pct}%`;
+  else if (key.startsWith('compute:')) ovStatus.textContent = `Analyzing subject — ${pct}%`;
   else ovStatus.textContent = `${key} — ${pct}%`;
 }
 
+/* ================= MediaPipe Video AI Engine ================= */
+async function initVideoAI() {
+  if (selfieSegReady && selfieSeg) return selfieSeg;
+  if (!window.SelfieSegmentation) {
+    console.warn("SelfieSegmentation not available globally");
+    return null;
+  }
+  showOverlay("Initializing on-device AI Video Neural Engine…", "MediaPipe SelfieSegmentation");
+  progress("compute:init", 40, 100);
+  try {
+    selfieSeg = new window.SelfieSegmentation({
+      locateFile: (file) => `js/mediapipe/${file}`
+    });
+    selfieSeg.setOptions({
+      modelSelection: 1, // 1 = landscape/fast
+      selfieMode: false
+    });
+    selfieSeg.onResults(results => {
+      currentSegmentationMask = results.segmentationMask;
+    });
+    await selfieSeg.initialize();
+    progress("compute:ready", 100, 100);
+    selfieSegReady = true;
+  } catch(e) {
+    console.warn("MediaPipe init fallback:", e);
+    selfieSegReady = true;
+  }
+  hideOverlay();
+  return selfieSeg;
+}
+
+/* ================= Chroma Key Engine ================= */
+function applyVideoChromaKey(src, w, h, keyHex = '#00FF00', tol = 0.36, feather = 0.14) {
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_vckCv) { _vckCv = document.createElement('canvas'); _vckCtx = _vckCv.getContext('2d', { willReadFrequently: true }); }
+  if (_vckCv.width !== w || _vckCv.height !== h) { _vckCv.width = w; _vckCv.height = h; }
+  _vckCtx.clearRect(0, 0, w, h);
+  try { _vckCtx.drawImage(src, 0, 0, w, h); } catch(e) { return src; }
+  let imgData = null;
+  try { imgData = _vckCtx.getImageData(0, 0, w, h); } catch(e) { return src; }
+  const d = imgData.data;
+  const hex = (keyHex || '#00FF00').replace('#', '');
+  const kr = parseInt(hex.slice(0, 2), 16) || 0;
+  const kg = parseInt(hex.slice(2, 4), 16) || 255;
+  const kb = parseInt(hex.slice(4, 6), 16) || 0;
+  const isGreen = kg > kr + 35 && kg > kb + 35;
+  const isBlue = kb > kr + 35 && kb > kg + 35;
+  const fthr = Math.max(0.02, feather || 0.14);
+
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
+    if (a === 0) continue;
+    let diff = 0;
+    if (isGreen) diff = (g - Math.max(r, b)) / 255;
+    else if (isBlue) diff = (b - Math.max(r, g)) / 255;
+    else { const dr = (r - kr) / 255, dg = (g - kg) / 255, db = (b - kb) / 255; diff = 1 - Math.sqrt(dr * dr + dg * dg + db * db) / 1.732; }
+    if (diff > tol) {
+      const k = Math.min(1, Math.max(0, (diff - tol) / fthr));
+      d[i + 3] = Math.round(a * (1 - k));
+      if (isGreen) d[i + 1] = Math.min(g, Math.round((r + b) / 2));
+      else if (isBlue) d[i + 2] = Math.min(b, Math.round((r + g) / 2));
+    }
+  }
+  _vckCtx.putImageData(imgData, 0, 0);
+  return _vckCv;
+}
+
 /* ================= input ================= */
+function isMediaVideo(f) {
+  if (f.type && f.type.startsWith('video/')) return true;
+  const ext = (f.name || '').toLowerCase();
+  return ext.endsWith('.mp4') || ext.endsWith('.webm') || ext.endsWith('.mov') || ext.endsWith('.m4v') || ext.endsWith('.avi') || ext.endsWith('.mkv');
+}
+
 function openPicker() { fileInput.click(); }
-dropzone.addEventListener('click', (e) => { if (e.target.id !== 'btnSample') openPicker(); });
+dropzone.addEventListener('click', (e) => { if (e.target.id !== 'btnSample' && e.target.id !== 'btnSampleVideo') openPicker(); });
 $('btnBrowse').addEventListener('click', (e) => { e.stopPropagation(); openPicker(); });
 $('btnAdd').addEventListener('click', openPicker);
 fileInput.addEventListener('change', () => {
@@ -585,18 +742,19 @@ fileInput.addEventListener('change', () => {
 ['dragover', 'dragenter'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.add('drag'); }));
 ['dragleave', 'drop'].forEach(ev => dropzone.addEventListener(ev, e => { e.preventDefault(); dropzone.classList.remove('drag'); }));
 dropzone.addEventListener('drop', e => {
-  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/') || isMediaVideo(f)));
 });
 workspace.addEventListener('dragover', e => e.preventDefault());
 workspace.addEventListener('drop', e => {
   e.preventDefault();
-  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/')));
+  addFiles([...e.dataTransfer.files].filter(f => f.type.startsWith('image/') || isMediaVideo(f)));
 });
 window.addEventListener('paste', e => {
   const files = [...(e.clipboardData?.items || [])]
-    .filter(i => i.type.startsWith('image/')).map(i => i.getAsFile());
+    .filter(i => i.type.startsWith('image/') || i.type.startsWith('video/')).map(i => i.getAsFile());
   if (files.length) addFiles(files);
 });
+
 $('btnSample').addEventListener('click', async (e) => {
   e.stopPropagation();
   showOverlay('Loading sample photo…', 'unsplash sample');
@@ -612,16 +770,77 @@ $('btnSample').addEventListener('click', async (e) => {
   }
 });
 
+$('btnSampleVideo').addEventListener('click', async (e) => {
+  e.stopPropagation();
+  showOverlay('Generating sample portrait video…', 'Sample video');
+  try {
+    const scCv = document.createElement('canvas');
+    scCv.width = 480; scCv.height = 640;
+    const sctx = scCv.getContext('2d');
+    const stream = scCv.captureStream(30);
+    const mime = MediaRecorder.isTypeSupported('video/webm; codecs=vp9') ? 'video/webm; codecs=vp9' : 'video/webm';
+    const rec = new MediaRecorder(stream, { mimeType: mime });
+    const chunks = [];
+    rec.ondataavailable = ev => chunks.push(ev.data);
+    rec.start();
+
+    let frame = 0;
+    const drawSample = () => {
+      const grad = sctx.createLinearGradient(0, 0, 480, 640);
+      grad.addColorStop(0, `hsl(${180 + frame * 1.5}, 65%, 45%)`);
+      grad.addColorStop(1, `hsl(${260 + frame * 1.5}, 70%, 35%)`);
+      sctx.fillStyle = grad;
+      sctx.fillRect(0, 0, 480, 640);
+
+      const bob = Math.sin(frame * 0.1) * 16;
+      sctx.fillStyle = '#2563eb';
+      sctx.beginPath();
+      sctx.ellipse(240, 520 + bob, 150, 160, 0, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = '#fbcfe8';
+      sctx.beginPath();
+      sctx.arc(240, 260 + bob, 85, 0, Math.PI * 2);
+      sctx.fill();
+      sctx.fillStyle = '#1e293b';
+      sctx.beginPath();
+      sctx.arc(240, 240 + bob, 95, Math.PI, Math.PI * 2);
+      sctx.fill();
+
+      frame++;
+      if (frame < 90) requestAnimationFrame(drawSample);
+      else rec.stop();
+    };
+    drawSample();
+    await new Promise(r => { rec.onstop = r; });
+    hideOverlay();
+    const vBlob = new Blob(chunks, { type: 'video/webm' });
+    addFiles([new File([vBlob], 'sample-portrait-video.webm', { type: 'video/webm' })]);
+  } catch(err) {
+    hideOverlay();
+    console.error(err);
+    alert('Please upload your own video file.');
+  }
+});
+
 /* ================= queue ================= */
 function addFiles(files) {
   if (!files.length) return;
   for (const f of files) {
     const id = ++seq;
+    const isVid = isMediaVideo(f);
     items.push({
-      id, file: f, name: f.name || `image-${id}.jpg`,
-      thumbUrl: URL.createObjectURL(f),
-      status: 'queued', img: null, rawCanvas: null, refCanvas: null,
-      beforeUrl: null, error: null, w: 0, h: 0
+      id,
+      type: isVid ? 'video' : 'image',
+      file: f,
+      name: f.name || (isVid ? `video-${id}.mp4` : `image-${id}.jpg`),
+      thumbUrl: isVid ? '' : URL.createObjectURL(f),
+      status: 'queued',
+      img: null, origImg: null, rawCanvas: null, refCanvas: null,
+      beforeUrl: null,
+      videoEl: null, beforeVidEl: null, videoUrl: null, dur: 0,
+      videoMode: 'ai',
+      keyColor: '#00FF00', keyTol: 0.36, keyFeather: 0.14,
+      error: null, w: 0, h: 0
     });
   }
   if (!activeId) activeId = items[0].id;
@@ -638,23 +857,41 @@ function renderQueue() {
     const d = document.createElement('div');
     d.className = 'qitem' + (it.id === activeId ? ' active' : '') + (it.status === 'working' ? ' working' : '');
     d.title = `${it.name}`;
-    d.innerHTML = `<img src="${it.thumbUrl}" alt=""><div class="spin"></div>
+    const badgeHtml = it.type === 'video' ? `<div class="vbadge">🎬 VIDEO</div>` : '';
+    d.innerHTML = `${badgeHtml}<img src="${it.thumbUrl || 'data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'76\' height=\'76\' fill=\'%231a2033\'><rect width=\'76\' height=\'76\'/><text x=\'38\' y=\'45\' fill=\'%238f96ad\' font-size=\'24\' text-anchor=\'middle\'>🎬</text></svg>'}" alt=""><div class="spin"></div>
       <div class="st ${it.status}">${it.status === 'working' ? '…' : it.status}</div>
       <button class="x" title="Remove">×</button>`;
     d.addEventListener('click', (e) => {
       if (e.target.classList.contains('x')) { removeItem(it.id); return; }
-      if (it.status === 'done') { activeId = it.id; renderQueue(); renderActive(); }
+      if (it.status === 'done') {
+        pauseAnyVideo();
+        activeId = it.id;
+        renderQueue();
+        renderActive();
+      }
     });
     queueEl.appendChild(d);
   }
+}
+
+function pauseAnyVideo() {
+  cancelAnimationFrame(animFrameId);
+  items.forEach(it => {
+    if (it.videoEl && !it.videoEl.paused) it.videoEl.pause();
+    if (it.beforeVidEl && !it.beforeVidEl.paused) it.beforeVidEl.pause();
+  });
+  btnPlayPause.textContent = '▶';
 }
 
 function removeItem(id) {
   const ix = items.findIndex(i => i.id === id);
   if (ix < 0) return;
   const [it] = items.splice(ix, 1);
-  URL.revokeObjectURL(it.thumbUrl);
+  if (it.thumbUrl && it.thumbUrl.startsWith('blob:')) URL.revokeObjectURL(it.thumbUrl);
   if (it.beforeUrl) URL.revokeObjectURL(it.beforeUrl);
+  if (it.videoUrl) URL.revokeObjectURL(it.videoUrl);
+  if (it.videoEl) { it.videoEl.pause(); it.videoEl.removeAttribute('src'); it.videoEl.load(); }
+  if (it.beforeVidEl) { it.beforeVidEl.pause(); it.beforeVidEl.removeAttribute('src'); it.beforeVidEl.load(); }
   if (activeId === id) activeId = items.length ? items[items.length - 1].id : null;
   if (!items.length) {
     workspace.classList.remove('on');
@@ -665,9 +902,11 @@ function removeItem(id) {
 
 $('btnNew').addEventListener('click', () => {
   if (processing) { alert('Wait for the batch to finish first.'); return; }
+  pauseAnyVideo();
   for (const it of items) {
-    URL.revokeObjectURL(it.thumbUrl);
+    if (it.thumbUrl && it.thumbUrl.startsWith('blob:')) URL.revokeObjectURL(it.thumbUrl);
     if (it.beforeUrl) URL.revokeObjectURL(it.beforeUrl);
+    if (it.videoUrl) URL.revokeObjectURL(it.videoUrl);
   }
   items = []; activeId = null;
   workspace.classList.remove('on');
@@ -682,35 +921,83 @@ async function processQueue() {
     if (it.status !== 'queued') continue;
     it.status = 'working';
     renderQueue();
-    showOverlay(`Removing background (${items.indexOf(it) + 1} of ${items.length})`, it.name);
-    try {
-      const blob = await removeBackground(it.file, {
-        progress,
-        output: { format: 'image/png', quality: 1 }
-      });
-      const url = URL.createObjectURL(blob);
-      const img = await loadImage(url);
-      URL.revokeObjectURL(url);
-      it.w = img.naturalWidth; it.h = img.naturalHeight;
-      it.img = img;
-      // original photo too (for the blurred-background option)
-      const ourl = URL.createObjectURL(it.file);
-      it.origImg = await loadImage(ourl);
-      URL.revokeObjectURL(ourl);
-      // raw cutout canvas (full res)
-      const rc = document.createElement('canvas');
-      rc.width = it.w; rc.height = it.h;
-      rc.getContext('2d').drawImage(img, 0, 0);
-      it.rawCanvas = rc;
-      it.refCanvas = document.createElement('canvas');
-      it.refCanvas.width = it.w; it.refCanvas.height = it.h;
-      applyRefine(it);   // with current (default) refine settings
-      it.beforeUrl = URL.createObjectURL(it.file);
-      it.status = 'done';
-    } catch (err) {
-      console.error(err);
-      it.status = 'error';
-      it.error = err?.message || String(err);
+    showOverlay(`Processing (${items.indexOf(it) + 1} of ${items.length})`, it.name);
+
+    if (it.type === 'video') {
+      try {
+        await initVideoAI();
+        const vUrl = URL.createObjectURL(it.file);
+        it.videoUrl = vUrl;
+        const v = document.createElement('video');
+        v.crossOrigin = 'anonymous';
+        v.playsInline = true;
+        v.muted = true;
+        v.loop = true;
+        v.src = vUrl;
+        await new Promise((resolve) => {
+          v.onloadedmetadata = resolve;
+          v.onerror = resolve;
+          setTimeout(resolve, 3000);
+        });
+        it.w = v.videoWidth || 640;
+        it.h = v.videoHeight || 360;
+        it.dur = v.duration || 5;
+        it.videoEl = v;
+
+        const bv = document.createElement('video');
+        bv.crossOrigin = 'anonymous';
+        bv.playsInline = true;
+        bv.muted = true;
+        bv.loop = true;
+        bv.src = vUrl;
+        it.beforeVidEl = bv;
+
+        v.currentTime = Math.min(0.5, it.dur / 2);
+        await new Promise(r => { v.onseeked = r; setTimeout(r, 600); });
+        const tc = document.createElement('canvas');
+        tc.width = 120; tc.height = Math.round(120 * (it.h / it.w));
+        tc.getContext('2d').drawImage(v, 0, 0, tc.width, tc.height);
+        it.thumbUrl = tc.toDataURL('image/jpeg', 0.85);
+
+        if (selfieSegReady && selfieSeg) {
+          try {
+            await selfieSeg.send({ image: v });
+          } catch(e) {}
+        }
+        it.status = 'done';
+      } catch (err) {
+        console.error(err);
+        it.status = 'error';
+        it.error = err?.message || String(err);
+      }
+    } else {
+      try {
+        const blob = await removeBackground(it.file, {
+          progress,
+          output: { format: 'image/png', quality: 1 }
+        });
+        const url = URL.createObjectURL(blob);
+        const img = await loadImage(url);
+        URL.revokeObjectURL(url);
+        it.w = img.naturalWidth; it.h = img.naturalHeight;
+        it.img = img;
+        const ourl = URL.createObjectURL(it.file);
+        it.origImg = await loadImage(ourl);
+        URL.revokeObjectURL(ourl);
+        const rc = document.createElement('canvas');
+        rc.width = it.w; rc.height = it.h;
+        rc.getContext('2d').drawImage(img, 0, 0);
+        it.rawCanvas = rc;
+        it.refCanvas = document.createElement('canvas');
+        it.refCanvas.width = it.w; it.refCanvas.height = it.h;
+        applyRefine(it);
+        it.beforeUrl = URL.createObjectURL(it.file);
+        it.status = 'done';
+      } catch (err) {
+        console.error(err);
+        it.status = 'error';
+        it.error = err?.message || String(err);
+      }
     }
     renderQueue();
     if (it.id === activeId) renderActive();
@@ -728,11 +1015,9 @@ function loadImage(url) {
   });
 }
 
-/* ================= edge refinement =================
-   feather: gaussian-ish blur of the alpha channel (GPU via ctx.filter)
-   expand/shrink: max/min filter of the alpha channel via lighten/darken
-   multi-offset draws (canvas compositing trick)                        */
+/* ================= edge refinement ================= */
 function applyRefine(it) {
+  if (it.type === 'video') return;
   const { feather, expand } = refine;
   const w = it.w, h = it.h;
   const src = it.rawCanvas;
@@ -745,7 +1030,6 @@ function applyRefine(it) {
     return;
   }
 
-  // 1. extract alpha -> grayscale canvas
   const aC = document.createElement('canvas');
   aC.width = w; aC.height = h;
   const ax = aC.getContext('2d', { willReadFrequently: true });
@@ -758,7 +1042,6 @@ function applyRefine(it) {
   }
   ax.putImageData(aImg, 0, 0);
 
-  // 2. expand (+) / shrink (−)
   if (expand !== 0) {
     const r = Math.abs(expand);
     if (expand < 0) { ax.filter = 'invert(1)'; ax.drawImage(aC, 0, 0); ax.filter = 'none'; }
@@ -769,21 +1052,19 @@ function applyRefine(it) {
     if (expand < 0) { ax.filter = 'invert(1)'; ax.drawImage(aC, 0, 0); ax.filter = 'none'; }
   }
 
-  // 3. feather
   if (feather > 0) {
     ax.filter = `blur(${feather}px)`;
     ax.drawImage(aC, 0, 0);
     ax.filter = 'none';
   }
 
-  // 4. read refined alpha, combine with original RGB
   const aData = ax.getImageData(0, 0, w, h).data;
   const outImg = octx.createImageData(w, h);
   for (let p = 0; p < w * h; p++) {
     outImg.data[p * 4] = sData[p * 4];
     outImg.data[p * 4 + 1] = sData[p * 4 + 1];
     outImg.data[p * 4 + 2] = sData[p * 4 + 2];
-    outImg.data[p * 4 + 3] = aData[p * 4]; // gray == alpha
+    outImg.data[p * 4 + 3] = aData[p * 4];
   }
   octx.putImageData(outImg, 0, 0);
 }
@@ -794,11 +1075,15 @@ function scheduleRefine() {
   refineTimer = setTimeout(() => {
     const it = active();
     if (it && it.status === 'done') {
-      applyRefine(it);
-      renderActive();
+      if (it.type === 'video') {
+        renderVideoFrame(it);
+      } else {
+        applyRefine(it);
+        renderActive();
+      }
     }
     $('refiningTag').classList.remove('on');
-  }, 220);
+  }, 180);
 }
 $('rFeather').addEventListener('input', () => {
   refine.feather = +$('rFeather').value;
@@ -810,13 +1095,43 @@ $('rExpand').addEventListener('input', () => {
   $('vExpand').textContent = $('rExpand').value;
   scheduleRefine();
 });
+rThreshold.addEventListener('input', () => {
+  refine.threshold = +rThreshold.value;
+  vThreshold.textContent = Math.round(refine.threshold * 100) + '%';
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+});
+
+videoModeSelect.addEventListener('change', () => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.videoMode = videoModeSelect.value;
+  chromaSettings.style.display = it.videoMode === 'chroma' ? 'block' : 'none';
+  ctlThreshold.style.display = it.videoMode === 'ai' ? 'flex' : 'none';
+  renderVideoFrame(it);
+});
+
+keyColorPicker.addEventListener('input', (e) => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.keyColor = e.target.value;
+  renderVideoFrame(it);
+});
+
+rTol.addEventListener('input', () => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.keyTol = +rTol.value;
+  vTol.textContent = Math.round(it.keyTol * 100) + '%';
+  renderVideoFrame(it);
+});
 
 /* ================= render ================= */
 function fitCanvas() {
   const it = active();
   if (!it) return;
   const maxW = compareBox.clientWidth || 1000;
-  const maxH = Math.round(window.innerHeight * 0.62);
+  const maxH = Math.round(window.innerHeight * 0.60);
   const s = Math.min(1, maxW / it.w, maxH / it.h);
   canvas.width = Math.max(1, Math.round(it.w * s));
   canvas.height = Math.max(1, Math.round(it.h * s));
@@ -830,12 +1145,63 @@ function drawBackground(c, w, h, it) {
   }
   else if (bgMode === 'white') { c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h); }
   else if (bgMode === 'black') { c.fillStyle = '#000000'; c.fillRect(0, 0, w, h); }
+  else if (bgMode === 'green') { c.fillStyle = '#00ff00'; c.fillRect(0, 0, w, h); }
   else if (bgMode === 'color') { c.fillStyle = customColor; c.fillRect(0, 0, w, h); }
-  else if (bgMode === 'blur' && it && it.origImg) {
+  else if (bgMode === 'blur') {
     c.save();
     c.filter = 'blur(24px) brightness(0.85)';
-    c.drawImage(it.origImg, 0, 0, w, h);
+    if (it && it.type === 'video' && it.videoEl) {
+      c.drawImage(it.videoEl, 0, 0, w, h);
+    } else if (it && it.origImg) {
+      c.drawImage(it.origImg, 0, 0, w, h);
+    }
     c.restore();
+  }
+}
+
+async function renderVideoFrame(it) {
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const v = it.videoEl;
+  const w = canvas.width, h = canvas.height;
+  if (w <= 2 || h <= 2) return;
+
+  if (it.videoMode === 'ai' && selfieSegReady && selfieSeg && !isProcessingVideoFrame) {
+    isProcessingVideoFrame = true;
+    try {
+      await selfieSeg.send({ image: v });
+    } catch(e) {}
+    isProcessingVideoFrame = false;
+  }
+
+  drawBackground(ctx, w, h, it);
+
+  if (it.videoMode === 'ai' && currentSegmentationMask) {
+    if (!tempVidCanvas || tempVidCanvas.width !== w || tempVidCanvas.height !== h) {
+      tempVidCanvas = document.createElement('canvas');
+      tempVidCanvas.width = w; tempVidCanvas.height = h;
+      tempVidCtx = tempVidCanvas.getContext('2d');
+    }
+    tempVidCtx.clearRect(0, 0, w, h);
+    tempVidCtx.drawImage(v, 0, 0, w, h);
+
+    tempVidCtx.save();
+    tempVidCtx.globalCompositeOperation = 'destination-in';
+    if (refine.feather > 0) {
+      tempVidCtx.filter = `blur(${refine.feather}px)`;
+    }
+    tempVidCtx.drawImage(currentSegmentationMask, 0, 0, w, h);
+    tempVidCtx.restore();
+
+    ctx.drawImage(tempVidCanvas, 0, 0, w, h);
+  } else if (it.videoMode === 'chroma') {
+    const keyed = applyVideoChromaKey(v, w, h, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
+    ctx.drawImage(keyed, 0, 0, w, h);
+  } else {
+    ctx.drawImage(v, 0, 0, w, h);
+  }
+
+  if (it.beforeVidEl && Math.abs(it.beforeVidEl.currentTime - v.currentTime) > 0.06) {
+    it.beforeVidEl.currentTime = v.currentTime;
   }
 }
 
@@ -844,18 +1210,136 @@ function renderActive() {
   if (!it || it.status !== 'done') {
     canvas.width = 2; canvas.height = 2;
     beforeImg.removeAttribute('src');
+    beforeVid.removeAttribute('src');
     $('metaLine').textContent = it ? `${it.name} — ${it.status}${it.error ? ': ' + it.error : ''}` : '';
     syncZoom(); return;
   }
+
   fitCanvas();
-  drawBackground(ctx, canvas.width, canvas.height, it);
-  ctx.drawImage(it.refCanvas, 0, 0, canvas.width, canvas.height);
-  beforeImg.src = it.beforeUrl;
-  $('metaLine').textContent = `${it.name} — ${it.w}×${it.h}px`;
+
+  if (it.type === 'video') {
+    beforeImg.style.display = 'none';
+    beforeVid.style.display = 'block';
+    if (beforeVid.src !== it.videoUrl) beforeVid.src = it.videoUrl;
+
+    videoControls.style.display = 'flex';
+    videoEngineGroup.style.display = 'block';
+    ctlThreshold.style.display = it.videoMode === 'ai' ? 'flex' : 'none';
+    videoModeSelect.value = it.videoMode || 'ai';
+    chromaSettings.style.display = it.videoMode === 'chroma' ? 'block' : 'none';
+
+    $('fmtSelect').innerHTML = `
+      <option value="webm">WebM Video — transparent alpha channel</option>
+      <option value="mp4">MP4 Video — universal video with background</option>
+    `;
+    $('btnDownload').textContent = '⬇ Download Video';
+    $('btnCopy').style.display = 'none';
+
+    $('metaLine').textContent = `${it.name} — ${it.w}×${it.h}px · ${it.dur.toFixed(1)}s (Video)`;
+    renderVideoFrame(it);
+  } else {
+    pauseAnyVideo();
+    beforeImg.style.display = 'block';
+    beforeVid.style.display = 'none';
+
+    videoControls.style.display = 'none';
+    videoEngineGroup.style.display = 'none';
+    ctlThreshold.style.display = 'none';
+
+    $('fmtSelect').innerHTML = `
+      <option value="png">PNG — transparent / best quality</option>
+      <option value="webp">WebP — small file, keeps transparency</option>
+      <option value="jpeg">JPG — small file, flat background</option>
+    `;
+    $('btnDownload').textContent = '⬇ Download Photo';
+    $('btnCopy').style.display = '';
+
+    drawBackground(ctx, canvas.width, canvas.height, it);
+    ctx.drawImage(it.refCanvas, 0, 0, canvas.width, canvas.height);
+    beforeImg.src = it.beforeUrl;
+    $('metaLine').textContent = `${it.name} — ${it.w}×${it.h}px (Photo)`;
+  }
+
   syncCompare();
   syncZoom();
 }
 window.addEventListener('resize', () => { if (active()?.status === 'done') renderActive(); });
+
+/* ---------- video player controls ---------- */
+function formatTime(s) {
+  s = Math.max(0, Math.floor(s || 0));
+  const m = Math.floor(s / 60);
+  const sec = s % 60;
+  return String(m).padStart(2, '0') + ':' + String(sec).padStart(2, '0');
+}
+
+function updateVideoScrubber() {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const v = it.videoEl;
+  if (!vSeek.matches(':active')) {
+    vSeek.value = it.dur ? (v.currentTime / it.dur) * 100 : 0;
+  }
+  vTime.textContent = `${formatTime(v.currentTime)} / ${formatTime(it.dur)}`;
+}
+
+function startVideoLoop() {
+  cancelAnimationFrame(animFrameId);
+  function step() {
+    const it = active();
+    if (it && it.type === 'video' && it.videoEl && !it.videoEl.paused) {
+      renderVideoFrame(it);
+      updateVideoScrubber();
+      animFrameId = requestAnimationFrame(step);
+    }
+  }
+  animFrameId = requestAnimationFrame(step);
+}
+
+btnPlayPause.addEventListener('click', () => {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const v = it.videoEl;
+  const bv = it.beforeVidEl;
+  if (v.paused) {
+    v.play();
+    if (bv) bv.play();
+    btnPlayPause.textContent = '⏸';
+    startVideoLoop();
+  } else {
+    v.pause();
+    if (bv) bv.pause();
+    btnPlayPause.textContent = '▶';
+    cancelAnimationFrame(animFrameId);
+  }
+});
+
+vSeek.addEventListener('input', () => {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const v = it.videoEl;
+  const bv = it.beforeVidEl;
+  const t = (vSeek.value / 100) * it.dur;
+  v.currentTime = t;
+  if (bv) bv.currentTime = t;
+  vTime.textContent = `${formatTime(t)} / ${formatTime(it.dur)}`;
+  renderVideoFrame(it);
+});
+
+btnLoop.addEventListener('click', () => {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  it.videoEl.loop = !it.videoEl.loop;
+  if (it.beforeVidEl) it.beforeVidEl.loop = it.videoEl.loop;
+  btnLoop.classList.toggle('active', it.videoEl.loop);
+});
+
+btnMute.addEventListener('click', () => {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  it.videoEl.muted = !it.videoEl.muted;
+  btnMute.textContent = it.videoEl.muted ? '🔇' : '🔊';
+});
 
 /* ---------- before/after slider ---------- */
 function syncCompare() {
@@ -880,7 +1364,9 @@ document.querySelectorAll('.swatch[data-bg]').forEach(sw => {
     document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
     sw.classList.add('active');
     bgMode = sw.dataset.bg;
-    renderActive();
+    const it = active();
+    if (it && it.type === 'video') renderVideoFrame(it);
+    else renderActive();
   });
 });
 $('bgColor').addEventListener('input', (e) => {
@@ -888,16 +1374,18 @@ $('bgColor').addEventListener('input', (e) => {
   document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
   e.target.classList.add('active');
   bgMode = 'color';
-  renderActive();
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
 });
 
 /* ================= export ================= */
 function baseName(name) {
   const i = name.lastIndexOf('.');
-  return (i > 0 ? name.slice(0, i) : name).replace(/[^\w\-]+/g, '-').slice(0, 60) || 'image';
+  return (i > 0 ? name.slice(0, i) : name).replace(/[^\w\-]+/g, '-').slice(0, 60) || 'media';
 }
 
-function exportItem(it, fmt) {
+function exportImageItem(it, fmt) {
   return new Promise((resolve) => {
     const w = it.w, h = it.h;
     const out = document.createElement('canvas');
@@ -926,19 +1414,142 @@ function exportItem(it, fmt) {
   });
 }
 
+async function exportVideoItem(it, fmt) {
+  const v = it.videoEl;
+  if (!v) return;
+
+  pauseAnyVideo();
+  showOverlay(`Exporting video (${fmt.toUpperCase()})…`, it.name);
+
+  const ew = it.w, eh = it.h;
+  const eCv = document.createElement('canvas');
+  eCv.width = ew; eCv.height = eh;
+  const eCtx = eCv.getContext('2d');
+
+  const cCv = document.createElement('canvas');
+  cCv.width = ew; cCv.height = eh;
+  const cCtx = cCv.getContext('2d');
+
+  let mimeType = 'video/webm; codecs=vp9';
+  if (fmt === 'mp4') {
+    if (MediaRecorder.isTypeSupported('video/mp4; codecs=avc1')) {
+      mimeType = 'video/mp4; codecs=avc1';
+    } else if (MediaRecorder.isTypeSupported('video/mp4')) {
+      mimeType = 'video/mp4';
+    } else {
+      mimeType = 'video/webm; codecs=vp9';
+    }
+  } else {
+    if (MediaRecorder.isTypeSupported('video/webm; codecs=vp9')) {
+      mimeType = 'video/webm; codecs=vp9';
+    } else if (MediaRecorder.isTypeSupported('video/webm')) {
+      mimeType = 'video/webm';
+    }
+  }
+
+  const stream = eCv.captureStream(30);
+  try {
+    const vStream = v.captureStream ? v.captureStream() : (v.mozCaptureStream ? v.mozCaptureStream() : null);
+    if (vStream && vStream.getAudioTracks().length) {
+      stream.addTrack(vStream.getAudioTracks()[0]);
+    }
+  } catch(e) {}
+
+  const chunks = [];
+  let recorder = null;
+  try {
+    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+  } catch(e) {
+    recorder = new MediaRecorder(stream);
+  }
+
+  recorder.ondataavailable = ev => { if (ev.data && ev.data.size > 0) chunks.push(ev.data); };
+  const recFinished = new Promise(resolve => { recorder.onstop = resolve; });
+  recorder.start(100);
+
+  v.currentTime = 0;
+  await new Promise(r => { v.onseeked = r; setTimeout(r, 400); });
+
+  const fps = 30;
+  const totalFrames = Math.max(1, Math.round(it.dur * fps));
+  const dt = 1 / fps;
+
+  for (let f = 0; f < totalFrames; f++) {
+    const t = f * dt;
+    v.currentTime = t;
+    await new Promise(r => { v.onseeked = r; setTimeout(r, 160); });
+
+    if (it.videoMode === 'ai' && selfieSegReady && selfieSeg) {
+      try {
+        await selfieSeg.send({ image: v });
+      } catch(e) {}
+    }
+
+    const flatBg = (fmt === 'mp4' && bgMode === 'transparent') ? 'green' : bgMode;
+    const oldBg = bgMode;
+    bgMode = flatBg;
+    drawBackground(eCtx, ew, eh, it);
+    bgMode = oldBg;
+
+    if (it.videoMode === 'ai' && currentSegmentationMask) {
+      cCtx.clearRect(0, 0, ew, eh);
+      cCtx.drawImage(v, 0, 0, ew, eh);
+      cCtx.save();
+      cCtx.globalCompositeOperation = 'destination-in';
+      if (refine.feather > 0) cCtx.filter = `blur(${refine.feather}px)`;
+      cCtx.drawImage(currentSegmentationMask, 0, 0, ew, eh);
+      cCtx.restore();
+      eCtx.drawImage(cCv, 0, 0, ew, eh);
+    } else if (it.videoMode === 'chroma') {
+      const keyed = applyVideoChromaKey(v, ew, eh, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
+      eCtx.drawImage(keyed, 0, 0, ew, eh);
+    } else {
+      eCtx.drawImage(v, 0, 0, ew, eh);
+    }
+
+    progress(`Rendering frame ${f + 1}/${totalFrames}`, f + 1, totalFrames);
+    await new Promise(r => setTimeout(r, 8));
+  }
+
+  recorder.stop();
+  await recFinished;
+
+  const actualExt = recorder.mimeType.includes('mp4') ? 'mp4' : 'webm';
+  const outBlob = new Blob(chunks, { type: recorder.mimeType });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(outBlob);
+  a.download = `${baseName(it.name)}-bg-removed.${actualExt}`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+
+  hideOverlay();
+  v.currentTime = 0;
+  renderActive();
+}
+
 $('btnDownload').addEventListener('click', async () => {
   const it = active();
-  if (!it || it.status !== 'done') { alert('Select a finished photo first.'); return; }
-  await exportItem(it, $('fmtSelect').value);
+  if (!it || it.status !== 'done') { alert('Select a finished item first.'); return; }
+  const fmt = $('fmtSelect').value;
+  if (it.type === 'video') {
+    await exportVideoItem(it, fmt);
+  } else {
+    await exportImageItem(it, fmt);
+  }
 });
 
 $('btnDownloadAll').addEventListener('click', async () => {
   const done = items.filter(i => i.status === 'done');
-  if (!done.length) { alert('No finished photos yet.'); return; }
-  if (!confirm(`Download ${done.length} photo(s)? Your browser may ask permission for multiple downloads.`)) return;
+  if (!done.length) { alert('No finished items yet.'); return; }
+  if (!confirm(`Download ${done.length} item(s)? Your browser may ask permission for multiple downloads.`)) return;
   const fmt = $('fmtSelect').value;
   for (const it of done) {
-    await exportItem(it, fmt);
+    if (it.type === 'video') {
+      await exportVideoItem(it, fmt);
+    } else {
+      await exportImageItem(it, fmt);
+    }
     await new Promise(r => setTimeout(r, 700));
   }
 });
@@ -946,7 +1557,7 @@ $('btnDownloadAll').addEventListener('click', async () => {
 /* ================= Reel Studio Integrations ================= */
 $('btnCopy').addEventListener('click', async () => {
   const it = active();
-  if (!it || it.status !== 'done') { alert('Select a finished photo first.'); return; }
+  if (!it || it.status !== 'done' || it.type === 'video') { alert('Select a finished photo first.'); return; }
   try {
     it.refCanvas.toBlob(async (blob) => {
       await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
@@ -959,8 +1570,8 @@ $('btnCopy').addEventListener('click', async () => {
 
 $('btnSendPost').addEventListener('click', () => {
   const it = active();
-  if (!it || it.status !== 'done') { alert('Select a finished photo first.'); return; }
-  const dataUrl = it.refCanvas.toDataURL('image/png');
+  if (!it || it.status !== 'done') { alert('Select a finished item first.'); return; }
+  const dataUrl = it.type === 'video' ? canvas.toDataURL('image/png') : it.refCanvas.toDataURL('image/png');
   if (window.parent && window.parent !== window){
     window.parent.postMessage({ girika: 'cutout', target: 'post', dataUrl }, '*');
   } else {
@@ -971,13 +1582,25 @@ $('btnSendPost').addEventListener('click', () => {
 
 $('btnSendVideo').addEventListener('click', () => {
   const it = active();
-  if (!it || it.status !== 'done') { alert('Select a finished photo first.'); return; }
-  const dataUrl = it.refCanvas.toDataURL('image/png');
-  if (window.parent && window.parent !== window){
-    window.parent.postMessage({ girika: 'cutout', target: 'video', dataUrl }, '*');
+  if (!it || it.status !== 'done') { alert('Select a finished item first.'); return; }
+  if (it.type === 'video') {
+    if (window.parent && window.parent !== window){
+      window.parent.postMessage({
+        girika: 'video-cutout',
+        blob: it.file,
+        name: it.name
+      }, '*');
+    } else {
+      window.open('video.html', '_blank');
+    }
   } else {
-    localStorage.setItem('rs-last-cutout', dataUrl);
-    window.open('video.html', '_blank');
+    const dataUrl = it.refCanvas.toDataURL('image/png');
+    if (window.parent && window.parent !== window){
+      window.parent.postMessage({ girika: 'cutout', target: 'video', dataUrl }, '*');
+    } else {
+      localStorage.setItem('rs-last-cutout', dataUrl);
+      window.open('video.html', '_blank');
+    }
   }
 });
 
@@ -997,7 +1620,6 @@ if (window.parent && window.parent !== window){
   window.parent.postMessage({ girika: 'ready', app: 'bgremover' }, '*');
 }
 
-
 /* ================= guide view toggle ================= */
 const appView = $('appView'), guideView = $('guideView');
 function showGuide(show) {
@@ -1008,19 +1630,13 @@ function showGuide(show) {
 $('guideLink').addEventListener('click', (e) => { e.preventDefault(); showGuide(true); });
 $('guideBack').addEventListener('click', () => showGuide(false));
 
-/* ================= on-device AI storage =================
-   Honest version: the library does NOT use Cache Storage or IndexedDB
-   itself — the model files (~40MB) are fetched like any normal download
-   and kept in the browser's HTTP cache, which a web page can neither
-   measure nor delete. This bar reports what it CAN see, clears what it
-   CAN clear, and tells the user the final manual step. */
+/* ================= on-device AI storage ================= */
 async function refreshStorageInfo() {
   const el = $('storageInfo');
   let n = 0;
   try { if ('caches' in window) n = (await caches.keys()).length; } catch { /* ignore */ }
   el.innerHTML =
-    `AI model: downloads automatically on first run (~40&nbsp;MB) and is kept in your browser's <b>HTTP cache</b> — ` +
-    `a web page cannot measure that directly. App storage entries visible here: <b>${n}</b>. ` +
+    `AI engines: Photo ISNet ONNX model &amp; Video MediaPipe Neural Engine run 100% on your device with <b>zero cloud processing</b>. App storage entries: <b>${n}</b>. ` +
     `For a complete wipe use your browser's <b>Settings → Delete browsing data → Cached images and files</b>.`;
 }
 
@@ -1045,8 +1661,7 @@ $('btnClearModel').addEventListener('click', async () => {
   alert((removed.length
       ? 'Cleared from app storage:\n• ' + removed.join('\n• ') + '\n\n'
       : 'App storage was already empty.\n\n') +
-    'For a FULL wipe: the AI model (~40 MB) may still be in your browser\'s HTTP cache.\n' +
-    'Chrome / Edge: Settings → Privacy and security → Delete browsing data → tick "Cached images and files" → Delete.');
+    'For a FULL wipe: Settings → Privacy and security → Delete browsing data → tick "Cached images and files" → Delete.');
 });
 refreshStorageInfo();
 </script>
