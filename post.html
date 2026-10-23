@@ -338,6 +338,26 @@ body.recording .add-wrap{display:none}
     </div>
   </div>
 </div>
+<div class="tpl-modal" id="capgenModal" hidden role="dialog" aria-modal="true" aria-labelledby="capgenTitle">
+  <div class="tpl-box" style="max-width:560px">
+    <div class="tpl-head">
+      <h1 id="capgenTitle">Write a caption</h1>
+      <span class="hint">Hover a style to see an example. Click to use it.</span>
+      <button class="btn" id="capgenClose">Close</button>
+    </div>
+    <div class="tpl-body" style="display:block;padding:16px 20px">
+      <div class="chips" id="capgenStyles" role="listbox" aria-label="Caption style"></div>
+      <p class="hint" id="capgenStyleHint" style="margin-top:8px"></p>
+      <div id="capgenFields" style="margin-top:12px"></div>
+      <p class="hint" style="margin-top:14px;margin-bottom:4px"><b id="capgenPreviewLabel">Example</b></p>
+      <textarea id="capgenOut" readonly rows="6" style="width:100%;padding:10px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font:inherit;resize:vertical"></textarea>
+      <div class="row" style="margin-top:10px;gap:8px">
+        <button class="btn primary" id="capgenCopy" type="button">Copy caption</button>
+        <span class="hint" id="capgenCopied" aria-live="polite"></span>
+      </div>
+    </div>
+  </div>
+</div>
 <div class="app">
 
   <!-- LEFT: format, layout, presets -->
@@ -354,6 +374,11 @@ body.recording .add-wrap{display:none}
       <h2>Templates</h2>
       <button class="btn primary block" id="tplOpen">Browse templates</button>
       <p class="hint">Listings, site visits, buyer guides, location, contact and festive posts. Text in [brackets] is for you to fill in.</p>
+    </div>
+    <div class="group">
+      <h2>Caption</h2>
+      <button class="btn block" id="capgenOpen" type="button">Write a caption</button>
+      <p class="hint">The words you post under this image, in a style that fits it. Hover a style to preview it.</p>
     </div>
   </aside>
 
@@ -3961,6 +3986,77 @@ function edInit(){ edToolbar(); edPaint(); edLoadFonts(); HIST.cur = histSnap();
   const announce = () => parent.postMessage({ girika:"ready", app:"post", templates:TEMPLATES.map((t, i) => ({ id:`post:${i}`, app:"post", cat:t.cat, name:t.name, sub:t.sub, tag:t.pages.length > 1 ? `Carousel, ${t.pages.length} pages` : "Post", thumb:thumbURL(renderTplThumb(t)) })) }, "*");
   /* brand fonts load async now (brand.js), so wait for onReady before making the thumbnails */
   new Promise(r => GIRIKA.onReady(r)).then(() => Promise.all([`500 40px "${GIRIKA.FONTS.head}"`,`italic 500 40px "${GIRIKA.FONTS.head}"`,`700 20px "${GIRIKA.FONTS.body}"`].map(f => document.fonts.load(f)))).catch(() => {}).then(() => setTimeout(announce, 150));
+})();
+</script>
+<script>
+/* ---------- Social caption composer: writes the text you post UNDER the image, not on it.
+   Hover a style chip to see an example in that style; click to use it and fill your own words. ---------- */
+(function(){
+  if (!document.getElementById("capgenModal")) return;
+  const capgenCta = () => { const k = (window.GIRIKA && GIRIKA.KIT) || {}; const bits = [k.handle, k.web].filter(Boolean); return bits.length ? `\n\n${bits.join("  |  ")}` : ""; };
+  const CAPGEN_STYLES = [
+    { id:"one-liner", name:"One-liner", hint:"Aesthetic photos, bold statements, lifestyle content.",
+      fields:[{ k:"line", label:"Your one punchy line", ph:"Still the best view in Dehradun." }],
+      build:f => (f.line || "").trim() },
+    { id:"self-correction", name:"Self-correction", hint:"Relatable humour, behind-the-scenes, personal branding.",
+      fields:[{ k:"assume", label:"What people assume", ph:"Plots this close to the road must cost more." }, { k:"truth", label:"Correction: what's actually true", ph:"This one's 18L less than you'd think." }],
+      build:f => `${(f.assume || "").trim()}\n\nCorrection: ${(f.truth || "").trim()}${capgenCta()}` },
+    { id:"bulleted-takeaway", name:"Bulleted takeaway", hint:"Educational content, tutorials, quick buyer tips.",
+      fields:[{ k:"topic", label:"Topic / headline", ph:"3 things to check before buying a plot" }, { k:"p1", label:"Point 1", ph:"Confirm the road is approved, not just mud-widened." }, { k:"p2", label:"Point 2", ph:"Ask for the registry copy, not just a sale agreement." }, { k:"p3", label:"Point 3", ph:"Walk the boundary yourself, don't trust the photo." }],
+      build:f => { const pts = [f.p1, f.p2, f.p3].filter(x => x && x.trim()).map(x => "• " + x.trim()); return `${(f.topic || "").trim()}\n\n${pts.join("\n")}${capgenCta()}`; } },
+    { id:"quiet-luxury", name:"Quiet luxury", hint:"Minimal: a single word, a place, or a timestamp.",
+      fields:[{ k:"word", label:"One word, a place, or a timestamp", ph:"Dehradun." }],
+      build:f => (f.word || "").trim() },
+    { id:"hear-me-out", name:"Hear me out", hint:"Casual, like a text to a close friend.",
+      fields:[{ k:"msg", label:"Write it like a text to a friend", ph:"ok so i walked this plot today and" }],
+      build:f => `${(f.msg || "").trim()}${capgenCta()}` }
+  ];
+  const capgenExample = st => st.build(Object.fromEntries(st.fields.map(fd => [fd.k, fd.ph])));
+  let capgenSel = null; const capgenVals = {};
+  const $c = id => document.getElementById(id);
+  function showExample(st){ $c("capgenOut").value = capgenExample(st); $c("capgenPreviewLabel").textContent = `Example — ${st.name}`; $c("capgenStyleHint").textContent = st.hint || ""; }
+  function showCurrent(){
+    const st = CAPGEN_STYLES.find(x => x.id === capgenSel);
+    if (!st){ $c("capgenOut").value = ""; $c("capgenPreviewLabel").textContent = "Example"; $c("capgenStyleHint").textContent = ""; return; }
+    $c("capgenPreviewLabel").textContent = "Your caption"; $c("capgenStyleHint").textContent = st.hint || "";
+    $c("capgenOut").value = st.build(capgenVals[st.id] || {});
+  }
+  function renderStyles(){
+    const host = $c("capgenStyles"); host.innerHTML = "";
+    CAPGEN_STYLES.forEach(st => {
+      const b = document.createElement("button"); b.type = "button"; b.className = "chip"; b.textContent = st.name; b.title = `Preview "${st.name}"`;
+      b.setAttribute("aria-pressed", String(capgenSel === st.id));
+      b.addEventListener("mouseenter", () => showExample(st)); b.addEventListener("focus", () => showExample(st));
+      b.addEventListener("mouseleave", showCurrent); b.addEventListener("blur", showCurrent);
+      b.addEventListener("click", () => { capgenSel = st.id; capgenVals[st.id] = capgenVals[st.id] || {}; renderStyles(); renderFields(); showCurrent(); });
+      host.appendChild(b);
+    });
+  }
+  function renderFields(){
+    const host = $c("capgenFields"); host.innerHTML = "";
+    const st = CAPGEN_STYLES.find(x => x.id === capgenSel); if (!st) return;
+    const vals = capgenVals[st.id] || (capgenVals[st.id] = {});
+    st.fields.forEach(fd => {
+      const wrap = document.createElement("div"); wrap.className = "field"; wrap.style.marginBottom = "8px";
+      const lab = document.createElement("label"); lab.textContent = fd.label; lab.style.cssText = "display:block;margin-bottom:4px;font-size:13px;opacity:.75";
+      const inp = document.createElement("input"); inp.type = "text"; inp.placeholder = fd.ph || ""; inp.value = vals[fd.k] || "";
+      inp.style.cssText = "width:100%;padding:8px;border-radius:8px;border:1px solid var(--line);background:var(--surface);font:inherit";
+      inp.addEventListener("input", () => { vals[fd.k] = inp.value; showCurrent(); });
+      wrap.append(lab, inp); host.appendChild(wrap);
+    });
+  }
+  function openCapgen(){ $c("capgenModal").hidden = false; renderStyles(); if (capgenSel) renderFields(); showCurrent(); $c("capgenClose").focus(); }
+  function closeCapgen(){ $c("capgenModal").hidden = true; }
+  $c("capgenOpen").addEventListener("click", openCapgen);
+  $c("capgenClose").addEventListener("click", closeCapgen);
+  $c("capgenModal").addEventListener("click", e => { if (e.target.id === "capgenModal") closeCapgen(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape" && !$c("capgenModal").hidden) closeCapgen(); });
+  $c("capgenCopy").addEventListener("click", async () => {
+    const ta = $c("capgenOut"), text = ta.value, note = $c("capgenCopied"); if (!text) return;
+    try { await navigator.clipboard.writeText(text); }
+    catch(e){ ta.removeAttribute("readonly"); ta.select(); try { document.execCommand("copy"); } catch(e2){} ta.setAttribute("readonly", ""); }
+    note.textContent = "Copied"; setTimeout(() => { if (note.textContent === "Copied") note.textContent = ""; }, 1500);
+  });
 })();
 </script>
 </body>

@@ -1350,7 +1350,7 @@ const P = {
   watermark:true, progressBar:false, progBar:{ pos:"bottom", color:"gradient", height:7, customColor:"#CCFF00" }, audiogram:{ on:false, style:"bars", pos:"bottom", color:"lime", height:64, bars:36 },
   droneHud:false, cinemascope:false,
   logo:{ wmKind:"lockup", wmTone:"dark", wmPos:"tr", wmSize:1, wmOpacity:.95, introKind:"stacked", introTone:"auto", introSize:1, outroKind:"lockup", outroTone:"auto", outroSize:1 },
-  cap:{ v:2, style:"bold", pos:"lower", size:1.3, bg:"slate", accent:"clayLt", case:"normal", anim:"word", words:"short", enter:"none", enterDur:.3, exit:"none", exitDur:.25, font:"", presetId:"", custom:{ ...capDef() } }, lang:"en-IN", autoCaps:true, micId:"", voiceClean:true, voSrc:"mic", muteVideo:false, hearWhileRec:false,
+  cap:{ v:2, style:"bold", pos:"lowmid", size:1.3, bg:"slate", accent:"clayLt", case:"normal", anim:"word", words:"short", enter:"none", enterDur:.3, exit:"none", exitDur:.25, font:"", presetId:"", custom:{ ...capDef() } }, lang:"en-IN", autoCaps:true, micId:"", voiceClean:true, voSrc:"mic", muteVideo:false, hearWhileRec:false,
   musicVol:.35, duckLevel:.22, voVol:1, td:.6, pps:50,
   exp:{ res:"1080", fps:30, mode:"fast" }, hl:{ len:30, shot:"auto", style:"smooth", grade:true }
 };
@@ -2571,6 +2571,120 @@ const capMix = (a, b, p) => { const x = parseInt(hex6(a).slice(1), 16), y = pars
   return "#" + ((1 << 24) + (m(16) << 16) + (m(8) << 8) + m(0)).toString(16).slice(1).toUpperCase(); };
 const CAP_FX = {
   /* active word */
+  fireglow:{ name:"Fire glow", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .24);
+      const flk = Math.sin((e.t - e.ws(i)) * 22) * .12;
+      const sc = 1 + (.14 * (1 - easeOutC(q)) + flk * .5) * e.amt;
+      const dy = -Math.sin(q * Math.PI) * e.size * .1 * e.amt;
+      const blur = e.size * (.38 + .2 * Math.sin(e.t * 16)) * e.amt;
+      return { sc, dy, color:"#FFF275", glow:{ color:e.hlCol(i) || "#FF4500", blur } };
+    }
+  },
+  bouncepop:{ name:"Bounce pop", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .28);
+      const sc = 1 + (.22 * (1 - easeOutC(q))) * e.amt;
+      const tilt = (i % 2 === 0 ? -1 : 1) * (1 - easeOutC(q)) * 4 * Math.PI / 180 * e.amt;
+      const dy = -Math.sin(q * Math.PI) * e.size * .14 * e.amt;
+      return { sc, rot:tilt, dy, glow:{ color:e.hlCol(i), blur:e.size * .22 * (1 - q) * e.amt } };
+    }
+  },
+  highlightbox:{ name:"Pill pop", group:"active", noHl:true,
+    pre(e){
+      const r = e.pos[e.k]; if (!r) return;
+      const c = e.c, s = e.size;
+      const q = easeOutC(e.wq(e.k, .18));
+      const sc = 1 + .08 * e.amt * (1 - q);
+      const bw = (r.ww + s * .38) * sc, bh = s * 1.22 * sc;
+      const bx = r.x + r.ww / 2 - bw / 2, by = r.ly - bh / 2;
+      const rad = Math.min(e.rad || s * .25, bh / 2);
+      c.save();
+      c.fillStyle = e.hlCol(e.k);
+      c.shadowColor = "rgba(0,0,0,0.4)";
+      c.shadowBlur = s * .24;
+      c.shadowOffsetY = s * .05;
+      c.beginPath();
+      c.roundRect(bx, by, bw, bh, rad);
+      c.fill();
+      c.restore();
+    },
+    word(e, i){
+      if (i === e.k){
+        return { color: lightHex(e.hlCol(i)) ? C.ink : "#FFFFFF", fillOnly:true, sc: 1.04 };
+      }
+      return null;
+    }
+  },
+  rgbglitch:{ name:"RGB glitch", group:"active",
+    paint(e, i, draw, x, y, ww){
+      if (i !== e.k){ draw(); return; }
+      const q = e.wq(i, .2);
+      if (q >= 1){ draw(); return; }
+      const c = e.c, f = (1 - easeOutC(q)) * e.amt, s = e.size * .08 * f;
+      const dx = Math.sin((e.t - e.ws(i)) * 48) * s + s;
+      c.save(); c.globalAlpha *= .75; c.translate(-dx, 0); draw("#FF0055", true); c.restore();
+      c.save(); c.globalAlpha *= .75; c.translate(dx, 0); draw("#00F0FF", true); c.restore();
+      draw();
+    },
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .22);
+      return { sc: 1 + .06 * e.amt * (1 - q) };
+    }
+  },
+  neonlaser:{ name:"Laser outline", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .26);
+      const pulse = .5 + .5 * Math.sin((e.t - e.ws(i)) * 16);
+      const sc = 1 + (.12 * (1 - q) + .04 * pulse) * e.amt;
+      return {
+        sc,
+        color: "#FFFFFF",
+        glow: { color: e.hlCol(i) || "#00FF88", blur: e.size * (.5 + .3 * pulse) * e.amt }
+      };
+    }
+  },
+  karaokedot:{ name:"Bouncing dot", group:"active",
+    post(e){
+      const r1 = e.pos[e.k]; if (!r1) return;
+      const c = e.c, s = e.size, u = e.u;
+      const r0 = e.pos[Math.max(0, e.k - 1)];
+      const q = e.k === 0 ? 1 : easeOutC(e.wq(e.k, .18));
+      const startX = r0 ? r0.x + r0.ww / 2 : r1.x + r1.ww / 2;
+      const targetX = r1.x + r1.ww / 2;
+      const curX = startX + (targetX - startX) * q;
+      const arcH = s * .45 * Math.sin(clamp(q, 0, 1) * Math.PI);
+      const curY = r1.ly - s * .65 - arcH;
+      const dotRad = Math.max(4 * u, s * .12);
+      c.save();
+      c.fillStyle = e.hlCol(e.k);
+      c.shadowColor = e.hlCol(e.k);
+      c.shadowBlur = s * .25;
+      c.beginPath();
+      c.arc(curX, curY, dotRad, 0, Math.PI * 2);
+      c.fill();
+      c.restore();
+    },
+    word(e, i){
+      if (i !== e.k) return null;
+      return { sc: 1.05 };
+    }
+  },
+  heartbeat:{ name:"Heartbeat", group:"active",
+    word(e, i){
+      if (i !== e.k) return null;
+      const q = e.wq(i, .4);
+      let p = 0;
+      if (q < .38){ p = Math.sin((q / .38) * Math.PI); }
+      else if (q < .76){ p = Math.sin(((q - .38) / .38) * Math.PI) * .7; }
+      const sc = 1 + (.2 * p) * e.amt;
+      return { sc, glow: p > .2 ? { color: e.hlCol(i) || "#FF2A6D", blur: e.size * .3 * p * e.amt } : null };
+    }
+  },
   kinetic:{ name:"Kinetic spring", group:"active",
     word(e, i){
       if (i !== e.k) return null;
@@ -2748,6 +2862,11 @@ let CS_LIST = CS ? CS.list() : [];
 capNormalize();
 const capSaved = id => CS_LIST.find(s => s.id === id) || null;
 function capOpts(cap){
+  if (CS_HOVER_PRESET){
+    const hp = CS_HOVER_PRESET, g0 = P.cap;
+    return { style:"custom", custom:capProps(hp.props), pos:hp.pos || g0.pos, size:hp.size || g0.size, bg:g0.bg, accent:g0.accent, textCase:g0.case || "normal", anim:hp.anim || g0.anim,
+      enter:CAP_ENTER_KEYS.has(hp.enter) ? hp.enter : "none", exit:CAP_EXIT_KEYS.has(hp.exit) ? hp.exit : "none", enterDur:+hp.enterDur || .3, exitDur:+hp.exitDur || .25, font:hp.props.font || "" };
+  }
   const g = P.cap, o = cap.o || {}, style = o.style || g.style || "bold";
   let props = null;
   if (capIsCustom(style)){
@@ -2839,7 +2958,7 @@ function capDrawWord(c, fx, x, ly, ww, fn){
   if (fx.a <= 0) return;
   c.save(); c.globalAlpha *= fx.a; const mx = x + ww / 2; c.translate(mx, ly + fx.dy); c.scale(fx.sc, fx.sc); c.translate(-mx, -ly); fn(); c.restore();
 }
-const capY = (pos, blockH, H, safe, u) => pos === "top" ? safe.t + 120 * u : pos === "middle" ? H / 2 - blockH / 2 : pos === "lowmid" ? Math.min(H * .66 - blockH / 2, H - safe.b - blockH - 40 * u) : H - safe.b - blockH - 40 * u;
+const capY = (pos, blockH, H, safe, u) => pos === "top" ? safe.t + 120 * u : pos === "middle" ? H / 2 - blockH / 2 : pos === "lowmid" ? Math.min(H * .66 - blockH / 2, H - safe.b - blockH - 50 * u) : H - safe.b - blockH - 50 * u;
 function drawCaption(c, cap, t){
   const { W, H, u, safe } = geo(), o = capOpts(cap);
   const life0 = Math.min(clamp((t - cap.start) / .1), clamp((cap.end - t) / .1));
@@ -3872,7 +3991,7 @@ function renderFrame(t){
   const onBrand = (cur.kind === "intro" || cur.kind === "outro") && !inTrans;
   P.overlays.forEach(o => { if (t >= o.start && t <= o.end) drawOverlay(ctx, o, t); });
   if (P.watermark && !onBrand && cur.kind !== "intro" && cur.kind !== "outro") drawWatermark(ctx);
-  P.captions.forEach(cp => { if (t >= cp.start && t <= cp.end) drawCaptionAt(ctx, cp, t); });
+  drawProjectCaptions(ctx, t);
   drawDrawing(ctx);
   drawAudiogram(ctx, t);
   drawProgressBar(ctx, t);
@@ -6508,10 +6627,152 @@ function seBusyPlacing(){ try { return !!(drawing || placing); } catch(e){ retur
 const SE = { drag:null, pts:new Map(), pinch:null, guides:null, capScope:"all" };
 const SNAP = 16;
 function capOffset(cp){ const o = cp.o || {}; return { dx:o.dx != null ? o.dx : (P.cap.dx || 0), dy:o.dy != null ? o.dy : (P.cap.dy || 0) }; }
-function drawCaptionAt(c, cp, t){
+function capBlockHeight(cp, W, H, u, safe){
+  if (!cp) return 70 * u;
+  const o = capOpts(cp);
+  if (o.style === "giant"){
+    return 210 * u * (o.size || 1) * 1.2;
+  }
+  const text = cp.text || "";
+  const words = parseWords(text);
+  if (!words.length) return 70 * u;
+  const sz = o.size || 1;
+  if (o.custom){
+    const S = o.custom;
+    const fam = capFam(S.font, SANS), fontAt = s => `${S.italic ? "italic " : ""}${S.weight} ${s}px ${fam}`;
+    const fullW = W - safe.l - safe.r, areaW = fullW * (S.maxWidth || 0.9);
+    try {
+      const LY = capLayout(ctx, words, S, fontAt, 68 * u * sz, areaW, u);
+      const size = (LY && LY.size) || (68 * u * sz);
+      const baseLh = size * (S.lineHeight || 1.12);
+      const n = (LY && LY.lines && LY.lines.length) ? LY.lines.length : 1;
+      const py = (S.padY || 0.2) * size;
+      const bp = S.bg === "block" ? py : 0;
+      const gapL = S.bg === "line" ? size * 0.1 : 0;
+      return n * baseLh + (n - 1) * gapL + bp * 2;
+    } catch(e){
+      return 85 * u * sz;
+    }
+  }
+  const style = CAP_FONT[o.style] ? o.style : "bold";
+  const fontConf = CAP_FONT[style] || [800, "sans", 72, 1.1];
+  const base = fontConf[2], lhK = fontConf[3];
+  const size = base * u * sz;
+  const lh = size * lhK;
+  const padY = (style === "lower" ? 22 : 16) * u;
+  const boxed = style === "classic" || style === "lower";
+  const estLines = Math.max(1, Math.min(3, Math.ceil(text.length / 26)));
+  return estLines * lh + (boxed ? padY * 2 : 10 * u);
+}
+
+function capStackOffset(targetCp, t){
+  if (!P.captions || !P.captions.length) return { dx:0, dy:0 };
+  const { W, H, u, safe } = geo();
+  const isAtEnd = TOTAL > 0 && t >= TOTAL - 0.001;
+  const active = P.captions.filter(cp => t >= cp.start && (isAtEnd ? t <= cp.end : t < cp.end));
+  if (active.length <= 1) return { dx:0, dy:0 };
+  active.sort((a, b) => a.start - b.start || a.id - b.id);
+  const targetPos = (capOpts(targetCp)).pos || "lower";
+  const samePos = active.filter(cp => ((capOpts(cp)).pos || "lower") === targetPos);
+  if (samePos.length <= 1) return { dx:0, dy:0 };
+  const idx = samePos.indexOf(targetCp);
+  if (idx < 0) return { dx:0, dy:0 };
+  const heights = samePos.map(cp => capBlockHeight(cp, W, H, u, safe));
+  const gap = 14 * u;
+  let dy = 0;
+  if (targetPos === "top"){
+    for (let i = 0; i < idx; i++) dy += (heights[i] + gap);
+  } else if (targetPos === "middle" || targetPos === "lowmid"){
+    const totalH = heights.reduce((s, h) => s + h, 0) + (samePos.length - 1) * gap;
+    let runY = -totalH / 2;
+    for (let i = 0; i < idx; i++) runY += (heights[i] + gap);
+    dy = runY + (heights[idx] / 2);
+  } else {
+    for (let i = 0; i < idx; i++) dy -= (heights[i] + gap);
+  }
+  return { dx:0, dy };
+}
+
+function drawCaptionAt(c, cp, t, extraOffset, extraAlpha){
   const { W, H } = geo(), o = capOffset(cp);
-  if (!o.dx && !o.dy){ drawCaption(c, cp, t); return; }
-  c.save(); c.translate(o.dx * W, o.dy * H); drawCaption(c, cp, t); c.restore();
+  const edx = (extraOffset && extraOffset.dx) || 0;
+  const edy = (extraOffset && extraOffset.dy) || 0;
+  const totalDx = (o.dx || 0) * W + edx;
+  const totalDy = (o.dy || 0) * H + edy;
+  const alpha = extraAlpha != null ? extraAlpha : 1;
+  if (!totalDx && !totalDy && alpha >= 1){ drawCaption(c, cp, t); return; }
+  c.save();
+  if (alpha < 1) c.globalAlpha *= Math.max(0, alpha);
+  if (totalDx || totalDy) c.translate(totalDx, totalDy);
+  drawCaption(c, cp, t);
+  c.restore();
+}
+
+function drawProjectCaptions(c, t){
+  if (!P.captions || !P.captions.length) return;
+  const { W, H, u, safe } = geo();
+  const EPS = 0.001;
+  const isAtEnd = TOTAL > 0 && t >= TOTAL - EPS;
+  const active = P.captions.filter(cp => {
+    if (t < cp.start) return false;
+    return isAtEnd ? t <= cp.end : t < cp.end;
+  });
+  if (!active.length) return;
+  if (active.length === 1){
+    drawCaptionAt(c, active[0], t);
+    return;
+  }
+  active.sort((a, b) => a.start - b.start || a.id - b.id);
+  const groups = new Map();
+  active.forEach(cp => {
+    const o = capOpts(cp);
+    const pos = o.pos || "lower";
+    if (!groups.has(pos)) groups.set(pos, []);
+    groups.get(pos).push(cp);
+  });
+  groups.forEach((caps, pos) => {
+    if (caps.length === 1){
+      drawCaptionAt(c, caps[0], t);
+      return;
+    }
+    // Consecutive transition / handoff between 2 sequential captions
+    if (caps.length === 2 && caps[0].start < caps[1].start && caps[0].end > caps[1].start){
+      const overlapDur = caps[0].end - caps[1].start;
+      if (overlapDur > 0 && overlapDur <= 0.45){
+        const p = clamp((t - caps[1].start) / overlapDur, 0, 1);
+        const a0 = 1 - ease(p);
+        const a1 = ease(p);
+        const dy0 = -(1 - a0) * 20 * u;
+        const dy1 = (1 - a1) * 16 * u;
+        drawCaptionAt(c, caps[0], t, { dy: dy0 }, a0);
+        drawCaptionAt(c, caps[1], t, { dy: dy1 }, a1);
+        return;
+      }
+    }
+    // Truly concurrent overlapping captions: stack vertically to prevent collision!
+    const heights = caps.map(cp => capBlockHeight(cp, W, H, u, safe));
+    const gap = 14 * u;
+    caps.forEach((cp, idx) => {
+      const co = capOffset(cp);
+      if (co.dx !== 0 || co.dy !== 0){
+        drawCaptionAt(c, cp, t);
+        return;
+      }
+      let dy = 0;
+      if (pos === "top"){
+        for (let i = 0; i < idx; i++) dy += (heights[i] + gap);
+      } else if (pos === "middle" || pos === "lowmid"){
+        const totalStackH = heights.reduce((sum, h) => sum + h, 0) + (caps.length - 1) * gap;
+        let runningY = -totalStackH / 2;
+        for (let i = 0; i < idx; i++) runningY += (heights[i] + gap);
+        dy = runningY + (heights[idx] / 2);
+      } else {
+        // "lower" (bottom): caps[0] stays anchored, subsequent stack upwards
+        for (let i = 0; i < idx; i++) dy -= (heights[i] + gap);
+      }
+      drawCaptionAt(c, cp, t, { dy });
+    });
+  });
 }
 /* caption bounds: draw it alone at quarter size and read the pixels (only on click / drag start) */
 const SE_PROBE = document.createElement("canvas");
@@ -6520,14 +6781,18 @@ function capBox(cp, t){
   if (SE_PROBE.width !== pw || SE_PROBE.height !== ph){ SE_PROBE.width = pw; SE_PROBE.height = ph; }
   const pc = SE_PROBE.getContext("2d", { willReadFrequently:true });
   pc.setTransform(1, 0, 0, 1, 0, 0); pc.clearRect(0, 0, pw, ph); pc.setTransform(s, 0, 0, s, 0, 0);
-  try { drawCaptionAt(pc, cp, clamp(t, cp.start + .01, cp.end - .01)); } catch(e){ return null; }
+  const sOff = capStackOffset(cp, t);
+  try { drawCaptionAt(pc, cp, clamp(t, cp.start + .01, cp.end - .01), sOff); } catch(e){ return null; }
   const d = pc.getImageData(0, 0, pw, ph).data; let x0 = pw, y0 = ph, x1 = -1, y1 = -1;
   for (let y = 0; y < ph; y += 2) for (let x = 0; x < pw; x += 2){ if (d[(y * pw + x) * 4 + 3] > 24){ if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y; } }
   if (x1 < 0) return null;
   return { x:x0 / s, y:y0 / s, w:(x1 - x0 + 2) / s, h:(y1 - y0 + 2) / s };
 }
 const inBox = (b, x, y, pad) => b && x >= b.x - pad && x <= b.x + b.w + pad && y >= b.y - pad && y <= b.y + b.h + pad;
-const capsAt = t => P.captions.filter(cp => t >= cp.start && t <= cp.end);
+const capsAt = t => {
+  const isEnd = TOTAL > 0 && t >= TOTAL - 0.001;
+  return P.captions.filter(cp => t >= cp.start && (isEnd ? t <= cp.end : t < cp.end));
+};
 const frameClip = c => c && (c.kind === "image" || c.kind === "video") && (!c.frame || c.frame === "full");
 function frameSet(c, patch){
   const local = clamp(now() - c._start, 0, c.dur);
@@ -7153,6 +7418,21 @@ const capChanged = () => { persist(); csRender(); };
 var csDockClosed = false;
 function csOpenDock(){ csDockClosed = false; renderCapExtras(); const d = $("capStyleDock"); if (d && !d.hidden){ d.scrollIntoView({ block:"start", behavior:"smooth" }); } }
 var csScope = "all", csSaveMode = null, csManageId = null, csLastSel = null, csWeightHost = null, csManageMode = null;
+/* hover / focus preview: when set, capOpts() draws every caption with this look instead of its real one.
+   Nothing is saved; leaving the chip (or blur) clears it and the canvas redraws the real caption. */
+var CS_HOVER_PRESET = null;
+function csPreviewTime(){
+  if (!P.captions.length) return playT;
+  const hit = P.captions.find(cc => playT >= cc.start && playT < cc.end);
+  if (hit) return playT;
+  const first = P.captions[0];
+  return clamp(first.start + Math.min(.3, (first.end - first.start) / 2), first.start, Math.max(first.start, first.end - .01));
+}
+function csPreviewPreset(p){
+  if (playing || exporting) return;
+  CS_HOVER_PRESET = p || null;
+  renderFrame(CS_HOVER_PRESET ? csPreviewTime() : playT);
+}
 const csSelCap = () => selected && selected.type === "caption" ? selected.item : null;
 const csOne = () => !!(csSelCap() && csScope === "one");
 /* the props the panel shows and edits */
@@ -7437,7 +7717,8 @@ function renderPresets(){
     const row = el("div", { class:"chips" });
     CS_PRESETS.filter(p => (p.group || "") === g).forEach(p => {
       const on = !!cur && cur.id === p.id && capIsCustom(csOne() ? csSelCap().o && csSelCap().o.style : P.cap.style);
-      row.appendChild(el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:p.name, onclick:() => csApplyPreset(p) }));
+      row.appendChild(el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:p.name, title:`Preview "${p.name}"`, onclick:() => csApplyPreset(p),
+        onmouseenter:() => csPreviewPreset(p), onmouseleave:() => csPreviewPreset(null), onfocus:() => csPreviewPreset(p), onblur:() => csPreviewPreset(null) }));
     });
     host.appendChild(row);
   });
@@ -7450,7 +7731,9 @@ function renderMyStyles(){
   if (!CS_LIST.length) host.appendChild(el("p", { class:"hint", text:"Make a Custom style, then save it to reuse it here." }));
   [...CS_LIST].sort((a, b) => String(a.name).localeCompare(String(b.name))).forEach(s => {
     const on = !!act && act.id === s.id;
-    const main = el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:s.name, title:`Use "${s.name}"` }); main.addEventListener("click", () => csApplySaved(s));
+    const main = el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:s.name, title:`Preview "${s.name}"` }); main.addEventListener("click", () => csApplySaved(s));
+    main.addEventListener("mouseenter", () => csPreviewPreset(s)); main.addEventListener("mouseleave", () => csPreviewPreset(null));
+    main.addEventListener("focus", () => csPreviewPreset(s)); main.addEventListener("blur", () => csPreviewPreset(null));
     const more = el("button", { type:"button", class:"cs-more", "aria-label":`Rename, update or delete "${s.name}"`, title:"Rename, update or delete", "aria-expanded":String(csManageId === s.id), "aria-controls":"capMyManage" });
     more.innerHTML = CS_MORE_SVG;
     more.addEventListener("click", () => { csManageId = csManageId === s.id ? null : s.id; csManageMode = null; renderMyStyles(); if (csManageId){ const f = $("capMyManage").querySelector("button"); f && f.focus(); } });
