@@ -311,6 +311,11 @@
       { enter:"fade", enterDur:.35, exit:"fade", exitDur:.3, anim:"none", size:1, pos:"middle" }),
     P("swiss", "Swiss", "Vibe",
       { font:"Archivo", weight:700, color:"#111111", hl:"#E3000F", hlMode:"color", bg:"block", bgShape:"box", bgColor:"#FFFFFF", bgOpacity:1, radius:0, padX:.3, padY:.12, align:"left", maxLines:2, spacing:0 },
-      { enter:"none", exit:"none", anim:"none", size:1, pos:"lower" })
+      { enter:"none", exit:"none", anim:"none", size:1, pos:"lower" }),
+    /* Renders behind the on-screen subject via on-device AI segmentation (captik.in's "Behind you" style).
+       Needs a one-time "Prepare" step per clip -- see the Depth section in the custom style panel. */
+    P("behind-you", "Behind You", "Depth",
+      { font:"Montserrat", weight:800, case:"upper", color:"#FFFFFF", hl:"#FFD60A", hlMode:"color", outline:true, outlineColor:"#000000", outlineW:.12, shadow:true, shadowBlur:14, shadowY:3, behindSubject:true },
+      { enter:"fade", enterDur:.25, exit:"fade", exitDur:.25, anim:"word", size:1.2, pos:"middle" })
   ]);
 })();

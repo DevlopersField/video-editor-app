@@ -1695,6 +1695,124 @@ function applyChromaKey(src, w, h, keyHex = "#00FF00", tol = 0.36, feather = 0.1
   _ckCtx.putImageData(imgData, 0, 0);
   return _ckCv;
 }
+/* ---------------- Behind-you captions: on-device AI subject segmentation ----------------
+   Puts a caption BEHIND the person in the shot (captik.in's "Behind you" style). Reuses the
+   MediaPipe SelfieSegmentation model already bundled for the background remover (js/mediapipe/),
+   loaded lazily so projects that never use this pay nothing. Masks are precomputed once per clip
+   (sampled at SM_SAMPLE_FPS) and cached for the session, so playback and export both do a cheap
+   synchronous lookup + canvas composite per frame instead of a per-frame AI call. */
+const SM_SAMPLE_FPS = 6;
+const SM = { seg:null, ready:false, loading:null, cache:new Map(), resolveMask:null, queue:Promise.resolve() };
+function smEnsure(){
+  if (SM.ready) return Promise.resolve(true);
+  if (SM.loading) return SM.loading;
+  SM.loading = (async () => {
+    if (!window.SelfieSegmentation){
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "js/mediapipe/selfie_segmentation.js"; s.onload = res; s.onerror = () => rej(new Error("Could not load the on-device AI model."));
+        document.head.appendChild(s);
+      });
+    }
+    SM.seg = new window.SelfieSegmentation({ locateFile:f => "js/mediapipe/" + f });
+    SM.seg.setOptions({ modelSelection:1, selfieMode:false });
+    SM.seg.onResults(r => { if (SM.resolveMask) SM.resolveMask(r.segmentationMask); });
+    await SM.seg.initialize();
+    SM.ready = true;
+    return true;
+  })();
+  return SM.loading;
+}
+function smSegmentOnce(src){
+  const run = () => new Promise((resolve, reject) => {
+    SM.resolveMask = mask => resolve(mask);
+    SM.seg.send({ image:src }).catch(reject);
+  });
+  const p = SM.queue.then(run, run);
+  SM.queue = p.catch(() => {});
+  return p;
+}
+function smSeekVideo(v, t){
+  return new Promise(resolve => {
+    if (Math.abs(v.currentTime - t) < .004){ resolve(); return; }
+    const done = () => { v.removeEventListener("seeked", done); resolve(); };
+    v.addEventListener("seeked", done);
+    v.currentTime = t;
+  });
+}
+async function smBuildCache(clip, onProgress){
+  await smEnsure();
+  const srcKey = clip.el && (clip.el.currentSrc || clip.el.src) || "";
+  if (clip.kind === "image"){
+    const mask = await smSegmentOnce(clip.el);
+    const cv = document.createElement("canvas"); cv.width = mask.width; cv.height = mask.height;
+    cv.getContext("2d").drawImage(mask, 0, 0);
+    SM.cache.set(clip.id, { kind:"static", mask:cv, src:srcKey });
+    onProgress && onProgress(1);
+    return;
+  }
+  if (clip.kind !== "video" || !clip.el) return;
+  const v = clip.el, dur = clip.dur || 0;
+  if (!dur) return;
+  const wasPaused = v.paused, wasT = v.currentTime;
+  if (!wasPaused) v.pause();
+  const n = Math.max(1, Math.round(dur * SM_SAMPLE_FPS));
+  const frames = [];
+  for (let i = 0; i < n; i++){
+    const local = Math.min(dur - .001, i / SM_SAMPLE_FPS);
+    await smSeekVideo(v, srcTime(clip, local));
+    const mask = await smSegmentOnce(v);
+    const cv = document.createElement("canvas"); cv.width = mask.width; cv.height = mask.height;
+    cv.getContext("2d").drawImage(mask, 0, 0);
+    frames.push({ local, mask:cv });
+    onProgress && onProgress((i + 1) / n);
+  }
+  SM.cache.set(clip.id, { kind:"video", frames, builtForDur:dur, src:srcKey });
+  await smSeekVideo(v, wasT);
+  if (!wasPaused) v.play().catch(() => {});
+}
+function smIsReady(clip){
+  const e = SM.cache.get(clip.id);
+  if (!e) return false;
+  const srcKey = clip.el && (clip.el.currentSrc || clip.el.src) || "";
+  if (e.src !== srcKey) return false;
+  if (clip.kind === "video") return e.builtForDur != null && Math.abs(e.builtForDur - (clip.dur || 0)) < .05;
+  return true;
+}
+function smGetMask(clip, local){
+  const e = SM.cache.get(clip.id); if (!e) return null;
+  if (e.kind === "static") return e.mask;
+  if (!e.frames || !e.frames.length) return null;
+  let best = e.frames[0], bd = Math.abs(best.local - local);
+  for (let i = 1; i < e.frames.length; i++){ const d = Math.abs(e.frames[i].local - local); if (d < bd){ bd = d; best = e.frames[i]; } }
+  return best.mask;
+}
+let _smCutCv = null, _smCutCtx = null;
+function smCutout(src, mask, w, h){
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_smCutCv){ _smCutCv = document.createElement("canvas"); _smCutCtx = _smCutCv.getContext("2d"); }
+  if (_smCutCv.width !== w || _smCutCv.height !== h){ _smCutCv.width = w; _smCutCv.height = h; }
+  _smCutCtx.clearRect(0, 0, w, h);
+  try { _smCutCtx.drawImage(src, 0, 0, w, h); } catch(e){ return null; }
+  _smCutCtx.save(); _smCutCtx.globalCompositeOperation = "destination-in";
+  try { _smCutCtx.drawImage(mask, 0, 0, w, h); } catch(e){}
+  _smCutCtx.restore();
+  return _smCutCv;
+}
+function smClipsForRange(start, end){
+  return SEQ.filter(c => (c.kind === "video" || c.kind === "image") && c._start < end && c._start + c.dur > start);
+}
+function activeBehindCaption(t){
+  if (!P.captions || !P.captions.length) return null;
+  const isAtEnd = TOTAL > 0 && t >= TOTAL - .001;
+  for (const cp of P.captions){
+    if (t < cp.start) continue;
+    if (isAtEnd ? t > cp.end : t >= cp.end) continue;
+    const o = capOpts(cp);
+    if (o.custom && o.custom.behindSubject) return cp;
+  }
+  return null;
+}
 function drawClip(c, clip, local){
   const { W, H } = geo(), p = clip.dur ? local / clip.dur : 0;
   if (clip.kind === "image" || clip.kind === "video"){
@@ -2848,7 +2966,7 @@ function capDef(){
     outline:true, outlineColor:"#1C2128", outlineW:.14, shadow:true, shadowColor:"#000000", shadowBlur:14, shadowY:4,
     bg:"none", bgColor:hex6(C.slate, "#2C3A47"), bgOpacity:.85, radius:14, padX:.35, padY:.2, spacing:0, lineHeight:1.12, align:"center", maxWidth:.9, maxLines:3,
     fx:"", fxAmt:1, fill:"solid", grad2:"#FFD60A", gradAngle:90, hlCycle:false, hl2:"#3EE07A", hl3:"#4DA3FF", outlineStyle:"single", outline2Color:"#FFFFFF", outline2W:.06,
-    bgShape:"box", tilt:0, track:0, longShadow:false, longColor:"#000000", longLen:.18, comboBig:false, colorOpacity:1 });
+    bgShape:"box", tilt:0, track:0, longShadow:false, longColor:"#000000", longLen:.18, comboBig:false, colorOpacity:1, behindSubject:false });
 }
 /* full, clean props from a partial or untrusted object */
 function capProps(p){
@@ -4055,6 +4173,17 @@ function renderFrame(t){
   P.overlays.forEach(o => { if (t >= o.start && t <= o.end) drawOverlay(ctx, o, t); });
   if (P.watermark && !onBrand && cur.kind !== "intro" && cur.kind !== "outro") drawWatermark(ctx);
   drawProjectCaptions(ctx, t);
+  if (!inTrans && activeBehindCaption(t) && smIsReady(cur)){
+    const local = Math.min(cur.dur, t - cur._start), X = clipXform(cur, local);
+    const mask = X && smGetMask(cur, local);
+    const cut = mask && smCutout(X.src, mask, X.dw, X.dh);
+    if (cut){
+      ctx.save();
+      if (X.rot){ ctx.translate(W / 2, H / 2); ctx.rotate(X.rot); ctx.translate(-W / 2, -H / 2); }
+      ctx.drawImage(cut, X.x, X.y, X.dw, X.dh);
+      ctx.restore();
+    }
+  }
   drawDrawing(ctx);
   drawAudiogram(ctx, t);
   drawProgressBar(ctx, t);
@@ -7767,6 +7896,41 @@ function csPresetTick(now){
 }
 document.addEventListener("visibilitychange", csPresetKick);
 setInterval(() => { if (!csPresetRaf) csPresetKick(); }, 1000);
+/* "Depth" section: render this caption behind the on-screen subject, via on-device AI segmentation. */
+function csDepthSection(S, cp){
+  const note = el("p", { class:"hint", text:"Puts this look behind the person on screen (captik.in's “Behind you” style). Works best with one clear subject." });
+  const kids = [csToggle("Render behind subject", "behindSubject"), note];
+  if (!S.behindSubject) return csSec("Depth", kids);
+  const range = cp && csScope === "one" ? [cp.start, cp.end] : [0, TOTAL];
+  const clips = smClipsForRange(range[0], range[1]);
+  const status = el("p", { class:"hint" });
+  const bar = el("div", { class:"prog" }, [el("i")]);
+  bar.hidden = true;
+  const btn = el("button", { type:"button", class:"btn sm" });
+  const paint = () => {
+    if (!clips.length){ status.textContent = "Add a video or photo clip under this caption first."; btn.hidden = true; return; }
+    const needs = clips.filter(c => !smIsReady(c));
+    if (!needs.length){ status.textContent = "Ready — prepared for Behind you."; btn.hidden = true; return; }
+    status.textContent = `${needs.length} clip${needs.length > 1 ? "s" : ""} to prepare (one-time, on this device).`;
+    btn.textContent = "Prepare"; btn.hidden = false; btn.disabled = false;
+  };
+  btn.addEventListener("click", async () => {
+    const needs = clips.filter(c => !smIsReady(c));
+    btn.disabled = true; bar.hidden = false; status.textContent = "Preparing…";
+    const fill = bar.querySelector("i");
+    try {
+      for (let i = 0; i < needs.length; i++){
+        await smBuildCache(needs[i], p => { fill.style.width = Math.round(((i + p) / needs.length) * 100) + "%"; });
+      }
+    } catch(e){
+      status.textContent = "Couldn't load the on-device AI model. Check your connection and try again.";
+      btn.disabled = false; bar.hidden = true; return;
+    }
+    bar.hidden = true; paint(); changed(false);
+  });
+  paint();
+  return csSec("Depth", [...kids, status, bar, btn]);
+}
 function renderCustomPanel(){
   const body = $("capCustomBody"); if (!body) return;
   const S = csProps(), cp = csSelCap(), gl = capIsCustom(P.cap.style);
@@ -7804,6 +7968,7 @@ function renderCustomPanel(){
       fChips("Max lines", S.maxLines, [[1,"1"],[2,"2"],[3,"3"]], v => csEdit("maxLines", v)),
       csSlider("Letter spacing", "spacing", -.05, .3, .005, v => v.toFixed(2)), csSlider("Line height", "lineHeight", .8, 1.8, .02, v => v.toFixed(2)), csSlider("Max width", "maxWidth", .4, 1, .01),
       csSlider("Word tilt", "tilt", 0, 12, 1, v => Math.round(v) + "\u00B0"), csSlider("Tracking in", "track", 0, .4, .01, v => v.toFixed(2))]),
+    csDepthSection(S, cp),
     el("div", { class:"cs-sec cs-save", id:"csSaveRow" })].filter(Boolean));
   $("capCustom").querySelector("summary").firstChild.textContent = csOne() ? "Custom style: this caption" : "Custom style";
   csPaintWeights(); renderSaveRow();
