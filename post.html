@@ -4009,7 +4009,22 @@ function edInit(){ edToolbar(); edPaint(); edLoadFonts(); HIST.cur = histSnap();
       build:f => (f.word || "").trim() },
     { id:"hear-me-out", name:"Hear me out", hint:"Casual, like a text to a close friend.",
       fields:[{ k:"msg", label:"Write it like a text to a friend", ph:"ok so i walked this plot today and" }],
-      build:f => `${(f.msg || "").trim()}${capgenCta()}` }
+      build:f => `${(f.msg || "").trim()}${capgenCta()}` },
+    { id:"curiosity", name:"Curiosity", hint:"Real estate: withhold one detail to drive DMs and comments.",
+      fields:[{ k:"setup", label:"Set up the listing", ph:"This plot in Sahastradhara has something most buyers miss." }, { k:"cta", label:"What they should do to find out", ph:"Comment \"PLOT\" and I'll send the details." }],
+      build:f => `${(f.setup || "").trim()}\n\n${(f.cta || "").trim()}${capgenCta()}` },
+    { id:"aspirational", name:"Aspirational", hint:"Real estate: lead with the lifestyle, not the specs. Good for luxury/lifestyle listings.",
+      fields:[{ k:"moment", label:"The lifestyle moment, not the spec sheet", ph:"Morning chai on your own terrace, hills on every side." }, { k:"cta", label:"Soft call to action", ph:"DM \"VIEW\" to walk this plot yourself." }],
+      build:f => `${(f.moment || "").trim()}\n\n${(f.cta || "").trim()}${capgenCta()}` },
+    { id:"urgency", name:"Urgency", hint:"Real estate: real inventory count or deadline. Use only when it's true.",
+      fields:[{ k:"scarcity", label:"The real count or deadline", ph:"Only 3 plots left in this phase." }, { k:"reason", label:"Why now", ph:"Prices go up once phase 2 opens next month." }],
+      build:f => `${(f.scarcity || "").trim()}\n${(f.reason || "").trim()}${capgenCta()}` },
+    { id:"local-authority", name:"Local Authority", hint:"Real estate: a neighbourhood detail only a local would know. Builds profile visits.",
+      fields:[{ k:"fact", label:"A detail about this neighbourhood", ph:"This stretch of Sahastradhara Road floods in August. Here's which plots don't." }],
+      build:f => `${(f.fact || "").trim()}${capgenCta()}` },
+    { id:"short-form", name:"Short-form", hint:"Real estate: under 80 characters plus a call to action. Built for WhatsApp broadcasts.",
+      fields:[{ k:"line", label:"One short line (under 80 characters)", ph:"4000 sqft, clear title, ready to register." }],
+      build:f => `${(f.line || "").trim()}${capgenCta()}` }
   ];
   const capgenExample = st => st.build(Object.fromEntries(st.fields.map(fd => [fd.k, fd.ph])));
   let capgenSel = null; const capgenVals = {};

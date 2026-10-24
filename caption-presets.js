@@ -186,6 +186,44 @@
       { enter:"fade", enterDur:.4, exit:"fade", exitDur:.35, anim:"none", size:.85, pos:"middle" }),
     P("hear-me-out", "Hear me out", "Social",
       { font:"DM Sans", weight:500, case:"lower", hlMode:"color", hl:"#9EDBFF", bg:"line", bgShape:"pill", bgColor:"#1B1F24", bgOpacity:.7, padX:.35, padY:.16, align:"left", maxLines:2 },
-      { enter:"up", enterDur:.2, exit:"fade", anim:"reveal", size:.95, pos:"lowmid" })
+      { enter:"up", enterDur:.2, exit:"fade", anim:"word", size:.95, pos:"lowmid" }),
+
+    /* Real Estate: built for listing reels (property, plot, open-house content) rather than general social voice */
+    P("just-listed", "Just Listed", "Real Estate",
+      { font:"Montserrat", weight:900, case:"upper", color:"#FFFFFF", hlMode:"none", bg:"block", bgShape:"box", bgColor:"#E8472B", bgOpacity:1, radius:6, padX:.4, padY:.16, maxLines:1, spacing:.02 },
+      { enter:"pop", enterDur:.22, exit:"none", anim:"none", size:1.1, pos:"lower" }),
+    P("price-reveal", "Price Reveal (Pro)", "Real Estate",
+      { font:"Anton", weight:400, case:"upper", color:"#FFE14D", hl:"#FFFFFF", fx:"punch", outline:true, outlineColor:"#000000", outlineW:.15, shadow:true, shadowBlur:10, shadowY:5, spacing:.01 },
+      { enter:"pop", enterDur:.25, exit:"none", anim:"word", size:1.3, pos:"middle", words:"short" }),
+    P("open-house", "Open House", "Real Estate",
+      { font:"DM Sans", weight:700, hlMode:"none", color:"#111111", bg:"line", bgColor:"#FFFFFF", bgOpacity:1, radius:8, padX:.3, padY:.1, maxLines:1 },
+      { enter:"up", enterDur:.2, exit:"fade", anim:"none", size:1, pos:"lower" }),
+    P("address-card", "Address Card", "Real Estate",
+      { font:"Fraunces", weight:400, hlMode:"none", color:"#FFFFFF", bg:"block", bgShape:"glass", bgColor:"#0B111E", bgOpacity:.5, radius:14, padX:.4, padY:.18, align:"left", maxLines:2 },
+      { enter:"fade", enterDur:.3, exit:"fade", anim:"none", size:.95, pos:"lowmid" }),
+    P("before-after", "Before / After (Pro)", "Real Estate",
+      { font:"Oswald", weight:700, case:"upper", hl:"#FF7A00", hlMode:"none", fx:"split", spacing:.03, shadow:true, shadowBlur:14, shadowY:3 },
+      { enter:"none", exit:"fade", anim:"none", size:1.25, pos:"middle" }),
+    P("sqft-stat", "Sqft Stat (Pro)", "Real Estate",
+      { font:"Kanit", weight:700, case:"upper", hl:"#39E75F", fx:"glow", shadow:true, shadowColor:"#00E5FF", shadowBlur:20, shadowY:0, spacing:.02 },
+      { enter:"blur", enterDur:.25, exit:"fade", anim:"word", size:1.15, pos:"lowmid" }),
+
+    /* Combo: the current word also pops big above the subject's head, on top of the normal subtitle
+       (comboBig:true) -- the two-layer look from captik.in's style switcher (Glow/Highlight/Bold/Serif/Outline) */
+    P("combo-glow", "Glow", "Combo",
+      { font:"Inter", weight:700, color:"#FFFFFF", hl:"#FFC83D", hlMode:"color", outline:true, outlineColor:"#000000", outlineW:.1, shadow:true, shadowBlur:20, shadowY:2, align:"left", comboBig:true },
+      { enter:"fade", enterDur:.18, exit:"fade", anim:"word", size:1, pos:"lower" }),
+    P("combo-highlight", "Highlight", "Combo",
+      { font:"Inter", weight:800, color:"#FFFFFF", hl:"#FF1B6B", hlMode:"box", outline:false, shadow:true, shadowBlur:10, shadowY:3, align:"left", comboBig:true },
+      { enter:"up", enterDur:.2, exit:"fade", anim:"word", size:1, pos:"lower" }),
+    P("combo-bold", "Bold", "Combo",
+      { font:"Montserrat", weight:900, case:"upper", color:"#FFFFFF", hl:"#A6FF3D", hlMode:"color", outline:false, shadow:true, shadowBlur:10, shadowY:4, align:"center", comboBig:true },
+      { enter:"pop", enterDur:.22, exit:"none", anim:"word", size:1.05, pos:"lower" }),
+    P("combo-serif", "Serif", "Combo",
+      { font:"Playfair Display", italic:true, weight:500, color:"#FFFFFF", hl:"#F2994A", hlMode:"color", outline:false, shadow:true, shadowBlur:16, shadowY:2, align:"left", comboBig:true },
+      { enter:"fade", enterDur:.3, exit:"fade", anim:"word", size:1, pos:"lower" }),
+    P("combo-outline", "Outline", "Combo",
+      { font:"Montserrat", weight:800, case:"upper", color:"#FFFFFF", colorOpacity:0, hl:"#FFFFFF", hlMode:"color", outline:true, outlineColor:"#000000", outlineW:.05, shadow:true, shadowBlur:8, shadowY:3, align:"center", comboBig:true },
+      { enter:"none", exit:"fade", anim:"word", size:1, pos:"lower" })
   ]);
 })();

@@ -60,7 +60,7 @@ body.simple .pro-only{display:none!important}
 .fx-gal{margin-bottom:8px}
 .fx-none{margin-bottom:4px}
 .fx-g{display:block;font:600 11px/1.2 var(--sans);color:var(--muted);margin:10px 0 6px}
-.fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px}
+.fx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(118px,1fr));gap:8px;width:100%}
 .fx-tile{display:flex;flex-direction:column;padding:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--text);overflow:hidden;cursor:pointer;text-align:left}
 .fx-tile canvas{display:block;width:100%;height:auto;aspect-ratio:7/4;background:#14181D}
 .fx-tile span{padding:6px 8px;font:600 11px/1.2 var(--sans);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -113,10 +113,16 @@ html.embedded .start{display:none}
 .bar .status{font-size:12px;color:var(--sage);white-space:nowrap}
 
 /* layout */
-.app{display:grid;grid-template-columns:270px minmax(0,1fr) 320px;grid-template-rows:minmax(0,1fr) 296px;height:calc(100vh - var(--bar))}
+.app{display:grid;grid-template-columns:var(--lw,270px) minmax(0,1fr) var(--rw,320px);grid-template-rows:minmax(0,1fr) 296px;height:calc(100vh - var(--bar))}
 .panel{overflow-y:auto;padding:18px;background:var(--surface)}
-.panel.left{border-right:1px solid var(--line)}
-.panel.right{border-left:1px solid var(--line)}
+.panel.left{border-right:1px solid var(--line);grid-column:1;grid-row:1}
+.panel.right{border-left:1px solid var(--line);grid-column:3;grid-row:1}
+.app > .stage{grid-column:2;grid-row:1}
+.rs-handle{grid-row:1;width:9px;cursor:col-resize;position:relative;z-index:5;touch-action:none}
+.rs-handle::after{content:"";position:absolute;top:0;bottom:0;left:3px;width:3px;border-radius:2px;background:transparent}
+.rs-handle:hover::after,.rs-handle.dragging::after{background:var(--accent,#C98B6E)}
+.rs-handle.rs-l{grid-column:1;justify-self:end;margin-right:-5px}
+.rs-handle.rs-r{grid-column:3;justify-self:start;margin-left:-5px}
 .group{padding-bottom:18px;margin-bottom:18px;border-bottom:1px solid var(--line)}
 .group:last-child{border-bottom:0;margin-bottom:0}
 .stage{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--stage)}
@@ -372,8 +378,10 @@ body.busy #exportGroup{pointer-events:auto;opacity:1}
 
 @media (max-width:1100px){
   .app{grid-template-columns:1fr;grid-template-rows:auto;height:auto}
+  .panel.left,.panel.right,.app > .stage{grid-column:1;grid-row:auto}
   .stage{min-height:70vh}
   .panel.left,.panel.right{border:0;border-top:1px solid var(--line)}
+  .rs-handle{display:none}
   .timeline{grid-column:1;height:280px}
   .choices,.choices.four{grid-template-columns:1fr}
   .nav a{padding:6px 8px}
@@ -512,6 +520,8 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
   </div>
 </div>
 <div class="app">
+  <div class="rs-handle rs-l" aria-hidden="true" title="Drag to resize (double-click to reset)"></div>
+  <div class="rs-handle rs-r" aria-hidden="true" title="Drag to resize (double-click to reset)"></div>
   <!-- LEFT -->
   <aside class="panel left" aria-label="Add and project settings">
     <div class="group">
@@ -2838,7 +2848,7 @@ function capDef(){
     outline:true, outlineColor:"#1C2128", outlineW:.14, shadow:true, shadowColor:"#000000", shadowBlur:14, shadowY:4,
     bg:"none", bgColor:hex6(C.slate, "#2C3A47"), bgOpacity:.85, radius:14, padX:.35, padY:.2, spacing:0, lineHeight:1.12, align:"center", maxWidth:.9, maxLines:3,
     fx:"", fxAmt:1, fill:"solid", grad2:"#FFD60A", gradAngle:90, hlCycle:false, hl2:"#3EE07A", hl3:"#4DA3FF", outlineStyle:"single", outline2Color:"#FFFFFF", outline2W:.06,
-    bgShape:"box", tilt:0, track:0, longShadow:false, longColor:"#000000", longLen:.18 });
+    bgShape:"box", tilt:0, track:0, longShadow:false, longColor:"#000000", longLen:.18, comboBig:false, colorOpacity:1 });
 }
 /* full, clean props from a partial or untrusted object */
 function capProps(p){
@@ -2859,7 +2869,7 @@ function capProps(p){
   if (!["left","center","right"].includes(o.align)) o.align = "center";
   if (!["normal","upper","lower"].includes(o.case)) o.case = "normal";
   o.padX = clamp(+o.padX || 0, 0, 1.5); o.padY = clamp(+o.padY || 0, 0, 1.5); o.radius = clamp(+o.radius || 0, 0, 80);
-  o.bgOpacity = clamp(+o.bgOpacity, 0, 1); o.dim = clamp(+o.dim || .45, .05, .95); o.maxWidth = clamp(+o.maxWidth || .9, .3, 1);
+  o.bgOpacity = clamp(+o.bgOpacity, 0, 1); o.colorOpacity = clamp(o.colorOpacity == null ? 1 : +o.colorOpacity, 0, 1); o.dim = clamp(+o.dim || .45, .05, .95); o.maxWidth = clamp(+o.maxWidth || .9, .3, 1);
   o.lineHeight = clamp(+o.lineHeight || 1.12, .8, 2.2); o.spacing = clamp(+o.spacing || 0, -.1, .5); o.outlineW = clamp(+o.outlineW || 0, 0, .4);
   o.shadowBlur = clamp(+o.shadowBlur || 0, 0, 60); o.shadowY = clamp(+o.shadowY || 0, -30, 30);
   return o;
@@ -3269,6 +3279,24 @@ const capMerge = (a, b) => {
   return r;
 };
 /* Custom and saved styles. Same code for preview, export and the effect tiles (G = geometry override). */
+/* "Combo" styles (captik.in-style): besides the normal subtitle line, pop the current active word
+   big above the subject's head, in the highlight colour. Draws inside the caller's already-alive
+   (life-faded) canvas state, so it fades in/out in sync with the subtitle beneath it. */
+function drawComboWord(c, text, u, safe, W, H, S){
+  if (!text) return;
+  const maxW = (W - safe.l - safe.r) * .86;
+  const fam = capFam(S.font, S.italic ? SERIF : SANS), wt = Math.max(700, +S.weight || 800);
+  const fontAt = s => `${S.italic ? "italic " : ""}${wt} ${s}px ${fam}`;
+  let size = 150 * u; const txt = text.toUpperCase();
+  c.font = fontAt(size);
+  while (c.measureText(txt).width > maxW && size > 36 * u){ size *= .93; c.font = fontAt(size); }
+  const y = safe.t + H * .26, col = S.hlMode !== "none" && S.hl ? S.hl : S.color;
+  c.save(); c.font = fontAt(size); c.textAlign = "center"; c.textBaseline = "middle";
+  c.shadowColor = "rgba(0,0,0,.45)"; c.shadowBlur = 16 * u; c.shadowOffsetY = 2 * u;
+  if (S.outline){ c.lineWidth = size * Math.max(S.outlineW, .12); c.lineJoin = "round"; c.strokeStyle = S.outlineColor; c.strokeText(txt, W / 2, y); }
+  c.shadowColor = "transparent"; c.fillStyle = col; c.fillText(txt, W / 2, y);
+  c.restore();
+}
 function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   const { W, H, u, safe } = G || geo(), S = o.custom;
   const fam = capFam(S.font, SANS), fontAt = s => `${S.italic ? "italic " : ""}${S.weight} ${s}px ${fam}`;
@@ -3355,7 +3383,7 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
   /* one gradient per frame for the whole block */
   const gradFor = (a, b) => { const ang = S.gradAngle * Math.PI / 180, mx = bx + bw / 2, my = y0 + blockH / 2, r = Math.abs(bw / 2 * Math.cos(ang)) + Math.abs(blockH / 2 * Math.sin(ang)) || 1;
     const g = c.createLinearGradient(mx - Math.cos(ang) * r, my - Math.sin(ang) * r, mx + Math.cos(ang) * r, my + Math.sin(ang) * r); g.addColorStop(0, a); g.addColorStop(1, b); return g; };
-  const textFill = S.fill === "gradient" ? gradFor(S.color, S.grad2) : S.color;
+  const textFill = S.colorOpacity < 1 ? hexA(S.color, S.colorOpacity) : (S.fill === "gradient" ? gradFor(S.color, S.grad2) : S.color);
   const strokeFill = S.outline && S.outlineStyle === "gradient" ? gradFor(S.outlineColor, S.outline2Color) : S.outlineColor;
   const longSteps = S.longShadow && S.longLen > 0 ? Math.min(FX && FX.letter ? 10 : 28, Math.max(4, Math.round(S.longLen * size / (2 * u)))) : 0;
   /* paint one piece of text: pass "under" = long shadow and outline, "fill" = the letters, "all" = both */
@@ -3432,6 +3460,7 @@ function drawCaptionCustom(c, cap, t, o, words, life0, nChars, G){
     }
   });
   if (FX && FX.post) FX.post(e);
+  if (S.comboBig) drawComboWord(c, (words[k] && words[k].t) || "", u, safe, W, H, S);
   c.restore(); c.letterSpacing = "0px"; c.textAlign = "left";
 }
 function capStyleOptions(cp){
@@ -6768,16 +6797,22 @@ function drawCaptionAt(c, cp, t, extraOffset, extraAlpha){
   c.restore();
 }
 
+/* Dummy text so a style/preset preview still shows something even on a project with no captions yet
+   (or no caption at the current playhead) — picking a look shouldn't require typing a caption first. */
+const CS_PREVIEW_TEXT = "Your caption looks like this";
 function drawProjectCaptions(c, t){
-  if (!P.captions || !P.captions.length) return;
+  if ((!P.captions || !P.captions.length) && !CS_HOVER_PRESET) return;
   const { W, H, u, safe } = geo();
   const EPS = 0.001;
   const isAtEnd = TOTAL > 0 && t >= TOTAL - EPS;
-  const active = P.captions.filter(cp => {
+  const active = (P.captions || []).filter(cp => {
     if (t < cp.start) return false;
     return isAtEnd ? t <= cp.end : t < cp.end;
   });
-  if (!active.length) return;
+  if (!active.length){
+    if (CS_HOVER_PRESET) drawCaption(c, { id:"__cs_preview__", start:t - 1, end:t + 10, text:CS_PREVIEW_TEXT }, t);
+    return;
+  }
   if (active.length === 1){
     drawCaptionAt(c, active[0], t);
     return;
@@ -7706,6 +7741,32 @@ function csFxDraw(cv, S, t){
 }
 document.addEventListener("visibilitychange", csFxKick);
 setInterval(() => { if (!csFxRaf) csFxKick(); }, 1000);
+/* Preset gallery: same live-tile treatment as the effects gallery above, but one tile per whole
+   caption style/preset (not just the active-word effect), so picking a look doesn't need a hover
+   on the main canvas. Rebuilt on every renderPresets() call since CS_PRESETS can grow after load
+   (caption-presets.js registers more styles once video.html has already rendered once). */
+var csPresetGal = null, csPresetRaf = 0, csPresetIO = null, csPresetLast = 0;
+function csPresetTileDraw(cv, p, t){
+  const c = cv.getContext("2d"), W = cv.width, H = cv.height;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.filter = "none";
+  const bg = c.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#2B3440"); bg.addColorStop(1, "#14181D"); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  const custom = { ...p.props, maxLines:2, maxWidth:.96, align:"center" };
+  const words = parseWords(CS_FX_CAP.text).map(w => ({ ...w, t:custom.case === "upper" ? w.t.toUpperCase() : custom.case === "lower" ? w.t.toLowerCase() : w.t }));
+  const o = { custom, enter:"none", exit:"none", enterDur:.3, exitDur:.25, anim:p.anim || "word", pos:"middle", size:1 };
+  drawCaptionCustom(c, CS_FX_CAP, t, o, words, 1, words.reduce((s, w) => s + w.t.length, 0) + words.length - 1, CS_FX_G);
+}
+function csPresetKick(){ if (!csPresetRaf && csPresetGal) csPresetRaf = requestAnimationFrame(csPresetTick); }
+function csPresetTick(now){
+  csPresetRaf = 0;
+  const g = csPresetGal; if (!g || !g.isConnected || !g.offsetParent || document.hidden || exporting) return;
+  const tiles = (g._tiles || []).filter(x => x._vis); if (!tiles.length) return;
+  csPresetRaf = requestAnimationFrame(csPresetTick);
+  if (now - csPresetLast < 33) return; csPresetLast = now;
+  const t = Math.min((now / 1000) % 2.9, 2.35);
+  tiles.forEach(cv => { try { csPresetTileDraw(cv, cv._preset, t); } catch(e) {} });
+}
+document.addEventListener("visibilitychange", csPresetKick);
+setInterval(() => { if (!csPresetRaf) csPresetKick(); }, 1000);
 function renderCustomPanel(){
   const body = $("capCustomBody"); if (!body) return;
   const S = csProps(), cp = csSelCap(), gl = capIsCustom(P.cap.style);
@@ -7720,6 +7781,8 @@ function renderCustomPanel(){
     csSec("Text", [fontField("Font", S.font, GIRIKA.FONTS.body, v => csEdit("font", v)), csWeightHost,
       fChips("Letters", S.case, [["normal","Normal"],["upper","ALL CAPS"],["lower","lower case"]], v => csEdit("case", v))]),
     csSec("Colour", [csColor("Text colour", "color"),
+      csSlider("Text opacity", "colorOpacity", 0, 1, .05, v => Math.round(v * 100) + "%"),
+      S.colorOpacity < 1 ? el("p", { class:"hint", text:"Lower opacity + Outline on = hollow outline text." }) : null,
       fChips("Fill", S.fill, [["solid","Solid"],["gradient","Gradient"]], v => csEdit("fill", v, true)),
       S.fill === "gradient" ? csSub([csColor("Second colour", "grad2"), csSlider("Angle", "gradAngle", 0, 360, 5, v => Math.round(v) + "\u00B0")]) : null,
       fChips("Highlight", S.hlMode, [["color","Colour"],["box","Box"],["marker","Marker"],["underline","Underline"],["bigger","Bigger"],["none","None"]], v => csEdit("hlMode", v, true)),
@@ -7746,15 +7809,66 @@ function renderCustomPanel(){
   csPaintWeights(); renderSaveRow();
   csUseFont(S.font); csFxKick();
 }
+/* Built-in style gallery: same live-tile treatment as the effects/preset galleries. These 8 looks
+   are drawn by drawCaption()'s own built-in branch on the real canvas (not drawCaptionCustom), which
+   is tied to the live project's geometry -- so tile previews instead use a close hand-matched custom-prop
+   approximation of each one (same font/weight/highlight/background family) purely for the gallery.
+   "Giant" previews via the same big-word renderer the Combo presets use, with no subtitle under it. */
+var csStyleGal = null, csStyleRaf = 0, csStyleIO = null, csStyleLast = 0;
+const CAP_STYLE_ACCENT = "#C98B6E";
+const CAP_STYLE_PREVIEW = {
+  bold:    { font:"Montserrat", weight:800, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", outline:true, outlineColor:"#1C2128", outlineW:.17, align:"center" },
+  glass:   { font:"Inter", weight:700, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", bg:"block", bgShape:"glass", bgColor:"#2C3A47", bgOpacity:.45, radius:20, padX:.35, padY:.2, align:"center" },
+  linebox: { font:"Inter", weight:700, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", bg:"line", bgShape:"box", bgColor:"#2C3A47", bgOpacity:.9, radius:10, padX:.3, padY:.12, align:"center" },
+  wordbox: { font:"Montserrat", weight:800, color:"#FFFFFF", hlMode:"box", hl:CAP_STYLE_ACCENT, shadow:true, shadowBlur:16, shadowY:3, align:"center" },
+  classic: { font:"Inter", weight:700, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", bg:"block", bgShape:"box", bgColor:"#2C3A47", bgOpacity:.92, radius:18, padX:.3, padY:.16, align:"center" },
+  lower:   { font:"Playfair Display", weight:500, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", bg:"block", bgShape:"box", bgColor:"#2C3A47", bgOpacity:.9, radius:8, padX:.35, padY:.14, align:"left" },
+  cinema:  { font:"Playfair Display", weight:500, color:"#FFFFFF", hl:CAP_STYLE_ACCENT, hlMode:"color", shadow:true, shadowBlur:16, shadowY:2, spacing:.02, align:"center" }
+};
+function csStyleTileDraw(cv, key, t){
+  const c = cv.getContext("2d"), W = cv.width, H = cv.height;
+  c.setTransform(1, 0, 0, 1, 0, 0); c.globalAlpha = 1; c.filter = "none";
+  const bg = c.createLinearGradient(0, 0, W, H); bg.addColorStop(0, "#2B3440"); bg.addColorStop(1, "#14181D"); c.fillStyle = bg; c.fillRect(0, 0, W, H);
+  if (key === "giant"){
+    const words = parseWords(CS_FX_CAP.text), span = Math.max(.2, CS_FX_CAP.end - CS_FX_CAP.start - .05);
+    const kk = Math.min(words.length - 1, Math.floor(clamp(t / span) * words.length));
+    drawComboWord(c, words[kk].t, CS_FX_G.u, CS_FX_G.safe, W, H, { font:"Montserrat", weight:900, italic:false, color:"#FFFFFF", hlMode:"none", outline:true, outlineColor:"#1C2128", outlineW:.15 });
+    return;
+  }
+  const custom = { ...capProps(CAP_STYLE_PREVIEW[key] || {}), maxLines:2, maxWidth:.96 };
+  const words = parseWords(CS_FX_CAP.text).map(w => ({ ...w, t:custom.case === "upper" ? w.t.toUpperCase() : custom.case === "lower" ? w.t.toLowerCase() : w.t }));
+  const o = { custom, enter:"none", exit:"none", enterDur:.3, exitDur:.25, anim:"word", pos:"middle", size:1 };
+  drawCaptionCustom(c, CS_FX_CAP, t, o, words, 1, words.reduce((s, w) => s + w.t.length, 0) + words.length - 1, CS_FX_G);
+}
+function csStyleKick(){ if (!csStyleRaf && csStyleGal) csStyleRaf = requestAnimationFrame(csStyleTick); }
+function csStyleTick(now){
+  csStyleRaf = 0;
+  const g = csStyleGal; if (!g || !g.isConnected || !g.offsetParent || document.hidden || exporting) return;
+  const tiles = (g._tiles || []).filter(x => x._vis); if (!tiles.length) return;
+  csStyleRaf = requestAnimationFrame(csStyleTick);
+  if (now - csStyleLast < 33) return; csStyleLast = now;
+  const t = Math.min((now / 1000) % 2.9, 2.35);
+  tiles.forEach(cv => { try { csStyleTileDraw(cv, cv._style, t); } catch(e) {} });
+}
+document.addEventListener("visibilitychange", csStyleKick);
+setInterval(() => { if (!csStyleRaf) csStyleKick(); }, 1000);
 function capStyleChips(){
   const host = $("capStyleList"); host.innerHTML = "";
   const st = P.cap.style, missing = st.startsWith("saved:") && !capSaved(st.slice(6));
-  [...CAP_STYLES, ["custom","Custom"]].forEach(([v, l]) => {
-    const on = v === st || (v === "custom" && missing);
-    const b = el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:l });
-    b.addEventListener("click", () => { P.cap.style = v; if (v !== "custom") P.cap.presetId = ""; csSaveMode = null; csScope = "all"; if (v === "custom") csDockClosed = false; capChanged(); refreshCapUI(); if (v === "custom") csOpenDock(); });
-    host.appendChild(b);
+  if (csStyleIO) csStyleIO.disconnect();
+  csStyleIO = typeof IntersectionObserver === "function" ? new IntersectionObserver(es => { es.forEach(x => { x.target._vis = x.isIntersecting; }); csStyleKick(); }) : null;
+  const tiles = [], grid = el("div", { class:"fx-grid" });
+  const pick = v => { P.cap.style = v; if (v !== "custom") P.cap.presetId = ""; csSaveMode = null; csScope = "all"; if (v === "custom") csDockClosed = false; capChanged(); refreshCapUI(); if (v === "custom") csOpenDock(); };
+  CAP_STYLES.forEach(([v, l]) => {
+    const on = v === st;
+    const cv = el("canvas", { width:CS_FX_G.W, height:CS_FX_G.H, "aria-hidden":"true" }); cv._style = v; cv._vis = !csStyleIO; tiles.push(cv);
+    grid.appendChild(el("button", { type:"button", class:"fx-tile", "aria-pressed":String(on), title:`Use "${l}"`, onclick:() => pick(v) }, [cv, el("span", { text:l })]));
+    if (csStyleIO) csStyleIO.observe(cv);
   });
+  host.appendChild(grid);
+  host.appendChild(el("div", { class:"chips fx-none" }, [el("button", { type:"button", class:"chip", "aria-pressed":String(st === "custom" || missing), text:"Custom", onclick:() => pick("custom") })]));
+  csStyleGal = host; csStyleGal._tiles = tiles;
+  csStyleKick();
 }
 function csApplyPreset(p){
   if (!p || typeof p !== "object") return;
@@ -7771,17 +7885,23 @@ function csApplyPreset(p){
 function renderPresets(){
   const wrap = $("capProWrap"), host = $("capProList"); if (!wrap || !host) return;
   wrap.hidden = !CS_PRESETS.length; host.innerHTML = "";
-  const cur = csActivePreset(), groups = [...new Set(CS_PRESETS.map(p => p.group || ""))];
+  if (!CS_PRESETS.length) return;
+  if (csPresetIO) csPresetIO.disconnect();
+  csPresetIO = typeof IntersectionObserver === "function" ? new IntersectionObserver(es => { es.forEach(x => { x.target._vis = x.isIntersecting; }); csPresetKick(); }) : null;
+  const tiles = [], cur = csActivePreset(), groups = [...new Set(CS_PRESETS.map(p => p.group || ""))];
   groups.forEach(g => {
-    if (groups.length > 1 && g) host.appendChild(el("span", { class:"cs-h", text:g, style:"margin:8px 0 6px" }));
-    const row = el("div", { class:"chips" });
+    if (groups.length > 1 && g) host.appendChild(el("span", { class:"fx-g", text:g, style:"margin:10px 0 6px" }));
+    const grid = el("div", { class:"fx-grid", role:"group", "aria-label":g || "Presets" });
     CS_PRESETS.filter(p => (p.group || "") === g).forEach(p => {
       const on = !!cur && cur.id === p.id && capIsCustom(csOne() ? csSelCap().o && csSelCap().o.style : P.cap.style);
-      row.appendChild(el("button", { type:"button", class:"chip", "aria-pressed":String(on), text:p.name, title:`Preview "${p.name}"`, onclick:() => csApplyPreset(p),
-        onmouseenter:() => csPreviewPreset(p), onmouseleave:() => csPreviewPreset(null), onfocus:() => csPreviewPreset(p), onblur:() => csPreviewPreset(null) }));
+      const cv = el("canvas", { width:CS_FX_G.W, height:CS_FX_G.H, "aria-hidden":"true" }); cv._preset = p; cv._vis = !csPresetIO; tiles.push(cv);
+      grid.appendChild(el("button", { type:"button", class:"fx-tile", "aria-pressed":String(on), title:`Use "${p.name}"`, "data-preset":p.id, onclick:() => csApplyPreset(p) }, [cv, el("span", { text:p.name })]));
+      if (csPresetIO) csPresetIO.observe(cv);
     });
-    host.appendChild(row);
+    host.appendChild(grid);
   });
+  csPresetGal = host; csPresetGal._tiles = tiles;
+  csPresetKick();
 }
 const CS_MORE_SVG = `<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/></svg>`;
 function renderMyStyles(){
@@ -8053,6 +8173,57 @@ $("openScenes").addEventListener("click", openScenes);
 $("openReels").addEventListener("click", openReels);
 $("startTemplates").addEventListener("click", () => { closeStart(); openReels(); });
 
+/* sidebar resize: drag the handles to widen/narrow the left/right panels */
+(function(){
+  const APPEL = document.querySelector(".app");
+  if (!APPEL) return;
+  const MIN = 220, MAX = 480, DEFAULTS = { "--lw":270, "--rw":320 };
+  const KEYS = { "--lw":"reelstudio-sidebar-lw", "--rw":"reelstudio-sidebar-rw" };
+  function apply(varName, px){
+    px = Math.max(MIN, Math.min(MAX, Math.round(px)));
+    APPEL.style.setProperty(varName, px + "px");
+    try { localStorage.setItem(KEYS[varName], String(px)); } catch(e) {}
+    return px;
+  }
+  Object.keys(DEFAULTS).forEach(v => {
+    let saved = DEFAULTS[v];
+    try { const s = localStorage.getItem(KEYS[v]); if (s && +s) saved = +s; } catch(e) {}
+    apply(v, saved);
+  });
+  function bind(sel, varName, sign){
+    const h = document.querySelector(sel);
+    if (!h) return;
+    let startX = 0, startPx = DEFAULTS[varName], dragging = false;
+    const move = e => {
+      if (!dragging) return;
+      const x = e.touches ? e.touches[0].clientX : e.clientX;
+      apply(varName, startPx + (x - startX) * sign);
+    };
+    const up = () => {
+      if (!dragging) return;
+      dragging = false; h.classList.remove("dragging"); document.body.style.cursor = "";
+      document.removeEventListener("mousemove", move);
+      document.removeEventListener("mouseup", up);
+      document.removeEventListener("touchmove", move);
+      document.removeEventListener("touchend", up);
+    };
+    const down = e => {
+      dragging = true; h.classList.add("dragging"); document.body.style.cursor = "col-resize";
+      startX = e.touches ? e.touches[0].clientX : e.clientX;
+      startPx = parseFloat(getComputedStyle(APPEL).getPropertyValue(varName)) || DEFAULTS[varName];
+      document.addEventListener("mousemove", move);
+      document.addEventListener("mouseup", up);
+      document.addEventListener("touchmove", move, { passive:false });
+      document.addEventListener("touchend", up);
+      e.preventDefault();
+    };
+    h.addEventListener("mousedown", down);
+    h.addEventListener("touchstart", down, { passive:false });
+    h.addEventListener("dblclick", () => apply(varName, DEFAULTS[varName]));
+  }
+  bind(".rs-handle.rs-l", "--lw", 1);
+  bind(".rs-handle.rs-r", "--rw", -1);
+})();
 /* sidebar: closed-by-default accordion, remembers what you open */
 const ACC_ICONS = {
   "Add":'<path d="M12 5v14M5 12h14"/>',
