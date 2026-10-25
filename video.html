@@ -1868,24 +1868,33 @@ function plotArea(pl){
   const f = parseFloat(String(pl.front || "").replace(/,/g, ""));
   const w = parseFloat(String(pl.w || "").replace(/,/g, ""));
   const l = parseFloat(String(pl.l || "").replace(/,/g, ""));
+  const l2 = parseFloat(String(pl.l2 || "").replace(/,/g, ""));
   let widthVal = 0;
   if (f > 0 && w > 0) widthVal = (f + w) / 2;
   else if (f > 0) widthVal = f;
   else if (w > 0) widthVal = w;
-  if (!(widthVal > 0 && l > 0)) return "";
-  const sqft = pl.unit === "m" ? widthVal * l * 10.7639 : widthVal * l;
+  let lenVal = 0;
+  if (l > 0 && l2 > 0) lenVal = (l + l2) / 2;
+  else if (l > 0) lenVal = l;
+  else if (l2 > 0) lenVal = l2;
+  if (!(widthVal > 0 && lenVal > 0)) return "";
+  const sqft = pl.unit === "m" ? widthVal * lenVal * 10.7639 : widthVal * lenVal;
   const val = pl.areaUnit === "sqyd" ? sqft / 9 : pl.areaUnit === "sqm" ? sqft * .092903 : sqft;
   const label = (AREA_UNITS.find(a => a[0] === pl.areaUnit) || AREA_UNITS[0])[1];
   return `${Math.round(val).toLocaleString("en-IN")} ${label}`;
 }
 /* big, readable size label. styles: pill (solid), glass (dark box), text (no box), tag (box + pointer), stamp (rotated badge). Returns its box for dragging. */
 const LABEL_BG = { red:"#E63B2E", yellow:"#FFD700", green:"#00E676", white:"#FFFFFF", dark:"#1C2128", clay:"#FF6D00", blue:"#00B0FF" };
-function bigLabel(c, text, x, y, u, fs, a, sc, bg, style = "pill", font = "bold", txtOver){
+function bigLabel(c, text, x, y, u, fs, a, sc, bg, style = "pill", font = "bold", txtOver, customFam){
   if (!text || a <= 0) return null;
   const { W, H } = geo(); c.save();
-  c.font = font === "serif" ? `500 ${fs * 1.05}px ${SERIF}` : `800 ${fs}px ${SANS}`;
+  const fam = customFam || (font === "serif" ? SERIF :
+              font === "mono" ? `"JetBrains Mono", monospace` :
+              font === "condensed" ? `"Oswald", "Bebas Neue", sans-serif` : SANS);
+  const wt = font === "serif" ? "600" : "800";
+  c.font = `${wt} ${fs}px ${fam}`;
   const tw = c.measureText(text).width, w = tw + fs * (style === "text" ? .2 : 1.1), h = fs * (style === "text" ? 1.2 : 1.5);
-  const cx = clamp(x, w / 2 + 12 * u, W - w / 2 - 12 * u), cy = clamp(y, h / 2 + 12 * u, H - h / 2 - 12 * u);
+  const cx = x, cy = y;
   c.globalAlpha = a; c.translate(cx, cy); if (style === "stamp") c.rotate(-.07); c.scale(sc, sc);
   const light = lightHex(bg);
   if (style === "box" || style === "outline"){
@@ -1912,10 +1921,13 @@ function bigLabel(c, text, x, y, u, fs, a, sc, bg, style = "pill", font = "bold"
   return { x:cx - w / 2 * sc, y:cy - h / 2 * sc, w:w * sc, h:h * sc, cx, cy };
 }
 const backOut = p => { p = clamp(p); const s = 1.7; return 1 + (s + 1) * Math.pow(p - 1, 3) + s * Math.pow(p - 1, 2); };
-function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
+function labelPill(c, text, x, y, u, a, sc, bg, fg, big, fontFam, customSize){
   if (!text || a <= 0) return;
-  const size = (big ? 34 : 28) * u; c.font = `700 ${size}px ${SANS}`;
-  const w = c.measureText(text).width + 32 * u, h = size + 22 * u;
+  const size = customSize || ((big ? 34 : 28) * u);
+  const fam = fontFam || SANS;
+  c.font = `700 ${size}px ${fam}`;
+  const padScale = size / (28 * u);
+  const w = c.measureText(text).width + 32 * u * padScale, h = size + 22 * u * padScale;
   c.save(); c.globalAlpha = a; c.translate(x, y); c.scale(sc, sc);
   c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 16 * u; c.fillStyle = bg;
   c.beginPath(); c.roundRect(-w / 2, -h / 2, w, h, h / 2); c.fill(); c.shadowColor = "transparent";
@@ -1925,26 +1937,39 @@ function labelPill(c, text, x, y, u, a, sc, bg, fg, big){
 /* Side-dimension label styles: "pill" keeps the original look; box/outline/text/glass/tag delegate to the
    proven bigLabel() renderer; dimline/dimarrow/dimtick are survey/CAD-style dashed dimension lines drawn
    flush along the edge itself, e.g. -------- Front: 45 ft --------, rotated to match the edge angle. */
-function drawSideLabel(c, text, x, y, u, a, sc, bg, fg, style, ang){
+function drawSideLabel(c, text, x, y, u, a, sc, bg, fg, style, ang, sizeScale = 1, fontChoice = "bold", customFam = null){
   if (!text || a <= 0) return;
-  if (!style || style === "pill"){ labelPill(c, text, x, y, u, a, sc, bg, fg); return; }
+  const ls = Math.max(0.4, Number(sizeScale) || 1);
+  const fam = customFam ? capFam(customFam, SANS) :
+              fontChoice === "serif" ? SERIF :
+              fontChoice === "mono" ? `"JetBrains Mono", monospace` :
+              fontChoice === "condensed" ? `"Oswald", "Bebas Neue", sans-serif` :
+              (fontChoice && fontChoice !== "bold" && fontChoice !== "sans") ? capFam(fontChoice, SANS) : SANS;
+  const wt = fontChoice === "serif" ? "600" : "700";
+  const baseSize = 28 * u * ls;
+
+  if (!style || style === "pill"){
+    labelPill(c, text, x, y, u, a, sc, bg, fg, false, fam, baseSize);
+    return;
+  }
   if (style === "box" || style === "outline" || style === "glass" || style === "tag" || style === "text"){
-    bigLabel(c, text, x, y, u, 28 * u, a, sc, bg, style, "bold", fg);
+    bigLabel(c, text, x, y, u, baseSize, a, sc, bg, style, fontChoice === "serif" ? "serif" : "bold", fg, fam);
     return;
   }
   /* dimline / dimarrow / dimtick: dashed line split by a text gap, end caps per style */
-  const size = 26 * u; c.font = `700 ${size}px ${SANS}`;
-  const tw = c.measureText(text).width, gap = tw + 28 * u, half = Math.max(90 * u, tw * .9);
+  const size = 26 * u * ls;
+  c.font = `${wt} ${size}px ${fam}`;
+  const tw = c.measureText(text).width, gap = tw + 28 * u * ls, half = Math.max(90 * u * ls, tw * .9);
   c.save(); c.globalAlpha = a; c.translate(x, y); c.rotate(ang || 0); c.scale(sc, sc);
-  c.strokeStyle = fg; c.lineWidth = 3 * u; c.lineCap = "round"; c.shadowColor = "rgba(0,0,0,.5)"; c.shadowBlur = 6 * u;
+  c.strokeStyle = fg; c.lineWidth = Math.max(2 * u, 3 * u * ls); c.lineCap = "round"; c.shadowColor = "rgba(0,0,0,.5)"; c.shadowBlur = 6 * u;
   c.beginPath(); c.moveTo(-half, 0); c.lineTo(-gap / 2, 0); c.moveTo(gap / 2, 0); c.lineTo(half, 0); c.stroke();
   if (style === "dimarrow"){
-    const cap = 10 * u;
+    const cap = 10 * u * ls;
     [[-half, 1], [half, -1]].forEach(([ex, dir]) => {
       c.beginPath(); c.moveTo(ex, 0); c.lineTo(ex + cap * dir, -cap * .55); c.moveTo(ex, 0); c.lineTo(ex + cap * dir, cap * .55); c.stroke();
     });
   } else if (style === "dimtick"){
-    const cap = 9 * u;
+    const cap = 9 * u * ls;
     [-half, half].forEach(ex => { c.beginPath(); c.moveTo(ex, -cap); c.lineTo(ex, cap); c.stroke(); });
   }
   c.shadowColor = "transparent";
@@ -2174,8 +2199,9 @@ function drawPlot(c, X, pl, local, clip){
     const cx0 = pts.reduce((s, p) => s + p[0], 0) / pts.length;
     const cy0 = pts.reduce((s, p) => s + p[1], 0) / pts.length;
     const roadCfg = { ...pl.road, front: pl.front || pl.w || 40, unit: pl.unit || "ft" };
-    const sideMode = pl.road.side ?? 0;
-    const edgesToDraw = (sideMode === "corner") ? [0, 1] : [+sideMode || 0];
+    const curF = ((Number(pl.frontEdge) || 0) % pts.length + pts.length) % pts.length;
+    const sideMode = pl.road.side ?? curF;
+    const edgesToDraw = (sideMode === "corner") ? [curF, (curF + 1) % pts.length] : [(+sideMode || 0) % pts.length];
     edgesToDraw.forEach((ei, idx) => {
       const p1 = pts[ei], p2 = pts[(ei + 1) % pts.length];
       if (p1 && p2){
@@ -2218,29 +2244,81 @@ function drawPlot(c, X, pl, local, clip){
   }
   /* corner dots */
   const da = ease(T / .35);
-  pts.forEach(([x, y]) => { c.fillStyle = "#fff"; c.globalAlpha = da * out; c.beginPath(); c.arc(x, y, (editing ? 14 : 9) * u, 0, Math.PI * 2); c.fill();
-    if (editing){ c.strokeStyle = col; c.lineWidth = 4 * u; c.stroke(); } });
+  pts.forEach(([x, y], idx) => {
+    c.fillStyle = "#fff"; c.globalAlpha = da * out; c.beginPath(); c.arc(x, y, (editing ? 14 : 9) * u, 0, Math.PI * 2); c.fill();
+    if (editing){
+      c.strokeStyle = col; c.lineWidth = 4 * u; c.stroke();
+      c.fillStyle = C.slate || "#1C2128"; c.font = `700 ${13 * u}px ${SANS}`; c.textAlign = "center"; c.textBaseline = "middle"; c.fillText(String(idx + 1), x, y + u);
+    }
+  });
   c.globalAlpha = out;
   if (!closed){ c.restore(); return; }
   /* side lengths on the edges, pushed outward from the centre */
   const cx = pts.reduce((s, p) => s + p[0], 0) / pts.length, cy = pts.reduce((s, p) => s + p[1], 0) / pts.length;
   const unit = pl.unit === "m" ? "m" : "ft";
   const segs = pts.map((p, i) => [p, pts[(i + 1) % pts.length]]).slice(0, closed ? pts.length : pts.length - 1);
+  const N = segs.length || pts.length || 4;
+  const F = ((Number(pl.frontEdge) || 0) % N + N) % N;
+  const wei = (F + Math.floor(N / 2)) % N;
+  const lei1 = (F + 1) % N;
+  const lei2 = (F + N - 1) % N;
+
+  /* On-canvas visual highlight for the Front edge while editing */
+  if (editing && segs[F]){
+    const [pA, pB] = segs[F];
+    c.save();
+    c.globalAlpha = 0.85 * out;
+    c.strokeStyle = "#FFFFFF";
+    c.lineWidth = 5 * u;
+    c.setLineDash([12 * u, 8 * u]);
+    c.beginPath();
+    c.moveTo(pA[0], pA[1]);
+    c.lineTo(pB[0], pB[1]);
+    c.stroke();
+    c.restore();
+  }
+
   const sideQ = [];
   pl._srects = [];
   const sides = [];
   if (pl.front){
-    sides.push({ ei:0, val:pl.front, role:"front" });
-    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
-    if (pl.w){
-      const wei = segs.length > 2 ? 2 : 0;
-      sides.push({ ei:wei, val:pl.w, role:"width" });
-    }
+    sides.push({ ei: F, val: pl.front, role: "front" });
+    if (pl.w) sides.push({ ei: wei, val: pl.w, role: "width" });
+    if (pl.l) sides.push({ ei: lei1, val: pl.l, role: "length" });
+    if (pl.l2) sides.push({ ei: lei2, val: pl.l2, role: "length2" });
+    else if (pl.bothDepths && pl.l && lei2 !== lei1) sides.push({ ei: lei2, val: pl.l, role: "length2" });
   } else {
-    if (pl.w) sides.push({ ei:0, val:pl.w, role:"width" });
-    if (pl.l) sides.push({ ei:1, val:pl.l, role:"length" });
+    if (pl.w) sides.push({ ei: F, val: pl.w, role: "width" });
+    if (pl.l) sides.push({ ei: lei1, val: pl.l, role: "length" });
+    if (pl.l2) sides.push({ ei: lei2, val: pl.l2, role: "length2" });
+    else if (pl.bothDepths && pl.l && lei2 !== lei1) sides.push({ ei: lei2, val: pl.l, role: "length2" });
   }
   const sideStyle = (SIDE_HOVER && isSelectedPlot) ? SIDE_HOVER : (pl.sideLabelStyle || "pill");
+  const sideScale = Math.max(0.4, Number(pl.sideLabelSize) || 1);
+  const sideFont = pl.sideLabelFont || "bold";
+  const sideFam = (sideFont === "custom" && pl.sideCustomFont) ? capFam(pl.sideCustomFont, SANS) :
+                  sideFont === "serif" ? SERIF :
+                  sideFont === "mono" ? `"JetBrains Mono", monospace` :
+                  sideFont === "condensed" ? `"Oswald", "Bebas Neue", sans-serif` :
+                  (sideFont && sideFont !== "bold" && sideFont !== "sans") ? capFam(sideFont, SANS) : SANS;
+  const sideWt = sideFont === "serif" ? "600" : "700";
+  const sideFontSize = 28 * u * sideScale;
+  /* name and the size you typed (or the calculated area) in the centre */
+  const area = plotArea(pl), pa = clamp((T - .7) / .4);
+  const sc = .7 + .3 * backOut(pa) + (pl.motion ? .03 * Math.sin(T * 5) * (pa >= 1 ? 1 : 0) : 0), a = ease(pa) * out, ls = pl.labelSize || 1;
+  const fs = 66 * u * ls;
+  let lx = cx, ly = cy + (pl.name ? 34 * u * ls : 0);
+  if (pl.lu != null){ [lx, ly] = mapPt(X_plot, pl.lu, pl.lv); }
+  const lbg = pl.labelColor === "custom" && pl.labelHex ? pl.labelHex : LABEL_BG[pl.labelColor] || col;
+
+  // Measure area badge bounds for anti-collision
+  c.font = `800 ${fs}px ${SANS}`;
+  const areaTw = area ? c.measureText(area).width : 0;
+  const areaStyle = pl.labelStyle || "pill";
+  const areaW = area ? (areaTw + fs * (areaStyle === "text" ? .2 : 1.1)) : 0;
+  const areaH = area ? (fs * (areaStyle === "text" ? 1.2 : 1.5)) : 0;
+  const areaBox = area ? { x0: lx - areaW / 2, x1: lx + areaW / 2, y0: ly - areaH / 2, y1: ly + areaH / 2 } : null;
+
   sides.forEach(({ ei, val, role }, k) => {
     if (!val || !segs[ei]) return;
     const [a, b] = segs[ei], mx = (a[0] + b[0]) / 2, my = (a[1] + b[1]) / 2, d = Math.hypot(mx - cx, my - cy) || 1;
@@ -2248,34 +2326,67 @@ function drawPlot(c, X, pl, local, clip){
     let txt = String(val).trim();
     if (!/[a-z]/i.test(txt)) txt = `${txt} ${unit}`;
     if (role === "front" && !/front/i.test(txt)) txt = `Front: ${txt}`;
+    if (role === "width" && pl.front && pl.backPrefix !== false && !/back|rear|width/i.test(txt)) txt = `Back: ${txt}`;
     /* inside the outline by default (never cut off by the frame); dragged spot moves with the camera */
-    c.font = `700 ${28 * u}px ${SANS}`; const sw = c.measureText(txt).width + 32 * u, sh = 50 * u, { W:CW, H:CH } = geo();
-    const inset = Math.min(70 * u, d * .45);
-    let sx = mx - (mx - cx) / d * inset, sy = my - (my - cy) / d * inset;
-    if (pl.side && pl.side[k]) [sx, sy] = mapPt(X_plot, pl.side[k][0], pl.side[k][1]);
-    sx = clamp(sx, sw / 2 + 12 * u, CW - sw / 2 - 12 * u); sy = clamp(sy, sh / 2 + 12 * u, CH - sh / 2 - 12 * u);
+    c.font = `${sideWt} ${sideFontSize}px ${sideFam}`;
+    const padX = 32 * u * sideScale, padY = 22 * u * sideScale;
+    const sw = c.measureText(txt).width + padX, sh = sideFontSize + padY;
+
+    const isDimStyle = sideStyle === "dimline" || sideStyle === "dimarrow" || sideStyle === "dimtick";
+    // For CAD / dimension lines, keep them right along the edge line!
+    // For badge styles, inset cleanly from the edge.
+    const inset = isDimStyle ? Math.min(10 * u * sideScale, d * 0.12) : Math.min(26 * u * sideScale, d * 0.28);
+    const ux = (mx - cx) / d, uy = (my - cy) / d;
+    let sx = mx - ux * inset, sy = my - uy * inset;
+
+    if (pl.side && pl.side[k]){
+      // User manually dragged this badge: keep it anchored to image space
+      [sx, sy] = mapPt(X_plot, pl.side[k][0], pl.side[k][1]);
+    } else {
+      // Automatic anti-collision with center area badge!
+      if (areaBox){
+        const buffer = 10 * u;
+        const bX0 = sx - sw / 2, bX1 = sx + sw / 2;
+        const bY0 = sy - sh / 2, bY1 = sy + sh / 2;
+        const hitX = (bX1 + buffer > areaBox.x0) && (bX0 - buffer < areaBox.x1);
+        const hitY = (bY1 + buffer > areaBox.y0) && (bY0 - buffer < areaBox.y1);
+        if (hitX && hitY){
+          // Pushed too close to center area badge! Pull back close to edge:
+          const edgeOffset = isDimStyle ? 6 * u * sideScale : Math.min(14 * u * sideScale, d * 0.15);
+          sx = mx - ux * edgeOffset;
+          sy = my - uy * edgeOffset;
+        }
+      }
+      // Anti-collision with previous side badges (e.g. adjacent edges at sharp corners)
+      for (let j = 0; j < k; j++){
+        const prev = pl._srects[j];
+        if (!prev) continue;
+        const distCenter = Math.hypot(sx - prev.cx, sy - prev.cy);
+        const minSpacing = (Math.max(sw, sh) + Math.max(prev.w, prev.h)) / 2 * 0.85;
+        if (distCenter < minSpacing){
+          const [e1, e2] = segs[ei], elen = Math.hypot(e2[0] - e1[0], e2[1] - e1[1]) || 1;
+          const ex = (e2[0] - e1[0]) / elen, ey = (e2[1] - e1[1]) / elen;
+          sx += ex * 16 * u; sy += ey * 16 * u;
+        }
+      }
+    }
+
     pl._srects[k] = { x:sx - sw / 2, y:sy - sh / 2, w:sw, h:sh, cx:sx, cy:sy };
+
     /* dimension-line styles lie flush along the edge; normalize the angle so text never ends up upside down */
     let edgeAng = Math.atan2(b[1] - a[1], b[0] - a[0]);
     if (edgeAng > Math.PI / 2) edgeAng -= Math.PI; else if (edgeAng < -Math.PI / 2) edgeAng += Math.PI;
-    const isDimStyle = sideStyle === "dimline" || sideStyle === "dimarrow" || sideStyle === "dimtick";
-    sideQ.push(() => drawSideLabel(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff", sideStyle, isDimStyle ? edgeAng : 0));
+
+    sideQ.push(() => drawSideLabel(c, txt, sx, sy, u, ease(p) * out, .7 + .3 * backOut(p), pl.sideBg || "rgba(28,33,40,.88)", pl.sideFg || "#fff", sideStyle, isDimStyle ? edgeAng : 0, sideScale, sideFont, pl.sideCustomFont));
   });
-  /* name and the size you typed (or the calculated area) in the centre */
-  const area = plotArea(pl), pa = clamp((T - .7) / .4);
+
   if (area || pl.name){
-    const sc = .7 + .3 * backOut(pa) + (pl.motion ? .03 * Math.sin(T * 5) * (pa >= 1 ? 1 : 0) : 0), a = ease(pa) * out, ls = pl.labelSize || 1;
-    const { W, H } = geo(), fs = 66 * u * ls;
-    /* label anchor: dragged spot on the picture, or the plot centre */
-    let lx = cx, ly = cy + (pl.name ? 34 * u * ls : 0);
-    if (pl.lu != null){ [lx, ly] = mapPt(X_plot, pl.lu, pl.lv); }
-    const lbg = pl.labelColor === "custom" && pl.labelHex ? pl.labelHex : LABEL_BG[pl.labelColor] || col;
     if (pl.lu != null && pl.leader !== false && Math.hypot(lx - cx, ly - cy) > fs * 1.4){
       c.save(); c.globalAlpha = a; c.strokeStyle = "#FFFFFF"; c.lineWidth = 4 * u; c.shadowColor = "rgba(0,0,0,.55)"; c.shadowBlur = 8 * u; c.lineCap = "round";
       c.beginPath(); c.moveTo(lx, ly); c.lineTo(cx, cy); c.stroke(); c.fillStyle = lbg; c.beginPath(); c.arc(cx, cy, 10 * u, 0, Math.PI * 2); c.fill(); c.stroke(); c.restore();
     }
-    const r = area ? bigLabel(c, area, lx, ly, u, fs, a, sc, lbg, pl.labelStyle || "pill", pl.labelFont || "bold", pl.labelText || undefined) : null;
-    if (pl.name) labelPill(c, pl.name.toUpperCase(), clamp(r ? r.cx : lx, 160 * u, W - 160 * u), (r ? r.y : ly) - 34 * u, u, a, sc, C.slate, C.lime);
+    const r = area ? bigLabel(c, area, lx, ly, u, fs, a, sc, lbg, pl.labelStyle || "pill", pl.labelFont || "bold", pl.labelText || undefined, (pl.labelFont === "custom" && pl.labelCustomFont) ? capFam(pl.labelCustomFont, SANS) : undefined) : null;
+    if (pl.name) labelPill(c, pl.name.toUpperCase(), r ? r.cx : lx, (r ? r.y : ly) - 34 * u, u, a, sc, C.slate, C.lime);
     pl._lrect = r || { x:lx - 80 * u, y:ly - 30 * u, w:160 * u, h:60 * u, cx:lx, cy:ly };
     if (editing && r){ c.save(); c.strokeStyle = "#fff"; c.setLineDash([10 * u, 7 * u]); c.lineWidth = 3 * u; c.strokeRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u); c.restore(); }
   }
@@ -5845,6 +5956,27 @@ function renderInspector(){
   if (type === "plot"){
     const pl = it, clip = selected.clip;
 
+    const nEdges = (pl.pts && pl.pts.length) ? pl.pts.length : 4;
+    const curFront = ((Number(pl.frontEdge) || 0) % nEdges + nEdges) % nEdges;
+    const curBack = (curFront + Math.floor(nEdges / 2)) % nEdges;
+    const curDepth1 = (curFront + 1) % nEdges;
+    const curDepth2 = (curFront + nEdges - 1) % nEdges;
+
+    const edgeChips = [];
+    for (let i = 0; i < nEdges; i++){
+      let desc = `Edge ${i + 1}`;
+      if (i === curFront) desc += " (Front)";
+      else if (i === curBack) desc += " (Back)";
+      else desc += " (Depth)";
+      edgeChips.push([String(i), desc]);
+    }
+
+    const roadSideOptions = [];
+    for (let i = 0; i < nEdges; i++){
+      roadSideOptions.push([String(i), i === curFront ? `Front (Edge ${i + 1})` : `Edge ${i + 1}`]);
+    }
+    roadSideOptions.push(["corner", "Corner (2 Roads)"]);
+
     function makeAccCard(title, children, { open = false, icon = "", badge = "" } = {}){
       const d = el("details", { class: "cs-panel", style: "margin:8px 0;border:1px solid var(--line);border-radius:10px;background:var(--surface)" });
       if (open) d.open = true;
@@ -6100,7 +6232,8 @@ function renderInspector(){
         fChips("Label colour", pl.labelColor || "auto", [["auto","Same as line"],["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Orange"],["blue","Blue"],["white","White"],["dark","Dark"],["custom","Custom"]], v => { pl.labelColor = v === "auto" ? undefined : v; if (v === "custom" && !pl.labelHex) pl.labelHex = "#1F3D2E"; changed(false); renderInspector(); }),
         pl.labelColor === "custom" ? plotColorField("Label colour", pl.labelHex || "#1F3D2E", v => { pl.labelHex = v; changed(false); }) : "",
         plotColorField("Text colour", pl.labelText || "", v => { pl.labelText = v || undefined; changed(false); }, true),
-        fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"]], v => { pl.labelFont = v; changed(false); }),
+        fChips("Font", pl.labelFont || "bold", [["bold","Bold"],["serif","Elegant"],["mono","Survey Mono"],["condensed","Compact"],["custom","Custom"]], v => { pl.labelFont = v; changed(false); renderInspector(); }),
+        pl.labelFont === "custom" ? fontField("Custom font", pl.labelCustomFont || "", SANS, v => { pl.labelCustomFont = v || undefined; changed(false); }) : "",
         el("div", { class:"row field", style:"margin-top:6px" }, [
           btn("Put labels back", () => { delete pl.lu; delete pl.lv; delete pl.side; if (pl.road){ delete pl.road.ru; delete pl.road.rv; } changed(false); }),
           toggleRow("Line from label to plot", pl.leader !== false, v => { pl.leader = v; changed(false); })
@@ -6109,15 +6242,48 @@ function renderInspector(){
 
       /* ACCORDION 6: SIDE DIMENSIONS & CALCULATED AREA */
       makeAccCard("Side Dimensions & Area Calculator", [
-        el("div", { class:"grid3" }, [
-          fText("Front side", pl.front, v => { pl.front = v; changed(false); renderInspectorArea(); }),
-          fText("Width", pl.w, v => { pl.w = v; changed(false); renderInspectorArea(); }),
-          fText("Length / Depth", pl.l, v => { pl.l = v; changed(false); renderInspectorArea(); })
+        el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"Choose Front side edge", style:"margin:0;font-weight:700" }),
+          btn("↻ Rotate Front Edge", () => {
+            pl.frontEdge = (curFront + 1) % nEdges;
+            delete pl.side;
+            changed(false);
+            renderInspector();
+            toast(`Front set to Edge ${pl.frontEdge + 1} (Opposite Edge ${((pl.frontEdge + Math.floor(nEdges / 2)) % nEdges) + 1} is Back)`);
+          }, "btn sm")
         ]),
+        fChips("Front side edge", String(curFront), edgeChips, v => {
+          pl.frontEdge = +v;
+          delete pl.side;
+          changed(false);
+          renderInspector();
+          toast(`Front set to Edge ${+v + 1}`);
+        }),
+        el("p", { class:"hint", style:"margin:4px 0 10px 0", text:`Front is Edge ${curFront + 1}. Opposite Edge ${curBack + 1} becomes Back Width, and Edges ${curDepth1 + 1}${curDepth2 !== curDepth1 ? ` & ${curDepth2 + 1}` : ""} become Length / Depth.` }),
+
+        el("div", { class:"grid3" }, [
+          fText(`Front (Edge ${curFront + 1})`, pl.front, v => { pl.front = v; changed(false); renderInspectorArea(); }),
+          fText(`Back width (Edge ${curBack + 1})`, pl.w, v => { pl.w = v; changed(false); renderInspectorArea(); }),
+          fText(`Length / Depth (Edge ${curDepth1 + 1})`, pl.l, v => { pl.l = v; changed(false); renderInspectorArea(); })
+        ]),
+        el("div", { class:"grid2", style:"margin-top:6px" }, [
+          fText(`Other side depth (Edge ${curDepth2 + 1}, optional)`, pl.l2 || "", v => { pl.l2 = v || undefined; changed(false); renderInspectorArea(); }),
+          toggleRow("Show depth on both sides", !!pl.bothDepths, v => { pl.bothDepths = v; changed(false); renderInspector(); })
+        ]),
+        toggleRow("Show 'Back:' prefix on rear edge", pl.backPrefix !== false, v => { pl.backPrefix = v; changed(false); }),
         el("div", { class:"grid2", style:"margin-top:6px" }, [
           plotColorField("Side badge colour", pl.sideBg || "#1C2128", v => { pl.sideBg = v || undefined; changed(false); }, true),
           plotColorField("Side text", pl.sideFg || "#FFFFFF", v => { pl.sideFg = v || undefined; changed(false); }, true)
         ]),
+        fSlider("Side label scale", pl.sideLabelSize || 1, .6, 2.5, .05, v => { pl.sideLabelSize = v; changed(false); }, v => Math.round(v * 100) + "%"),
+        fChips("Side label font", pl.sideLabelFont || "bold", [
+          ["bold","Bold Sans"],
+          ["serif","Elegant Serif"],
+          ["mono","Survey Mono"],
+          ["condensed","Compact"],
+          ["custom","Custom"]
+        ], v => { pl.sideLabelFont = v; changed(false); renderInspector(); }),
+        pl.sideLabelFont === "custom" ? fontField("Side label font", pl.sideCustomFont || "", SANS, v => { pl.sideCustomFont = v || undefined; changed(false); }) : "",
         fChipsPreview("Side label style", pl.sideLabelStyle || "pill",
           [["pill","Solid pill"],["box","Box"],["outline","Outline"],["text","Text only"],["dimline","Dimension line"],["glass","Dark glass (Pro)"],["dimarrow","Arrow dimension (Pro)"],["dimtick","Tick dimension (Pro)"]],
           v => { pl.sideLabelStyle = v === "pill" ? undefined : v; changed(false); },
@@ -6128,14 +6294,14 @@ function renderInspector(){
         fChips("Show area in", pl.areaUnit, AREA_UNITS, v => { pl.areaUnit = v; changed(false); renderInspectorArea(); }),
         el("p", { class:"hint", id:"areaPreview", text:"" }),
         el("p", { class:"hint", text:"The size you type above wins. Leave it empty to show the area worked out from front/width and length." })
-      ], { open: !!(pl.front || pl.w || pl.l), icon: "📐" }),
+      ], { open: !!(pl.front || pl.w || pl.l || pl.l2 || pl.frontEdge), icon: "📐" }),
 
       /* ACCORDION 7: ROAD HIGHLIGHT CORRIDOR */
       makeAccCard("Road Highlight Corridor", [
         el("div", { class:"row", style:"justify-content:space-between;align-items:center;margin-bottom:6px" }, [
           el("span", { class:"lbl", text:"🛣️ Show road next to plot", style:"margin:0;font-weight:700" }),
           toggleRow("Show road", pl.road && pl.road.on, v => {
-            pl.road = pl.road || { width:"30", text:"", side:0, style:"asphalt" };
+            pl.road = pl.road || { width:"30", text:"", side:curFront, style:"asphalt" };
             pl.road.on = v;
             changed(false);
             renderInspector();
@@ -6146,7 +6312,7 @@ function renderInspector(){
           el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap" }, ["20 ft","25 ft","30 ft","40 ft","50 ft","60 ft","80 ft","100 ft"].map(v => btn(v, () => { pl.road.width = v.replace(" ft",""); changed(false); renderInspector(); }))),
           fText("Road badge text (optional)", pl.road.text || "", v => { pl.road.text = v; changed(false); }),
           el("div", { class:"row field", style:"gap:5px;flex-wrap:wrap" }, ["25 ft Road","30 ft Road","40 ft Wide Road","60 ft Main Road"].map(v => btn(v, () => { pl.road.text = v; changed(false); renderInspector(); }))),
-          fChips("Road position", String(pl.road.side ?? 0), [["0","Front (Edge 1)"],["1","Edge 2"],["2","Edge 3"],["3","Edge 4"],["corner","Corner (2 Roads)"]], v => { pl.road.side = v === "corner" ? "corner" : +v; changed(false); }),
+          fChips("Road position", String(pl.road.side ?? curFront), roadSideOptions, v => { pl.road.side = v === "corner" ? "corner" : +v; changed(false); }),
           fChips("Road style", pl.road.style || "asphalt", [["asphalt","Asphalt (Dashed)"],["yellow","Survey Yellow"],["white","Survey White"],["lime","Lime Green"]], v => { pl.road.style = v; changed(false); })
         ]) : el("p", { class:"hint", text:"Add an asphalt or survey road corridor along any edge of the plot." })
       ], { open: !!(pl.road && pl.road.on), icon: "🛣️" }),
@@ -6703,8 +6869,12 @@ function finishDraw(){
       pts,
       name: "",
       front: "",
+      frontEdge: 0,
       w: "",
       l: "",
+      l2: "",
+      bothDepths: false,
+      backPrefix: true,
       unit: "ft",
       areaUnit: "sqyd",
       areaText: "",
@@ -9124,7 +9294,7 @@ function proPointerMove(e){
   if (dragL){
     const [px, py] = canvasPt(e);
     const local = now() - dragL.clip._start;
-    const useFixedX = (dragL.clip && dragL.clip.kind === "image") || (dragL.pl && dragL.pl.stickMode === "screen");
+    const useFixedX = (dragL.pl && dragL.pl.stickMode === "screen");
     const X = useFixedX ? (clipXform(dragL.clip, dragL.pl.at || 0) || clipXform(dragL.clip, local)) : clipXform(dragL.clip, local);
     if (X){
       const [lu, lv] = invPt(X, px - dragL.dx, py - dragL.dy);
