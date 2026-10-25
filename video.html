@@ -433,6 +433,42 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
 :root{--stage:#E6E7E4;--tl:#F7F7F5;--tl-line:#ECEDEA;--rule:#CFD1CD}
 :root[data-theme="dark"]{--stage:#0E1013;--tl:#16181C;--tl-line:#22252A;--rule:#363A41}
 @media (prefers-color-scheme:dark){:root[data-theme="system"]{--stage:#0E1013;--tl:#16181C;--tl-line:#22252A;--rule:#363A41}}
+
+/* Instagram Cutout Studio & Sticker Tray */
+.ig-cutout-box {
+  width: min(1140px, 96vw);
+  height: min(90vh, 880px);
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  border-radius: 18px;
+  overflow: hidden;
+  box-shadow: 0 24px 60px rgba(0,0,0,0.55);
+}
+.ig-bg-btn.on, .ig-mode-btn.on, .ig-tool-btn.on {
+  background: var(--clay) !important;
+  color: #fff !important;
+  border-color: var(--clay) !important;
+}
+.ig-tray-card {
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+.ig-tray-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--clay) !important;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.22);
+}
+@keyframes igSpin {
+  to { transform: rotate(360deg); }
+}
+.ig-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(255,255,255,0.2);
+  border-top-color: var(--clay);
+  border-radius: 50%;
+  animation: igSpin 0.75s linear infinite;
+}
 </style>
 </head>
 <body>
@@ -519,6 +555,169 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
     <p class="pv-note" id="pvNote"></p>
   </div>
 </div>
+
+<!-- Instagram Cutouts & Sticker Studio Modal -->
+<div class="tpl-modal" id="igCutoutModal" hidden role="dialog" aria-modal="true" aria-labelledby="igCutoutTitle" style="z-index:90;">
+  <div class="tpl-box ig-cutout-box">
+    <!-- Head -->
+    <div class="tpl-head" style="display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--line); background:var(--surface);">
+      <div style="display:flex; align-items:center; gap:12px;">
+        <span style="font-size:24px;">✂️</span>
+        <div>
+          <h1 id="igCutoutTitle" style="font:600 20px var(--serif); color:var(--heading); margin:0;">Cutouts & Stickers (Instagram Style)</h1>
+          <span class="hint" style="font-size:12px; color:var(--muted); margin:0;">Isolate subjects from photos, video clips, or reel frames & create floating cutout overlays</span>
+        </div>
+      </div>
+      <div style="display:flex; align-items:center; gap:8px;">
+        <button type="button" class="btn sm" id="btnIgTrayTab">🗂️ Your Cutouts Tray</button>
+        <button type="button" class="btn sm" id="btnIgCreateTab" style="display:none;">✂️ Cutout Creator</button>
+        <button type="button" class="btn sm" id="igCutoutClose">✕ Close</button>
+      </div>
+    </div>
+
+    <!-- Body: Creator View -->
+    <div id="igCutoutCreatorView" style="display:flex; flex:1; min-height:0; overflow:hidden;">
+      <!-- Left: Interactive Canvas Area -->
+      <div style="flex:1.2; display:flex; flex-direction:column; background:#12161A; position:relative; overflow:hidden; border-right:1px solid var(--line);">
+        <!-- Top canvas toolbar -->
+        <div style="display:flex; align-items:center; justify-content:space-between; padding:8px 14px; background:rgba(0,0,0,0.5); border-bottom:1px solid rgba(255,255,255,0.08); font-size:12px; gap:8px; flex-wrap:wrap;">
+          <div style="display:flex; align-items:center; gap:6px;">
+            <label class="btn sm upload" style="padding:4px 10px; font-size:12px; cursor:pointer;">
+              📁 Pick Photo / Video
+              <input type="file" id="igFileInput" accept="image/*,video/*,.webm,.mp4,.mov" style="display:none;">
+            </label>
+            <button type="button" class="btn sm" id="btnIgFromFrame" style="padding:4px 10px; font-size:12px;" title="Grab current frame from video timeline">🎬 From Current Video Frame</button>
+          </div>
+          <div style="display:flex; align-items:center; gap:6px;">
+            <span style="color:#aaa; font-size:11px;">Backdrop:</span>
+            <button type="button" class="btn sm ig-bg-btn on" data-bg="check" title="Checkerboard">🏁</button>
+            <button type="button" class="btn sm ig-bg-btn" data-bg="black" title="Dark">⬛</button>
+            <button type="button" class="btn sm ig-bg-btn" data-bg="white" title="Light">⬜</button>
+            <button type="button" class="btn sm ig-bg-btn" data-bg="video" title="Timeline Video Scene">🎬</button>
+          </div>
+        </div>
+
+        <!-- Canvas Viewport -->
+        <div id="igCanvasViewport" style="flex:1; display:flex; align-items:center; justify-content:center; position:relative; overflow:hidden; cursor:crosshair; user-select:none; background:repeating-conic-gradient(#1c2128 0% 25%, #252b33 0% 50%) 50% / 20px 20px;">
+          <canvas id="igPreviewCv" style="max-width:94%; max-height:94%; object-fit:contain; border-radius:8px; box-shadow:0 12px 36px rgba(0,0,0,0.7);"></canvas>
+          <div id="igBrushCursor" style="position:absolute; pointer-events:none; border:2px solid #fff; border-radius:50%; box-shadow:0 0 6px rgba(0,0,0,0.9); transform:translate(-50%,-50%); display:none;"></div>
+          <div id="igLoadingOverlay" style="position:absolute; inset:0; background:rgba(18,22,26,0.85); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; color:#fff;" hidden>
+            <div class="ig-spinner"></div>
+            <span id="igLoadingMsg" style="font-weight:600; font-size:14px;">Running On-Device AI Segmentation…</span>
+          </div>
+        </div>
+
+        <!-- Canvas Footer Note -->
+        <div style="padding:6px 14px; background:rgba(0,0,0,0.4); border-top:1px solid rgba(255,255,255,0.06); font-size:11px; color:#888; display:flex; justify-content:space-between;">
+          <span id="igCanvasHint">Drag brush to refine edges. Zoom with mouse wheel.</span>
+          <span id="igDimensions"></span>
+        </div>
+      </div>
+
+      <!-- Right: Controls & Styling Panel -->
+      <div style="flex:0.95; display:flex; flex-direction:column; overflow-y:auto; padding:16px 18px; gap:14px; background:var(--surface);">
+        <!-- Mode: AI vs Manual -->
+        <div>
+          <span class="lbl" style="font-weight:600; margin-bottom:6px; display:block;">Cutout Selection Mode</span>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn sm dark ig-mode-btn on" id="btnIgModeAi" style="flex:1;">⚡ Automatic AI</button>
+            <button type="button" class="btn sm dark ig-mode-btn" id="btnIgModeManual" style="flex:1;">✂️ Select Manually</button>
+          </div>
+        </div>
+
+        <!-- Manual Selection Toolbar -->
+        <div id="igManualBox" style="background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:12px; display:none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-weight:600; font-size:12px; color:var(--heading);">✂️ Manual Refinement Tools</span>
+            <button type="button" class="btn sm" id="btnIgInvert" style="padding:2px 8px; font-size:11px;">🌓 Invert Mask</button>
+          </div>
+          <div style="display:flex; gap:4px; margin-bottom:10px;">
+            <button type="button" class="btn sm ig-tool-btn on" id="btnIgToolBrush" data-tool="brush" style="flex:1;" title="Paint to keep / add to cutout">🖌️ Keep</button>
+            <button type="button" class="btn sm ig-tool-btn" id="btnIgToolErase" data-tool="erase" style="flex:1;" title="Erase from cutout">🧽 Erase</button>
+            <button type="button" class="btn sm ig-tool-btn" id="btnIgToolKey" data-tool="colorKey" style="flex:1;" title="Click background color to remove">🟢 Key Color</button>
+          </div>
+          <div id="igBrushRow" class="field" style="margin-bottom:8px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span>Brush Size</span><b id="igBrushSizeVal">30 px</b>
+            </div>
+            <input type="range" id="igBrushSize" min="4" max="120" value="30" style="width:100%;">
+          </div>
+          <div id="igKeyTolRow" class="field" style="margin-bottom:8px; display:none;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span>Color Tolerance</span><b id="igKeyTolVal">35%</b>
+            </div>
+            <input type="range" id="igKeyTol" min="0.05" max="0.8" step="0.01" value="0.35" style="width:100%;">
+          </div>
+          <div class="field" style="margin-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; font-size:12px;">
+              <span>Edge Feather</span><b id="igFeatherVal">2 px</b>
+            </div>
+            <input type="range" id="igFeather" min="0" max="15" value="2" style="width:100%;">
+          </div>
+          <div style="display:flex; gap:6px; margin-top:8px;">
+            <button type="button" class="btn sm" id="btnIgResetMask" style="flex:1; font-size:11px;">↩️ Reset to AI</button>
+            <button type="button" class="btn sm" id="btnIgClearMask" style="flex:1; font-size:11px;">🧹 Clear All</button>
+          </div>
+        </div>
+
+        <!-- Instagram Sticker Styling -->
+        <div style="background:var(--soft); border:1px solid var(--line); border-radius:10px; padding:12px;">
+          <span style="font-weight:600; font-size:13px; color:var(--heading); display:block; margin-bottom:8px;">🏷️ Instagram Sticker Styling</span>
+          <div class="chips" id="igStyleChips" style="margin-bottom:10px;"></div>
+          <div id="igBorderOpts">
+            <span class="lbl" style="font-size:12px;">Border / Outline Colour</span>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:8px; flex-wrap:wrap;" id="igColorSwatches"></div>
+            <div class="field" style="margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px;">
+                <span>Border Width</span><b id="igBorderWidthVal">8 px</b>
+              </div>
+              <input type="range" id="igBorderWidth" min="2" max="30" value="8" style="width:100%;">
+            </div>
+            <div class="field" style="margin-bottom:8px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px;">
+                <span>Sticker Angle / Tilt</span><b id="igAngleVal">0°</b>
+              </div>
+              <div style="display:flex; align-items:center; gap:6px;">
+                <button type="button" class="btn sm ig-tilt-btn" data-deg="-15">-15°</button>
+                <button type="button" class="btn sm ig-tilt-btn" data-deg="0">0°</button>
+                <button type="button" class="btn sm ig-tilt-btn" data-deg="15">+15°</button>
+                <input type="range" id="igAngle" min="-180" max="180" value="0" style="flex:1;">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Actions -->
+        <div style="margin-top:auto; display:flex; flex-direction:column; gap:8px;">
+          <button type="button" class="btn primary" id="btnIgAddToVideo" style="padding:10px; font-weight:600; font-size:14px;">✨ Add Sticker to Video Reel</button>
+          <div style="display:flex; gap:6px;">
+            <button type="button" class="btn sm" id="btnIgSaveToTray" style="flex:1;">💾 Save to Your Cutouts</button>
+            <button type="button" class="btn sm" id="btnIgDownloadPng" style="flex:1;">⬇️ Download PNG</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tray View -->
+    <div id="igCutoutTrayView" style="display:none; flex:1; min-height:0; overflow-y:auto; padding:20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px;">
+        <div>
+          <h2 style="font:600 18px var(--serif); margin:0; color:var(--heading);">Your Cutouts (Sticker Tray)</h2>
+          <p class="hint" style="margin:2px 0 0; font-size:12px;">Saved cutout stickers. Tap any sticker to add it to your video reel instantly.</p>
+        </div>
+        <button type="button" class="btn sm primary" id="btnIgCreateNew">+ Create New Cutout</button>
+      </div>
+      <div id="igTrayGrid" style="display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); gap:14px;"></div>
+      <div id="igTrayEmpty" style="text-align:center; padding:50px 20px; color:var(--muted); display:none;">
+        <span style="font-size:36px; display:block; margin-bottom:8px;">✂️</span>
+        <b style="color:var(--heading); font-size:15px; display:block;">No saved cutouts yet</b>
+        <p style="font-size:13px; max-width:340px; margin:6px auto 14px;">Create your first cutout from a photo or the current video frame and save it to your sticker tray!</p>
+        <button type="button" class="btn primary" id="btnIgCreateFirst">Create Cutout Sticker</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="app">
   <div class="rs-handle rs-l" aria-hidden="true" title="Drag to resize (double-click to reset)"></div>
   <div class="rs-handle rs-r" aria-hidden="true" title="Drag to resize (double-click to reset)"></div>
@@ -530,10 +729,10 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-8 9"/></svg>Photos<input type="file" id="addPhotos" accept="image/*" multiple></label>
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2v8l-4-2"/></svg>Video clips<input type="file" id="addVideos" accept="video/*" multiple></label>
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>Before / after<input type="file" id="addCompare" accept="image/*" multiple></label>
-        <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1"/></svg>Cutout / Image<input type="file" id="addOverlay" accept="image/*,video/*,.webm,.mp4,.mov"></label>
+        <button type="button" class="btn" id="btnOpenCutoutModal" style="display:flex;align-items:center;justify-content:center;gap:6px;padding:8px 4px;font-weight:600;"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><line x1="20" y1="4" x2="8.12" y2="15.88"/><line x1="14.47" y1="14.48" x2="20" y2="20"/><line x1="8.12" y1="8.12" x2="12" y2="12"/></svg>Cutouts (IG)<input type="file" id="addOverlay" accept="image/*,video/*,.webm,.mp4,.mov" style="display:none;"></button>
       </div>
       <p class="hint">Before / after: select 2 photos together, before first.</p>
-      <div class="row" style="margin-top:10px"><button class="btn sm dark" id="openScenes">Motion scenes</button><button class="btn sm" id="openReels">Reel templates</button><button class="btn sm" id="openTexts">Text and titles</button></div>
+      <div class="row" style="margin-top:10px"><button class="btn sm dark" id="openScenes">Motion scenes</button><button class="btn sm" id="openReels">Reel templates</button><button class="btn sm" id="openTexts">Text and titles</button><button class="btn sm" id="openCutoutTrayBtn" title="Open Your Cutouts Sticker Tray">✂️ Cutout tray</button></div>
     </div>
 
     <div class="group">
@@ -1838,8 +2037,11 @@ function drawCutoutHighlight(c, src, x, y, w, h, u, t, cfg){
     return;
   }
 
-  const colKey = cfg.hlColor || "cyan";
-  const colHex = (colKey === "custom" && cfg.hlHex) ? cfg.hlHex : (CUTOUT_HL_COLORS[colKey] || cfg.hlHex || "#00E5FF");
+  const style = cfg.hlStyle || "sticker";
+  if (style === "none") return;
+
+  const colKey = cfg.hlColor || (style === "sticker" || style === "solid" ? "white" : "cyan");
+  const colHex = (colKey === "custom" && cfg.hlHex) ? cfg.hlHex : (CUTOUT_HL_COLORS[colKey] || cfg.hlHex || (style === "sticker" || style === "solid" ? "#FFFFFF" : "#00E5FF"));
 
   // Create solid colored silhouette matching cutout alpha
   _hlCtx.save();
@@ -1848,13 +2050,39 @@ function drawCutoutHighlight(c, src, x, y, w, h, u, t, cfg){
   _hlCtx.fillRect(0, 0, w, h);
   _hlCtx.restore();
 
-  const style = cfg.hlStyle || "glow";
-  const strokeW = Math.max(1, (cfg.hlWidth ?? 6) * u);
+  const strokeW = Math.max(1, (cfg.hlWidth ?? (style === "sticker" ? 8 : 6)) * u);
   const blurR = Math.max(0, (cfg.hlBlur ?? 18) * u);
-  const baseAlpha = clamp(cfg.hlOpacity ?? 0.9, 0.1, 1);
+  const baseAlpha = clamp(cfg.hlOpacity ?? 0.95, 0.1, 1);
 
   c.save();
-  if (style === "pulse"){
+  if (style === "sticker" || style === "solid"){
+    // Instagram Cutout Sticker: die-cut contour + 3D elevation drop shadow
+    c.globalAlpha = baseAlpha;
+    if (cfg.shadow !== false){
+      c.shadowColor = "rgba(0,0,0,0.42)";
+      c.shadowBlur = Math.max(6 * u, strokeW * 1.4);
+      c.shadowOffsetY = Math.max(3 * u, strokeW * 0.7);
+      c.shadowOffsetX = 0;
+    }
+    const numAngles = 24;
+    // Outer perimeter with drop shadow
+    for (let i = 0; i < numAngles; i++){
+      const ang = (i / numAngles) * Math.PI * 2;
+      c.drawImage(_hlCv, x + Math.cos(ang) * strokeW, y + Math.sin(ang) * strokeW, w, h);
+    }
+    // Inner concentric passes to create solid die-cut border
+    c.shadowColor = "transparent";
+    const steps = Math.max(1, Math.floor(strokeW / (2.5 * u)));
+    for (let s = 1; s < steps; s++){
+      const curR = (s / steps) * strokeW;
+      const count = Math.max(8, Math.floor(numAngles * (curR / strokeW)));
+      for (let i = 0; i < count; i++){
+        const ang = (i / count) * Math.PI * 2;
+        c.drawImage(_hlCv, x + Math.cos(ang) * curR, y + Math.sin(ang) * curR, w, h);
+      }
+    }
+    c.drawImage(_hlCv, x, y, w, h);
+  } else if (style === "pulse"){
     const spd = cfg.hlSpeed || 4.5;
     const pulse = 0.5 + 0.5 * Math.sin((t || 0) * spd);
     const curBlur = blurR * (0.65 + 0.7 * pulse);
@@ -1869,21 +2097,6 @@ function drawCutoutHighlight(c, src, x, y, w, h, u, t, cfg){
     c.drawImage(_hlCv, x, y + d, w, h);
     c.shadowBlur = curBlur * 1.8;
     c.drawImage(_hlCv, x, y, w, h);
-  } else if (style === "solid"){
-    c.globalAlpha = baseAlpha;
-    c.shadowColor = "rgba(0,0,0,0.4)";
-    c.shadowBlur = 4 * u;
-    const numSteps = 16;
-    for (let i = 0; i < numSteps; i++){
-      const ang = (i / numSteps) * Math.PI * 2;
-      c.drawImage(_hlCv, x + Math.cos(ang) * strokeW, y + Math.sin(ang) * strokeW, w, h);
-    }
-    if (strokeW > 3 * u){
-      for (let i = 0; i < 8; i++){
-        const ang = (i / 8) * Math.PI * 2;
-        c.drawImage(_hlCv, x + Math.cos(ang) * (strokeW * 0.5), y + Math.sin(ang) * (strokeW * 0.5), w, h);
-      }
-    }
   } else if (style === "cyber"){
     const secCol = cfg.hlSecColor || (colHex === "#00E5FF" ? "#FF007F" : (colHex === "#00E676" ? "#00E5FF" : "#FF007F"));
     c.globalAlpha = baseAlpha * 0.85;
@@ -2868,7 +3081,11 @@ function drawOverlay(c, o, t){
   const { u } = geo(), fadeIn = clamp((t - o.start) / .35), fadeOut = clamp((o.end - t) / .35), a = Math.min(fadeIn, fadeOut);
   if (a <= 0) return;
   const r = overlayRect(o), sc = .96 + .04 * ease(fadeIn), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
-  c.save(); c.globalAlpha = a; c.translate(cx, cy); c.scale(sc, sc); c.translate(-cx, -cy);
+  c.save(); c.globalAlpha = a;
+  c.translate(cx, cy);
+  if (o.rot) c.rotate((o.rot * Math.PI) / 180);
+  c.scale(sc, sc);
+  c.translate(-cx, -cy);
   if (o.blendMode && o.blendMode !== "source-over") c.globalCompositeOperation = o.blendMode;
 
   if (o.el && o.el.tagName === "VIDEO"){
@@ -2882,7 +3099,7 @@ function drawOverlay(c, o, t){
   }
 
   // Cutout Highlight (glowing outline, sticker stroke, neon glow)
-  if (o.cutoutHl){
+  if (o.cutoutHl && o.hlStyle !== "none"){
     const srcToHl = o.chromaKey ?
       applyChromaKey(o.el, r.w, r.h, o.keyColor || "#00FF00", o.keyTol ?? 0.36, o.keyFeather ?? 0.14) :
       o.el;
@@ -2890,11 +3107,11 @@ function drawOverlay(c, o, t){
   }
 
   const rad = o.shape === "circle" ? r.w / 2 : o.shape === "rounded" ? 24 * u : 0;
-  if (o.border){
+  if (o.border && !o.cutoutHl){
     c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 30 * u; c.shadowOffsetY = 10 * u; c.fillStyle = "#fff";
     c.beginPath(); c.roundRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u, rad ? rad + 8 * u : 0); c.fill(); c.shadowColor = "transparent";
   }
-  if (rad || o.border){
+  if ((rad || o.border) && !o.cutoutHl){
     c.beginPath(); c.roundRect(r.x, r.y, r.w, r.h, rad); c.clip();
   }
   if (o.chromaKey){
@@ -2905,7 +3122,14 @@ function drawOverlay(c, o, t){
   }
   c.restore();
   if (selected && selected.type === "overlay" && selected.item === o && !exporting){
-    c.save(); c.strokeStyle = C.clayLt; c.setLineDash([12 * u, 8 * u]); c.lineWidth = 4 * u; c.strokeRect(r.x - 14 * u, r.y - 14 * u, r.w + 28 * u, r.h + 28 * u); c.restore();
+    c.save();
+    if (o.rot){
+      c.translate(cx, cy);
+      c.rotate((o.rot * Math.PI) / 180);
+      c.translate(-cx, -cy);
+    }
+    c.strokeStyle = C.clayLt; c.setLineDash([12 * u, 8 * u]); c.lineWidth = 4 * u; c.strokeRect(r.x - 14 * u, r.y - 14 * u, r.w + 28 * u, r.h + 28 * u);
+    c.restore();
   }
 }
 const LOGO_KINDS = [["lockup","Horizontal"],["stacked","Stacked"],["mark","Mark only"]];
@@ -4884,18 +5108,22 @@ async function addOverlay(file){
     end: Math.min(TOTAL || dur, start + dur),
     x: .5,
     y: .5,
-    w: isCutout ? .5 : .42,
+    w: isCutout ? .48 : .42,
+    rot: 0,
     shape: isCutout ? "none" : "rounded",
     border: !isCutout,
     cutoutHl: isCutout,
-    hlStyle: "glow",
-    hlColor: "cyan",
-    hlWidth: 6,
-    hlBlur: 18,
-    hlOpacity: 0.9
+    hlStyle: isCutout ? "sticker" : "glow",
+    hlColor: isCutout ? "white" : "cyan",
+    hlWidth: isCutout ? 8 : 6,
+    hlBlur: 14,
+    hlOpacity: 0.95,
+    isCutout: isCutout,
+    isIgSticker: isCutout
   };
   P.overlays.push(o); refresh(); select("overlay", o);
-  toast(isCutout ? "✂️ Cutout added with glowing outline." : "Overlay added.");
+  if (isCutout && typeof saveCutoutToTray === "function") saveCutoutToTray(o);
+  toast(isCutout ? "✂️ Instagram Cutout Sticker added to reel!" : "Overlay added.");
 }
 async function decodeAudio(file){ const buf = await file.arrayBuffer(); return await AC.decodeAudioData(buf); }
 function speechSegments(buffer){
@@ -6530,56 +6758,75 @@ function renderInspector(){
   }
   if (type === "overlay"){
     const o = it;
-    const isCutout = /cutout/i.test(o.name || "") || (o.el && o.el.tagName === "VIDEO") || o.cutoutHl;
-    box.append(el("p", { class:"insp-title", text: isCutout ? "✂️ Cutout & Overlay" : "Image on top" }),
+    const isCutout = /cutout/i.test(o.name || "") || (o.el && o.el.tagName === "VIDEO") || o.cutoutHl || o.isIgSticker;
+    box.append(el("p", { class:"insp-title", text: isCutout ? "✂️ Instagram Cutout Sticker" : "Image on top" }),
       el("div", { class:"grid2" }, [fNum("Show from (s)", o.start, v => { o.start = clamp(v, 0, o.end - .3); changed(); renderInspector(); }), fNum("Until (s)", o.end, v => { o.end = Math.max(o.start + .3, v); changed(); renderInspector(); })]),
       el("div", { class:"row field" }, [btn("Start here", () => { o.start = clamp(now(), 0, o.end - .3); changed(); renderInspector(); }), btn("End here", () => { o.end = Math.max(o.start + .3, now()); changed(); renderInspector(); })]),
       fChips("Position", "", [["tl","Top left"],["tr","Top right"],["c","Centre"],["bl","Bottom left"],["br","Bottom right"]], v => { const { W, H, safe } = geo(), r = overlayRect(o); const hw = r.w / 2 / W, hh = r.h / 2 / H, l = safe.l / W + hw + .02, rr = 1 - safe.r / W - hw - .02, t = safe.t / H + hh + .06, b = 1 - safe.b / H - hh - .02; Object.assign(o, { tl:{ x:l, y:t }, tr:{ x:rr, y:t }, c:{ x:.5, y:.5 }, bl:{ x:l, y:b }, br:{ x:rr, y:b } }[v]); changed(false); }),
-      fSlider("Size", o.w, .15, .95, .01, v => { o.w = v; changed(false); }),
+      fSlider("Size", o.w, .1, 1.4, .01, v => { o.w = v; changed(false); }),
+      fSlider("Sticker angle / Tilt", o.rot || 0, -180, 180, 1, v => { o.rot = v; changed(false); }, v => v + "°"),
+      el("div", { class:"row field", style:"gap:6px;margin-bottom:8px" }, [
+        btn("-15° Tilt", () => { o.rot = (o.rot || 0) - 15; changed(false); renderInspector(); }),
+        btn("0° Straight", () => { o.rot = 0; changed(false); renderInspector(); }),
+        btn("+15° Tilt", () => { o.rot = (o.rot || 0) + 15; changed(false); renderInspector(); }),
+        btn("🔄 Cycle Style", () => {
+          o.cutoutHl = true;
+          const seq = ["sticker", "glow", "pulse", "cyber", "halo", "none"];
+          const curIdx = seq.indexOf(o.hlStyle || "sticker");
+          o.hlStyle = seq[(curIdx + 1) % seq.length];
+          changed(false);
+          renderInspector();
+        })
+      ]),
       fChips("Shape", o.shape || "none", [["none","Sticker (No crop)"],["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }),
-      el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]),
+      !o.cutoutHl ? el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]) : "",
 
-      /* CUTOUT HIGHLIGHT */
-      el("h2", { text:"✂️ Cutout Highlight", style:"margin-top:12px" }),
-      toggleRow("Enable Cutout Highlight (Glowing Outline)", !!o.cutoutHl, v => {
+      /* CUTOUT HIGHLIGHT & INSTAGRAM STICKER */
+      el("h2", { text:"✂️ Cutout & Sticker Styling (Instagram)", style:"margin-top:12px" }),
+      toggleRow("Enable Cutout Highlight / Sticker Border", !!o.cutoutHl, v => {
         o.cutoutHl = v;
-        if (v && !o.hlColor) o.hlColor = "cyan";
-        if (v && !o.hlStyle) o.hlStyle = "glow";
+        if (v && !o.hlColor) o.hlColor = "white";
+        if (v && !o.hlStyle) o.hlStyle = "sticker";
         if (v && o.shape !== "none") o.shape = "none";
         if (v) o.border = false;
         changed(false);
         renderInspector();
       }),
       o.cutoutHl ? el("div", { class:"field", style:"margin-top:8px;padding:10px;background:var(--soft);border-radius:10px;border:1px solid var(--line)" }, [
-        fChips("Highlight style", o.hlStyle || "glow", [
+        fChips("Highlight style", o.hlStyle || "sticker", [
+          ["sticker", "🏷️ Instagram Sticker (White Border + Shadow)"],
           ["glow", "✨ Neon Glow"],
-          ["solid", "🏷️ Solid Stroke"],
           ["pulse", "⚡ Pulsing Neon"],
           ["cyber", "🔮 Cyberpunk Dual"],
-          ["halo", "🌌 Drop Halo"]
+          ["halo", "🌌 Drop Halo"],
+          ["none", "✂️ Clean Cutout (No border)"]
         ], v => { o.hlStyle = v; changed(false); renderInspector(); }),
-        fChips("Highlight colour", o.hlColor || "cyan", [
+        o.hlStyle !== "none" ? fChips("Highlight colour", o.hlColor || (o.hlStyle === "sticker" ? "white" : "cyan"), [
+          ["white","White (IG)"],
           ["cyan","Cyan"],
           ["lime","Lime"],
           ["gold","Gold"],
           ["pink","Pink"],
-          ["white","White"],
           ["purple","Violet"],
           ["red","Red"],
           ["custom","Custom"]
-        ], v => { o.hlColor = v; if (v === "custom" && !o.hlHex) o.hlHex = "#00E5FF"; changed(false); renderInspector(); }),
-        o.hlColor === "custom" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-bottom:6px" }, [
+        ], v => { o.hlColor = v; if (v === "custom" && !o.hlHex) o.hlHex = "#FFFFFF"; changed(false); renderInspector(); }) : "",
+        o.hlColor === "custom" && o.hlStyle !== "none" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-bottom:6px" }, [
           el("span", { class:"lbl", text:"Custom colour" }),
-          fColorPicker(o.hlHex || "#00E5FF", c => { o.hlHex = c; changed(false); })
+          fColorPicker(o.hlHex || "#FFFFFF", c => { o.hlHex = c; changed(false); })
         ]) : "",
-        fSlider("Outline thickness", o.hlWidth ?? 6, 1, 30, 1, v => { o.hlWidth = v; changed(false); }, v => v + "px"),
-        fSlider("Glow blur radius", o.hlBlur ?? 18, 0, 50, 1, v => { o.hlBlur = v; changed(false); }, v => v + "px"),
-        fSlider("Highlight intensity", o.hlOpacity ?? 0.9, 0.2, 1, 0.05, v => { o.hlOpacity = v; changed(false); }, v => Math.round(v * 100) + "%"),
+        o.hlStyle !== "none" ? fSlider("Outline thickness", o.hlWidth ?? 8, 1, 30, 1, v => { o.hlWidth = v; changed(false); }, v => v + "px") : "",
+        (o.hlStyle === "glow" || o.hlStyle === "pulse" || o.hlStyle === "cyber" || o.hlStyle === "halo") ? fSlider("Glow blur radius", o.hlBlur ?? 18, 0, 50, 1, v => { o.hlBlur = v; changed(false); }, v => v + "px") : "",
+        fSlider("Highlight intensity", o.hlOpacity ?? 0.95, 0.2, 1, 0.05, v => { o.hlOpacity = v; changed(false); }, v => Math.round(v * 100) + "%"),
         o.hlStyle === "pulse" ? fSlider("Pulse speed", o.hlSpeed ?? 4.5, 1, 10, 0.5, v => { o.hlSpeed = v; changed(false); }) : "",
         o.hlStyle === "cyber" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-top:6px" }, [
           el("span", { class:"lbl", text:"Outer neon aura colour" }),
           fColorPicker(o.hlSecColor || "#FF007F", c => { o.hlSecColor = c; changed(false); })
         ]) : "",
+        el("div", { class:"row field", style:"margin-top:10px;gap:6px" }, [
+          btn("💾 Save to Your Cutouts Tray", () => saveCutoutToTray(o), "btn sm primary"),
+          btn("✂️ Open in Cutout Creator", () => openCutoutModal(false, o), "btn sm")
+        ]),
         el("p", { class:"hint", style:"margin:6px 0 0", text:"Highlight wraps around the transparent silhouette of your cutout." })
       ]) : "",
 
@@ -7193,7 +7440,19 @@ cv.addEventListener("pointerdown", e => {
   }
   if (stageHandleDown(e, px, py)) return;
   const r = cv.getBoundingClientRect(), k = kk, x = px, y = py, t = now();
-  const hit = [...P.overlays].reverse().find(o => t >= o.start && t <= o.end && (() => { const q = overlayRect(o); return x >= q.x && x <= q.x + q.w && y >= q.y && y <= q.y + q.h; })());
+  const hit = [...P.overlays].reverse().find(o => t >= o.start && t <= o.end && (() => {
+    const q = overlayRect(o);
+    let hx = x, hy = y;
+    if (o.rot){
+      const cx = q.x + q.w / 2, cy = q.y + q.h / 2;
+      const rad = -o.rot * Math.PI / 180;
+      const cos = Math.cos(rad), sin = Math.sin(rad);
+      const dx = x - cx, dy = y - cy;
+      hx = cx + dx * cos - dy * sin;
+      hy = cy + dx * sin + dy * cos;
+    }
+    return hx >= q.x && hx <= q.x + q.w && hy >= q.y && hy <= q.y + q.h;
+  })());
   if (!hit){ stagePointerDown(e, px, py); return; }
   if (!(selected && selected.item === hit)) select("overlay", hit);
   dragO = { o:hit, x, y, ox:hit.x, oy:hit.y, k }; cv.setPointerCapture(e.pointerId);
@@ -7746,6 +8005,26 @@ function seToolbar(){
     b("Style", () => { if (typeof csOpenDock === "function"){ if (!capIsCustom(P.cap.style)){ P.cap.style = "custom"; capChanged(); refreshCapUI(); } csOpenDock(); } }, { title:"Edit caption style" });
   }
   if (selected.type === "overlay"){
+    if (it.cutoutHl || /cutout/i.test(it.name || "") || it.isIgSticker){
+      b("🏷️ Sticker", () => {
+        it.cutoutHl = true;
+        it.hlStyle = it.hlStyle === "sticker" ? "glow" : (it.hlStyle === "glow" ? "pulse" : (it.hlStyle === "pulse" ? "none" : "sticker"));
+        it.shape = "none";
+        it.border = false;
+        seLive();
+        renderInspector();
+      }, { on: it.cutoutHl && it.hlStyle === "sticker", title: "Toggle Instagram Sticker Border" });
+      b("🔄 Tilt", () => {
+        it.rot = ((it.rot || 0) + 15) % 360;
+        if (it.rot > 180) it.rot -= 360;
+        seLive();
+        renderInspector();
+      }, { title: "Tilt sticker by 15°" });
+      b("💾 Save", () => {
+        saveCutoutToTray(it);
+      }, { title: "Save to Your Cutouts Tray" });
+      sep();
+    }
     b("Front", () => { P.overlays.splice(P.overlays.indexOf(it), 1); P.overlays.push(it); seLive(); }, { title:"Bring to front" });
     b("Copy", () => { const d = { ...it, id:uid++, x:clamp(it.x + .04, .02, .98), y:clamp(it.y + .04, .02, .98) }; P.overlays.push(d); refresh(); select("overlay", d); seToolbar(); }, { title:"Duplicate" });
   }
@@ -8012,6 +8291,10 @@ new ResizeObserver(fitCanvas).observe($("canvasArea"));
 const onFiles = (id, fn) => $(id).addEventListener("change", e => { const fs = [...(e.target.files || [])]; e.target.value = ""; if (fs.length) fn(fs); });
 onFiles("addPhotos", addPhotos); onFiles("addVideos", addVideos); onFiles("addCompare", addCompare);
 onFiles("addOverlay", fs => addOverlay(fs[0]));
+const _openCutBtn = $("btnOpenCutoutModal");
+if (_openCutBtn) _openCutBtn.addEventListener("click", () => openCutoutModal(false));
+const _openTrayBtn = $("openCutoutTrayBtn");
+if (_openTrayBtn) _openTrayBtn.addEventListener("click", () => openCutoutModal(true));
 onFiles("voFile", async fs => { try { await setVO(await decodeAudio(fs[0]), 0, fs[0].name); } catch(e){ toast("Could not read that audio file."); } });
 onFiles("musicFile", async fs => { try { const b = await decodeAudio(fs[0]); P.music = { buffer:b, name:fs[0].name, offset:0 }; refresh(); } catch(e){ toast("Could not read that audio file."); } });
 function renderVoSrc(){
@@ -9251,6 +9534,882 @@ function openTexts(){
     TEXT_PRESETS.map(pre => ({ name:pre.name, sub:pre.sub, thumb:renderOff(oc => { brandBg(oc, THEMES.slate); const o = textOverlayFromPreset(pre, 0); o.end = 99; if (o.type === "lower"){ const { W, safe } = geo(); o.x = safe.l / W; } drawTextOverlay(oc, o, 1.6); }), onPick:() => { closeGallery(); addTextOverlay(pre); } })));
 }
 
+/* =========================================================
+   Instagram Cutouts & Sticker Studio (AI & Manual Selection)
+   ========================================================= */
+let igSrcCv = null;
+let igMaskCv = null;
+let igEditCv = null;
+let igCutCv = null;
+let igSnapshotCv = null;
+const igState = {
+  srcLoaded: false,
+  srcName: "cutout.png",
+  mode: "ai",
+  tool: "brush",
+  brushSize: 30,
+  feather: 2,
+  keyTol: 0.35,
+  backdrop: "check",
+  style: "sticker",
+  color: "white",
+  hex: "#FFFFFF",
+  borderWidth: 8,
+  angle: 0,
+  drawing: false,
+  lastX: 0,
+  lastY: 0
+};
+
+function getSavedCutouts(){
+  try {
+    const raw = localStorage.getItem("rs_ig_cutouts");
+    return raw ? JSON.parse(raw) : [];
+  } catch(e){ return []; }
+}
+
+function saveSavedCutouts(list){
+  try {
+    localStorage.setItem("rs_ig_cutouts", JSON.stringify(list));
+  } catch(e){
+    if (list.length > 4){
+      saveSavedCutouts(list.slice(0, Math.floor(list.length / 2)));
+    }
+  }
+}
+
+function saveCutoutToTray(o){
+  if (!o || !o.el){ toast("Select a valid cutout sticker first."); return; }
+  try {
+    const nw = o.el.naturalWidth || o.el.videoWidth || o.el.width || 300;
+    const nh = o.el.naturalHeight || o.el.videoHeight || o.el.height || 300;
+    const maxDim = 400;
+    const sc = Math.min(1, maxDim / Math.max(nw, nh));
+    const tw = Math.max(1, Math.round(nw * sc)), th = Math.max(1, Math.round(nh * sc));
+    const tc = document.createElement("canvas");
+    tc.width = tw; tc.height = th;
+    const tctx = tc.getContext("2d");
+    if (o.chromaKey){
+      const keyed = applyChromaKey(o.el, tw, th, o.keyColor || "#00FF00", o.keyTol ?? 0.36, o.keyFeather ?? 0.14);
+      tctx.drawImage(keyed, 0, 0, tw, th);
+    } else {
+      tctx.drawImage(o.el, 0, 0, tw, th);
+    }
+    const dataUrl = tc.toDataURL("image/png");
+    const saved = getSavedCutouts();
+    const item = {
+      id: "cutout_" + Date.now(),
+      name: (o.name || "Sticker").replace(/\.[^.]+$/, ""),
+      dataUrl,
+      style: o.hlStyle || "sticker",
+      color: o.hlColor || "white",
+      hex: o.hlHex || "#FFFFFF",
+      width: o.hlWidth || 8,
+      rot: o.rot || 0,
+      created: Date.now()
+    };
+    saved.unshift(item);
+    saveSavedCutouts(saved.slice(0, 24));
+    toast("💾 Saved to Your Cutouts tray! Re-use on any clip anytime.");
+  } catch(e){
+    console.error(e);
+    toast("Could not save cutout to tray.");
+  }
+}
+
+function captureCurrentVideoFrame(){
+  const { W, H } = geo();
+  const capCv = document.createElement("canvas");
+  capCv.width = W;
+  capCv.height = H;
+  const cctx = capCv.getContext("2d");
+  const clip = activeClipAt(now());
+  if (clip && (clip.kind === "video" || clip.kind === "image")){
+    const local = clamp(now() - clip._start, 0, clip.dur);
+    const X = clipXform(clip, local);
+    if (X && X.src){
+      try {
+        if (X.rot){
+          cctx.translate(W / 2, H / 2);
+          cctx.rotate(X.rot);
+          cctx.translate(-W / 2, -H / 2);
+        }
+        cctx.drawImage(X.src, X.x, X.y, X.dw, X.dh);
+        return capCv;
+      } catch(e){}
+    }
+  }
+  try {
+    cctx.drawImage(cv, 0, 0, W, H);
+    return capCv;
+  } catch(e){}
+  return null;
+}
+
+function getIgCanvasCoords(e){
+  const pv = $("igPreviewCv");
+  const rect = pv.getBoundingClientRect();
+  const scaleX = pv.width / rect.width;
+  const scaleY = pv.height / rect.height;
+  const rawX = (e.clientX - rect.left) * scaleX;
+  const rawY = (e.clientY - rect.top) * scaleY;
+
+  if (!igState.angle) return { x: rawX, y: rawY };
+  const cx = pv.width / 2, cy = pv.height / 2;
+  const rad = -igState.angle * Math.PI / 180;
+  const cos = Math.cos(rad), sin = Math.sin(rad);
+  const dx = rawX - cx, dy = rawY - cy;
+  return {
+    x: cx + dx * cos - dy * sin,
+    y: cy + dx * sin + dy * cos
+  };
+}
+
+function igPaintStroke(x0, y0, x1, y1){
+  if (!igEditCv) return;
+  const ectx = igEditCv.getContext("2d");
+  ectx.save();
+  const isErase = igState.tool === "erase";
+  ectx.globalCompositeOperation = isErase ? "destination-out" : "source-over";
+  ectx.strokeStyle = "#FFFFFF";
+  ectx.fillStyle = "#FFFFFF";
+  ectx.lineWidth = igState.brushSize;
+  ectx.lineCap = "round";
+  ectx.lineJoin = "round";
+
+  ectx.beginPath();
+  ectx.moveTo(x0, y0);
+  ectx.lineTo(x1, y1);
+  ectx.stroke();
+  ectx.beginPath();
+  ectx.arc(x1, y1, igState.brushSize / 2, 0, Math.PI * 2);
+  ectx.fill();
+  ectx.restore();
+}
+
+function igApplyColorKeyAt(x, y){
+  if (!igSrcCv || !igEditCv) return;
+  const sctx = igSrcCv.getContext("2d");
+  const pixel = sctx.getImageData(clamp(Math.round(x), 0, igSrcCv.width - 1), clamp(Math.round(y), 0, igSrcCv.height - 1), 1, 1).data;
+  const tr = pixel[0], tg = pixel[1], tb = pixel[2];
+
+  const w = igSrcCv.width, h = igSrcCv.height;
+  const srcData = sctx.getImageData(0, 0, w, h);
+  const ectx = igEditCv.getContext("2d");
+  const maskData = ectx.getImageData(0, 0, w, h);
+  const tolMax = (igState.keyTol || 0.35) * 441.67;
+
+  const sD = srcData.data, mD = maskData.data;
+  for (let i = 0; i < sD.length; i += 4){
+    const dr = sD[i] - tr, dg = sD[i+1] - tg, db = sD[i+2] - tb;
+    const dist = Math.sqrt(dr*dr + dg*dg + db*db);
+    if (dist <= tolMax){
+      mD[i + 3] = 0;
+    }
+  }
+  ectx.putImageData(maskData, 0, 0);
+  renderIgPreview();
+  toast("🟢 Keyed out matching background color.");
+}
+
+function updateIgBrushCursor(e){
+  const cursor = $("igBrushCursor");
+  const viewport = $("igCanvasViewport");
+  const pv = $("igPreviewCv");
+  if (!cursor || !viewport || !pv || igState.mode !== "manual") {
+    if (cursor) cursor.style.display = "none";
+    if (pv) pv.style.cursor = "default";
+    return;
+  }
+  if (igState.tool === "colorKey"){
+    cursor.style.display = "none";
+    pv.style.cursor = "crosshair";
+    return;
+  }
+  pv.style.cursor = "none";
+  const vpRect = viewport.getBoundingClientRect();
+  const pvRect = pv.getBoundingClientRect();
+  if (e.clientX < pvRect.left || e.clientX > pvRect.right || e.clientY < pvRect.top || e.clientY > pvRect.bottom){
+    cursor.style.display = "none";
+    return;
+  }
+  cursor.style.display = "block";
+  const relX = e.clientX - vpRect.left;
+  const relY = e.clientY - vpRect.top;
+  const scale = pvRect.width / pv.width;
+  const diam = Math.max(8, igState.brushSize * scale);
+  cursor.style.left = relX + "px";
+  cursor.style.top = relY + "px";
+  cursor.style.width = diam + "px";
+  cursor.style.height = diam + "px";
+  cursor.style.borderColor = igState.tool === "erase" ? "#FF3B30" : "#00E5FF";
+}
+
+function renderIgPreview(){
+  const pv = $("igPreviewCv");
+  if (!pv || !igSrcCv) return;
+  const w = igSrcCv.width, h = igSrcCv.height;
+  if (pv.width !== w || pv.height !== h){
+    pv.width = w; pv.height = h;
+  }
+  const ctx = pv.getContext("2d");
+  ctx.clearRect(0, 0, w, h);
+
+  // Backdrop
+  if (igState.backdrop === "check"){
+    const sz = 24;
+    for (let y = 0; y < h; y += sz){
+      for (let x = 0; x < w; x += sz){
+        ctx.fillStyle = ((Math.floor(x / sz) + Math.floor(y / sz)) % 2 === 0) ? "#20252C" : "#171B20";
+        ctx.fillRect(x, y, sz, sz);
+      }
+    }
+  } else if (igState.backdrop === "black"){
+    ctx.fillStyle = "#0E1013"; ctx.fillRect(0, 0, w, h);
+  } else if (igState.backdrop === "white"){
+    ctx.fillStyle = "#F5F6F8"; ctx.fillRect(0, 0, w, h);
+  } else if (igState.backdrop === "video"){
+    if (igSnapshotCv){
+      ctx.drawImage(igSnapshotCv, 0, 0, w, h);
+    } else {
+      ctx.fillStyle = "#12161A"; ctx.fillRect(0, 0, w, h);
+    }
+  }
+
+  // Masked Cutout
+  if (!igCutCv) igCutCv = document.createElement("canvas");
+  if (igCutCv.width !== w || igCutCv.height !== h){
+    igCutCv.width = w; igCutCv.height = h;
+  }
+  const cctx = igCutCv.getContext("2d");
+  cctx.clearRect(0, 0, w, h);
+  cctx.drawImage(igSrcCv, 0, 0, w, h);
+  cctx.save();
+  cctx.globalCompositeOperation = "destination-in";
+  if (igState.feather > 0){
+    cctx.filter = `blur(${igState.feather}px)`;
+  }
+  cctx.drawImage(igEditCv || igMaskCv, 0, 0, w, h);
+  cctx.restore();
+
+  // Draw Sticker / Highlight rotated
+  const cx = w / 2, cy = h / 2;
+  ctx.save();
+  ctx.translate(cx, cy);
+  if (igState.angle) ctx.rotate((igState.angle * Math.PI) / 180);
+  ctx.translate(-cx, -cy);
+
+  if (igState.style !== "none"){
+    const mockCfg = {
+      hlStyle: igState.style,
+      hlColor: igState.color,
+      hlHex: igState.hex,
+      hlWidth: igState.borderWidth,
+      hlBlur: igState.style === "sticker" ? 14 : 18,
+      hlOpacity: 0.95
+    };
+    drawCutoutHighlight(ctx, igCutCv, 0, 0, w, h, w / 800, 0, mockCfg);
+  }
+  ctx.drawImage(igCutCv, 0, 0, w, h);
+  ctx.restore();
+}
+
+async function loadIgSource(source, name = "cutout.png"){
+  if (!source) return;
+  const overlay = $("igLoadingOverlay");
+  const msg = $("igLoadingMsg");
+  if (overlay){ overlay.hidden = false; if (msg) msg.textContent = "Loading image…"; }
+
+  try {
+    const sw = source.naturalWidth || source.videoWidth || source.width || 800;
+    const sh = source.naturalHeight || source.videoHeight || source.height || 600;
+    const maxDim = 1200;
+    const sc = Math.min(1, maxDim / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * sc));
+    const h = Math.max(1, Math.round(sh * sc));
+
+    if (!igSrcCv) igSrcCv = document.createElement("canvas");
+    igSrcCv.width = w; igSrcCv.height = h;
+    const sctx = igSrcCv.getContext("2d");
+    sctx.clearRect(0, 0, w, h);
+    sctx.drawImage(source, 0, 0, w, h);
+
+    if (!igMaskCv) igMaskCv = document.createElement("canvas");
+    igMaskCv.width = w; igMaskCv.height = h;
+    if (!igEditCv) igEditCv = document.createElement("canvas");
+    igEditCv.width = w; igEditCv.height = h;
+
+    const dimEl = $("igDimensions");
+    if (dimEl) dimEl.textContent = `${w} × ${h} px`;
+
+    if (msg) msg.textContent = "AI Isolating Subject…";
+    await smEnsure();
+    const segMask = await smSegmentOnce(igSrcCv);
+    if (segMask){
+      const mctx = igMaskCv.getContext("2d");
+      mctx.clearRect(0, 0, w, h);
+      mctx.drawImage(segMask, 0, 0, w, h);
+
+      const ectx = igEditCv.getContext("2d");
+      ectx.clearRect(0, 0, w, h);
+      ectx.drawImage(segMask, 0, 0, w, h);
+    } else {
+      const ectx = igEditCv.getContext("2d");
+      ectx.fillStyle = "#FFFFFF"; ectx.fillRect(0, 0, w, h);
+    }
+    igState.srcLoaded = true;
+    igState.srcName = name;
+  } catch(err){
+    console.error("AI Cutout error:", err);
+    if (igSrcCv && igEditCv){
+      const ectx = igEditCv.getContext("2d");
+      ectx.fillStyle = "#FFFFFF"; ectx.fillRect(0, 0, igSrcCv.width, igSrcCv.height);
+    }
+    igState.srcLoaded = true;
+  } finally {
+    if (overlay) overlay.hidden = true;
+    renderIgPreview();
+  }
+}
+
+function addIgStickerToTimeline(){
+  if (!igCutCv){
+    toast("No cutout created yet."); return;
+  }
+  const img = new Image();
+  img.onload = () => {
+    const start = clamp(now(), 0, Math.max(0, TOTAL - 0.5));
+    const o = {
+      id: uid++,
+      el: img,
+      name: (igState.srcName || "ig-cutout").replace(/\.[^.]+$/, "") + ".png",
+      start,
+      end: Math.min(TOTAL || 5, start + 5),
+      x: 0.5,
+      y: 0.5,
+      w: 0.44,
+      rot: igState.angle || 0,
+      shape: "none",
+      border: false,
+      cutoutHl: igState.style !== "none",
+      hlStyle: igState.style,
+      hlColor: igState.color,
+      hlHex: igState.hex,
+      hlWidth: igState.borderWidth,
+      hlBlur: igState.style === "sticker" ? 14 : 18,
+      hlOpacity: 0.95,
+      isCutout: true,
+      isIgSticker: true
+    };
+    P.overlays.push(o);
+    refresh();
+    select("overlay", o);
+    saveCutoutToTray(o);
+    closeCutoutModal();
+    toast("✂️ Instagram Cutout Sticker added to your reel! Drag to position, resize with handle.");
+  };
+  img.src = igCutCv.toDataURL("image/png");
+}
+
+function saveIgCurrentToTray(){
+  if (!igCutCv){ toast("Create a cutout first."); return; }
+  const dataUrl = igCutCv.toDataURL("image/png");
+  const saved = getSavedCutouts();
+  const item = {
+    id: "cutout_" + Date.now(),
+    name: "Sticker " + (saved.length + 1),
+    dataUrl,
+    style: igState.style,
+    color: igState.color,
+    hex: igState.hex,
+    width: igState.borderWidth,
+    rot: igState.angle || 0,
+    created: Date.now()
+  };
+  saved.unshift(item);
+  saveSavedCutouts(saved.slice(0, 24));
+  toast("💾 Cutout saved to Your Cutouts tray!");
+  renderIgTray();
+}
+
+function downloadIgStickerPng(){
+  if (!igCutCv){ toast("Create a cutout first."); return; }
+  const dlCv = document.createElement("canvas");
+  dlCv.width = igCutCv.width; dlCv.height = igCutCv.height;
+  const dctx = dlCv.getContext("2d");
+  if (igState.style !== "none"){
+    const mockCfg = {
+      hlStyle: igState.style,
+      hlColor: igState.color,
+      hlHex: igState.hex,
+      hlWidth: igState.borderWidth,
+      hlBlur: igState.style === "sticker" ? 14 : 18,
+      hlOpacity: 0.95
+    };
+    drawCutoutHighlight(dctx, igCutCv, 0, 0, dlCv.width, dlCv.height, dlCv.width / 800, 0, mockCfg);
+  }
+  dctx.drawImage(igCutCv, 0, 0);
+  const a = document.createElement("a");
+  a.href = dlCv.toDataURL("image/png");
+  a.download = "cutout-sticker.png";
+  a.click();
+}
+
+function renderIgTray(){
+  const grid = $("igTrayGrid");
+  const empty = $("igTrayEmpty");
+  if (!grid || !empty) return;
+  const cutouts = getSavedCutouts();
+  grid.innerHTML = "";
+  if (!cutouts.length){
+    empty.style.display = "block";
+    grid.style.display = "none";
+    return;
+  }
+  empty.style.display = "none";
+  grid.style.display = "grid";
+  cutouts.forEach((item) => {
+    const card = document.createElement("div");
+    card.className = "ig-tray-card";
+    card.style.cssText = "background:var(--surface); border:1px solid var(--line); border-radius:12px; padding:10px; display:flex; flex-direction:column; align-items:center; gap:8px; position:relative;";
+    card.innerHTML = `
+      <div style="width:100%; height:120px; border-radius:8px; background:repeating-conic-gradient(#222 0% 25%, #2a2a2a 0% 50%) 50% / 14px 14px; display:flex; align-items:center; justify-content:center; overflow:hidden; position:relative;">
+        <img src="${item.dataUrl}" style="max-width:85%; max-height:85%; object-fit:contain; filter:drop-shadow(0 4px 10px rgba(0,0,0,0.5)); transform:rotate(${item.rot || 0}deg);" alt="Cutout">
+      </div>
+      <div style="width:100%; display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
+        <span style="font-size:12px; font-weight:600; color:var(--heading); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:90px;">${item.name || "Sticker"}</span>
+        <button type="button" class="btn sm" data-del="${item.id}" style="padding:2px 6px; font-size:11px; color:var(--muted); background:transparent; border:none;" title="Delete cutout">🗑️</button>
+      </div>
+      <button type="button" class="btn sm primary block" data-add="${item.id}" style="width:100%; padding:6px; font-size:11px; font-weight:600;">✨ Add to Reel</button>
+    `;
+    card.querySelector(`[data-add="${item.id}"]`).addEventListener("click", () => {
+      addCutoutFromDataUrl(item.dataUrl, item.name, item);
+      closeCutoutModal();
+    });
+    card.querySelector(`[data-del="${item.id}"]`).addEventListener("click", (e) => {
+      e.stopPropagation();
+      const updated = getSavedCutouts().filter(x => x.id !== item.id);
+      saveSavedCutouts(updated);
+      renderIgTray();
+      toast("Cutout removed from tray.");
+    });
+    grid.appendChild(card);
+  });
+}
+
+function addCutoutFromDataUrl(dataUrl, name, opts = {}){
+  const img = new Image();
+  img.onload = () => {
+    const start = clamp(now(), 0, Math.max(0, TOTAL - 0.5));
+    const o = {
+      id: uid++,
+      el: img,
+      name: name || "ig-cutout.png",
+      start,
+      end: Math.min(TOTAL || 5, start + 5),
+      x: 0.5,
+      y: 0.5,
+      w: 0.42,
+      rot: opts.rot || 0,
+      shape: "none",
+      border: false,
+      cutoutHl: opts.style !== "none",
+      hlStyle: opts.style || "sticker",
+      hlColor: opts.color || "white",
+      hlHex: opts.hex || "#FFFFFF",
+      hlWidth: opts.width || 8,
+      hlBlur: opts.style === "sticker" ? 14 : 18,
+      hlOpacity: 0.95,
+      isCutout: true,
+      isIgSticker: true
+    };
+    P.overlays.push(o);
+    refresh();
+    select("overlay", o);
+    toast("✂️ Instagram Cutout Sticker stamped onto video reel!");
+  };
+  img.src = dataUrl;
+}
+
+let _igEventsBound = false;
+function initIgCutoutUI(){
+  // Style Chips
+  const styleBox = $("igStyleChips");
+  if (styleBox && !styleBox.children.length){
+    const styles = [
+      ["sticker", "🏷️ Instagram Sticker"],
+      ["glow", "✨ Neon Glow"],
+      ["pulse", "⚡ Pulse Neon"],
+      ["cyber", "🔮 Cyberpunk Dual"],
+      ["halo", "🌌 Drop Halo"],
+      ["none", "✂️ Clean Cutout"]
+    ];
+    styles.forEach(([st, lbl]) => {
+      const b = el("button", { type:"button", class:"chip" + (igState.style === st ? " on" : ""), text:lbl });
+      b.addEventListener("click", () => {
+        styleBox.querySelectorAll(".chip").forEach(x => x.classList.remove("on"));
+        b.classList.add("on");
+        igState.style = st;
+        const bOpts = $("igBorderOpts");
+        if (bOpts) bOpts.style.display = st === "none" ? "none" : "block";
+        renderIgPreview();
+      });
+      styleBox.appendChild(b);
+    });
+  }
+
+  // Color Swatches
+  const colorBox = $("igColorSwatches");
+  if (colorBox && !colorBox.children.length){
+    const colors = [
+      ["white", "#FFFFFF", "White"],
+      ["cyan", "#00E5FF", "Cyan"],
+      ["lime", "#00E676", "Lime"],
+      ["gold", "#FFD600", "Gold"],
+      ["pink", "#FF007F", "Pink"],
+      ["purple", "#D500F9", "Violet"],
+      ["red", "#FF3B30", "Red"]
+    ];
+    colors.forEach(([key, hex, name]) => {
+      const s = el("button", {
+        type:"button",
+        class:"btn sm swatch" + (igState.color === key ? " on" : ""),
+        title:name,
+        style:`width:26px;height:26px;border-radius:50%;background:${hex};padding:0;border:2px solid ${igState.color === key ? "var(--heading)" : "rgba(255,255,255,0.2)"};cursor:pointer;`
+      });
+      s.addEventListener("click", () => {
+        colorBox.querySelectorAll(".swatch").forEach(x => { x.classList.remove("on"); x.style.borderColor = "rgba(255,255,255,0.2)"; });
+        s.classList.add("on");
+        s.style.borderColor = "var(--heading)";
+        igState.color = key;
+        igState.hex = hex;
+        renderIgPreview();
+      });
+      colorBox.appendChild(s);
+    });
+  }
+
+  if (_igEventsBound) return;
+  _igEventsBound = true;
+
+  // Backdrop switcher
+  document.querySelectorAll(".ig-bg-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.querySelectorAll(".ig-bg-btn").forEach(b => b.classList.remove("on"));
+      btn.classList.add("on");
+      igState.backdrop = btn.dataset.bg;
+      if (igState.backdrop === "video" && !igSnapshotCv){
+        igSnapshotCv = captureCurrentVideoFrame();
+      }
+      renderIgPreview();
+    });
+  });
+
+  // Mode switcher (AI vs Manual)
+  const btnAi = $("btnIgModeAi");
+  const btnManual = $("btnIgModeManual");
+  const manualBox = $("igManualBox");
+  if (btnAi && btnManual && manualBox){
+    btnAi.addEventListener("click", () => {
+      btnAi.classList.add("on");
+      btnManual.classList.remove("on");
+      manualBox.style.display = "none";
+      igState.mode = "ai";
+      const pv = $("igPreviewCv");
+      if (pv) pv.style.cursor = "default";
+      const cur = $("igBrushCursor");
+      if (cur) cur.style.display = "none";
+    });
+    btnManual.addEventListener("click", () => {
+      btnManual.classList.add("on");
+      btnAi.classList.remove("on");
+      manualBox.style.display = "block";
+      igState.mode = "manual";
+      toast("✂️ Manual selection active! Paint with brush to keep, or use eraser.");
+    });
+  }
+
+  // Tool switcher
+  const btnBrush = $("btnIgToolBrush");
+  const btnErase = $("btnIgToolErase");
+  const btnKey = $("btnIgToolKey");
+  const keyTolRow = $("igKeyTolRow");
+  const brushRow = $("igBrushRow");
+  const setTool = (tool) => {
+    igState.tool = tool;
+    document.querySelectorAll(".ig-tool-btn").forEach(b => b.classList.remove("on"));
+    if (tool === "brush" && btnBrush) btnBrush.classList.add("on");
+    if (tool === "erase" && btnErase) btnErase.classList.add("on");
+    if (tool === "colorKey" && btnKey) btnKey.classList.add("on");
+    if (keyTolRow) keyTolRow.style.display = tool === "colorKey" ? "block" : "none";
+    if (brushRow) brushRow.style.display = tool === "colorKey" ? "none" : "block";
+    const pv = $("igPreviewCv");
+    if (pv) pv.style.cursor = tool === "colorKey" ? "crosshair" : "none";
+  };
+  if (btnBrush) btnBrush.addEventListener("click", () => setTool("brush"));
+  if (btnErase) btnErase.addEventListener("click", () => setTool("erase"));
+  if (btnKey) btnKey.addEventListener("click", () => setTool("colorKey"));
+
+  // Sliders
+  const slBrush = $("igBrushSize");
+  if (slBrush) slBrush.addEventListener("input", e => {
+    igState.brushSize = +e.target.value;
+    const v = $("igBrushSizeVal"); if (v) v.textContent = e.target.value + " px";
+  });
+  const slFeather = $("igFeather");
+  if (slFeather) slFeather.addEventListener("input", e => {
+    igState.feather = +e.target.value;
+    const v = $("igFeatherVal"); if (v) v.textContent = e.target.value + " px";
+    renderIgPreview();
+  });
+  const slTol = $("igKeyTol");
+  if (slTol) slTol.addEventListener("input", e => {
+    igState.keyTol = +e.target.value;
+    const v = $("igKeyTolVal"); if (v) v.textContent = Math.round(+e.target.value * 100) + "%";
+  });
+  const slBorder = $("igBorderWidth");
+  if (slBorder) slBorder.addEventListener("input", e => {
+    igState.borderWidth = +e.target.value;
+    const v = $("igBorderWidthVal"); if (v) v.textContent = e.target.value + " px";
+    renderIgPreview();
+  });
+  const slAngle = $("igAngle");
+  if (slAngle) slAngle.addEventListener("input", e => {
+    igState.angle = +e.target.value;
+    const v = $("igAngleVal"); if (v) v.textContent = e.target.value + "°";
+    renderIgPreview();
+  });
+  document.querySelectorAll(".ig-tilt-btn").forEach(btn => {
+    btn.addEventListener("click", () => {
+      igState.angle = +btn.dataset.deg;
+      if (slAngle) slAngle.value = igState.angle;
+      const v = $("igAngleVal"); if (v) v.textContent = igState.angle + "°";
+      renderIgPreview();
+    });
+  });
+
+  // Invert / Reset / Clear
+  const btnInvert = $("btnIgInvert");
+  if (btnInvert) btnInvert.addEventListener("click", () => {
+    if (!igEditCv) return;
+    const ectx = igEditCv.getContext("2d");
+    const imgData = ectx.getImageData(0, 0, igEditCv.width, igEditCv.height);
+    const d = imgData.data;
+    for (let i = 0; i < d.length; i += 4){
+      d[i + 3] = 255 - d[i + 3];
+    }
+    ectx.putImageData(imgData, 0, 0);
+    renderIgPreview();
+    toast("Mask inverted.");
+  });
+
+  const btnReset = $("btnIgResetMask");
+  if (btnReset) btnReset.addEventListener("click", () => {
+    if (!igMaskCv || !igEditCv) return;
+    const ectx = igEditCv.getContext("2d");
+    ectx.clearRect(0, 0, igEditCv.width, igEditCv.height);
+    ectx.drawImage(igMaskCv, 0, 0);
+    renderIgPreview();
+    toast("Mask reset to AI extraction.");
+  });
+
+  const btnClear = $("btnIgClearMask");
+  if (btnClear) btnClear.addEventListener("click", () => {
+    if (!igEditCv) return;
+    const ectx = igEditCv.getContext("2d");
+    ectx.clearRect(0, 0, igEditCv.width, igEditCv.height);
+    renderIgPreview();
+    toast("Mask cleared. Paint with brush to include areas.");
+  });
+
+  // Canvas drawing & pointer interactions
+  const pv = $("igPreviewCv");
+  if (pv){
+    pv.addEventListener("pointerdown", e => {
+      if (igState.mode !== "manual") return;
+      const pt = getIgCanvasCoords(e);
+      if (igState.tool === "colorKey"){
+        igApplyColorKeyAt(pt.x, pt.y);
+        return;
+      }
+      igState.drawing = true;
+      igState.lastX = pt.x;
+      igState.lastY = pt.y;
+      pv.setPointerCapture(e.pointerId);
+      igPaintStroke(pt.x, pt.y, pt.x, pt.y);
+      renderIgPreview();
+    });
+
+    pv.addEventListener("pointermove", e => {
+      updateIgBrushCursor(e);
+      if (!igState.drawing || igState.mode !== "manual") return;
+      const pt = getIgCanvasCoords(e);
+      igPaintStroke(igState.lastX, igState.lastY, pt.x, pt.y);
+      igState.lastX = pt.x;
+      igState.lastY = pt.y;
+      renderIgPreview();
+    });
+
+    const stopDraw = () => { igState.drawing = false; };
+    pv.addEventListener("pointerup", stopDraw);
+    pv.addEventListener("pointercancel", stopDraw);
+  }
+
+  const vp = $("igCanvasViewport");
+  if (vp){
+    vp.addEventListener("pointerleave", () => {
+      const cur = $("igBrushCursor");
+      if (cur) cur.style.display = "none";
+    });
+  }
+
+  // File picker
+  const fileInp = $("igFileInput");
+  if (fileInp){
+    fileInp.addEventListener("change", async e => {
+      const file = e.target.files && e.target.files[0];
+      e.target.value = "";
+      if (!file) return;
+      if (file.type && file.type.startsWith("video/")){
+        const vid = document.createElement("video");
+        vid.crossOrigin = "anonymous"; vid.playsInline = true; vid.muted = true; vid.src = URL.createObjectURL(file);
+        await new Promise(r => { vid.onloadeddata = r; vid.onerror = r; });
+        vid.currentTime = 0.1;
+        await new Promise(r => { vid.onseeked = r; vid.onerror = r; });
+        loadIgSource(vid, file.name);
+      } else {
+        const img = await loadImage(file);
+        loadIgSource(img, file.name);
+      }
+    });
+  }
+
+  // Frame capture button
+  const btnFrame = $("btnIgFromFrame");
+  if (btnFrame){
+    btnFrame.addEventListener("click", () => {
+      const frameCv = captureCurrentVideoFrame();
+      if (frameCv){
+        loadIgSource(frameCv, "video-frame.png");
+        toast("🎬 Captured frame at playhead into Cutout Studio.");
+      } else {
+        toast("No active clip on timeline at playhead.");
+      }
+    });
+  }
+
+  // Action buttons
+  const btnAdd = $("btnIgAddToVideo");
+  if (btnAdd) btnAdd.addEventListener("click", addIgStickerToTimeline);
+
+  const btnSave = $("btnIgSaveToTray");
+  if (btnSave) btnSave.addEventListener("click", saveIgCurrentToTray);
+
+  const btnDl = $("btnIgDownloadPng");
+  if (btnDl) btnDl.addEventListener("click", downloadIgStickerPng);
+
+  // Tab switching
+  const btnTrayTab = $("btnIgTrayTab");
+  const btnCreateTab = $("btnIgCreateTab");
+  const cView = $("igCutoutCreatorView");
+  const tView = $("igCutoutTrayView");
+
+  if (btnTrayTab && btnCreateTab && cView && tView){
+    btnTrayTab.addEventListener("click", () => {
+      cView.style.display = "none";
+      tView.style.display = "block";
+      btnTrayTab.style.display = "none";
+      btnCreateTab.style.display = "inline-block";
+      renderIgTray();
+    });
+    btnCreateTab.addEventListener("click", () => {
+      tView.style.display = "none";
+      cView.style.display = "flex";
+      btnCreateTab.style.display = "none";
+      btnTrayTab.style.display = "inline-block";
+      renderIgPreview();
+    });
+  }
+
+  const btnCreateNew = $("btnIgCreateNew");
+  const btnCreateFirst = $("btnIgCreateFirst");
+  const goToCreator = () => { if (btnCreateTab) btnCreateTab.click(); };
+  if (btnCreateNew) btnCreateNew.addEventListener("click", goToCreator);
+  if (btnCreateFirst) btnCreateFirst.addEventListener("click", goToCreator);
+
+  // Close modal
+  const btnClose = $("igCutoutClose");
+  if (btnClose) btnClose.addEventListener("click", closeCutoutModal);
+  const modal = $("igCutoutModal");
+  if (modal){
+    modal.addEventListener("click", e => {
+      if (e.target.id === "igCutoutModal") closeCutoutModal();
+    });
+  }
+}
+
+async function openCutoutModal(openTrayDirectly = false, existingOverlay = null){
+  const modal = $("igCutoutModal");
+  if (!modal) return;
+  pause();
+
+  const cView = $("igCutoutCreatorView");
+  const tView = $("igCutoutTrayView");
+  const btnTray = $("btnIgTrayTab");
+  const btnCreate = $("btnIgCreateTab");
+
+  initIgCutoutUI();
+
+  if (openTrayDirectly){
+    if (cView) cView.style.display = "none";
+    if (tView) tView.style.display = "block";
+    if (btnTray) btnTray.style.display = "none";
+    if (btnCreate) btnCreate.style.display = "inline-block";
+    renderIgTray();
+    modal.hidden = false;
+    return;
+  }
+
+  if (cView) cView.style.display = "flex";
+  if (tView) tView.style.display = "none";
+  if (btnTray) btnTray.style.display = "inline-block";
+  if (btnCreate) btnCreate.style.display = "none";
+  modal.hidden = false;
+
+  igSnapshotCv = captureCurrentVideoFrame();
+
+  if (existingOverlay && existingOverlay.el){
+    igState.style = existingOverlay.hlStyle || "sticker";
+    igState.color = existingOverlay.hlColor || "white";
+    igState.hex = existingOverlay.hlHex || "#FFFFFF";
+    igState.borderWidth = existingOverlay.hlWidth || 8;
+    igState.angle = existingOverlay.rot || 0;
+    await loadIgSource(existingOverlay.el, existingOverlay.name || "cutout.png");
+  } else if (!igState.srcLoaded){
+    const frameCv = captureCurrentVideoFrame();
+    if (frameCv){
+      await loadIgSource(frameCv, "video-frame.png");
+    } else {
+      const fInp = $("igFileInput");
+      if (fInp) fInp.click();
+    }
+  } else {
+    renderIgPreview();
+  }
+}
+
+function closeCutoutModal(){
+  const modal = $("igCutoutModal");
+  if (modal) modal.hidden = true;
+}
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape" && !e.defaultPrevented && $("igCutoutModal") && !$("igCutoutModal").hidden){
+    e.preventDefault();
+    closeCutoutModal();
+  }
+});
+
+
 /* ---------- graphics on top: emoji, stickers, shapes, arrows, badges ----------
   P.overlays item, kind "gfx" (on the "On top" track, saved in projects as plain data):
     { id, kind:"gfx", g, start, end, x, y (centre, 0 to 1), size (scale), op (opacity 0 to 1),
@@ -9425,6 +10584,7 @@ function openAddMenu(anchor){
   const grid = kids => el("div", { class:"add-grid2" }, kids);
   addPop = el("div", { class:"add-pop", role:"menu", "aria-label":"Add to the video" }, [
     el("h3", { text:"Text" }), grid([item("Text", () => { const { W, H } = geo(); seAddTextAt(W / 2, H * .4); }), item("Text styles", () => openTexts()), item("Badge", () => gfxAdd("pill"))]),
+    el("h3", { text:"Cutouts & Stickers (Instagram)" }), grid([item("✂️ Create Cutout", () => openCutoutModal(false)), item("🗂️ Your Cutouts Tray", () => openCutoutModal(true))]),
     el("h3", { text:"Emoji" }), el("div", { class:"ws-emos" }, WS_EMOJI.map(em => el("button", { type:"button", class:"ws-emo", role:"menuitem", "aria-label":"Add " + em, text:em, onclick:pick(() => gfxAdd("emoji", em)) }))),
     el("h3", { text:"Stickers" }), grid(GFX_STICKERS.map(([k, l]) => item(l, () => gfxAdd("sticker", k)))),
     el("h3", { text:"Shapes" }), grid(GFX_SHAPES.map(([k, l]) => item(l, () => gfxAdd("shape", k)))),
@@ -11061,23 +12221,28 @@ if (EMBED){
         const o = {
           id: uid++,
           el: img,
-          name: "cutout.png",
+          name: m.name || "cutout.png",
           start,
           end: Math.min(TOTAL || 4, start + 4),
           x: .5,
           y: .5,
           w: .45,
+          rot: m.rot || 0,
           shape: "none",
           border: false,
           cutoutHl: m.cutoutHl ?? true,
-          hlStyle: m.hlStyle || "glow",
-          hlColor: m.hlColor || "cyan",
-          hlWidth: m.hlWidth || 6,
-          hlBlur: m.hlBlur || 18,
-          hlOpacity: 0.9
+          hlStyle: m.hlStyle || "sticker",
+          hlColor: m.hlColor || "white",
+          hlHex: m.hlHex || "#FFFFFF",
+          hlWidth: m.hlWidth || 8,
+          hlBlur: 14,
+          hlOpacity: 0.95,
+          isCutout: true,
+          isIgSticker: true
         };
         P.overlays.push(o); refresh(); select("overlay", o);
-        toast("✂️ AI Cutout added with Cutout Highlight.");
+        if (typeof saveCutoutToTray === "function") saveCutoutToTray(o);
+        toast("✂️ Instagram Cutout Sticker added to reel!");
       };
       img.src = m.dataUrl;
     }
@@ -11097,17 +12262,22 @@ if (EMBED){
           x: .5,
           y: .5,
           w: .55,
+          rot: m.rot || 0,
           shape: "none",
           border: false,
           cutoutHl: m.cutoutHl ?? true,
-          hlStyle: m.hlStyle || "glow",
-          hlColor: m.hlColor || "cyan",
-          hlWidth: m.hlWidth || 6,
-          hlBlur: m.hlBlur || 18,
-          hlOpacity: 0.9
+          hlStyle: m.hlStyle || "sticker",
+          hlColor: m.hlColor || "white",
+          hlHex: m.hlHex || "#FFFFFF",
+          hlWidth: m.hlWidth || 8,
+          hlBlur: 14,
+          hlOpacity: 0.95,
+          isCutout: true,
+          isIgSticker: true
         };
         P.overlays.push(o); refresh(); select("overlay", o);
-        toast("🎬 AI Video Cutout added with Cutout Highlight.");
+        if (typeof saveCutoutToTray === "function") saveCutoutToTray(o);
+        toast("🎬 Instagram Video Cutout Sticker added to reel!");
       };
       vid.src = srcUrl;
     }

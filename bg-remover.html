@@ -418,8 +418,9 @@
             <div class="ctl">
               <label>Highlight Style</label>
               <select id="selHlStyle">
+                <option value="sticker">🏷️ Instagram Sticker (White Border + Shadow)</option>
                 <option value="glow">✨ Neon Glow</option>
-                <option value="solid">🏷️ Solid Stroke (Sticker)</option>
+                <option value="solid">🏷️ Solid Stroke</option>
                 <option value="cyber">🔮 Cyberpunk Dual</option>
                 <option value="halo">🌌 Soft Halo</option>
               </select>
@@ -1205,14 +1206,26 @@ function drawCutoutGlow(targetCtx, cutSrc, w, h, cfg){
   const blurR = cfg.blur || 18;
 
   targetCtx.save();
-  if (style === 'solid'){
-    targetCtx.shadowColor = 'rgba(0,0,0,0.4)';
-    targetCtx.shadowBlur = 4;
-    const steps = 16;
+  if (style === 'sticker' || style === 'solid'){
+    targetCtx.shadowColor = 'rgba(0,0,0,0.42)';
+    targetCtx.shadowBlur = Math.max(6, strokeW * 1.4);
+    targetCtx.shadowOffsetY = Math.max(3, strokeW * 0.7);
+    const steps = 24;
     for (let i = 0; i < steps; i++){
       const ang = (i / steps) * Math.PI * 2;
       targetCtx.drawImage(_bgHlCv, Math.cos(ang) * strokeW, Math.sin(ang) * strokeW, w, h);
     }
+    targetCtx.shadowColor = 'transparent';
+    const fillSteps = Math.max(1, Math.floor(strokeW / 2.5));
+    for (let s = 1; s < fillSteps; s++){
+      const curR = (s / fillSteps) * strokeW;
+      const count = Math.max(8, Math.floor(steps * (curR / strokeW)));
+      for (let i = 0; i < count; i++){
+        const ang = (i / count) * Math.PI * 2;
+        targetCtx.drawImage(_bgHlCv, Math.cos(ang) * curR, Math.sin(ang) * curR, w, h);
+      }
+    }
+    targetCtx.drawImage(_bgHlCv, 0, 0, w, h);
   } else if (style === 'cyber'){
     targetCtx.shadowColor = '#FF007F';
     targetCtx.shadowBlur = blurR * 2;
