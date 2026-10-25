@@ -407,6 +407,45 @@
           </div>
         </div>
         <div>
+          <h3>✨ Cutout Highlight</h3>
+          <div class="ctl">
+            <label class="toggle-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="chkCutoutHl" />
+              <span style="font-weight:600">Glowing outline on cutout</span>
+            </label>
+          </div>
+          <div id="cutoutHlOptions" style="display:none;margin-top:8px">
+            <div class="ctl">
+              <label>Highlight Style</label>
+              <select id="selHlStyle">
+                <option value="glow">✨ Neon Glow</option>
+                <option value="solid">🏷️ Solid Stroke (Sticker)</option>
+                <option value="cyber">🔮 Cyberpunk Dual</option>
+                <option value="halo">🌌 Soft Halo</option>
+              </select>
+            </div>
+            <div class="ctl">
+              <label>Colour</label>
+              <div class="swatches" id="hlSwatches" style="display:flex;gap:6px;flex-wrap:wrap">
+                <button type="button" class="swatch active" data-color="#00E5FF" style="background:#00E5FF" title="Cyan"></button>
+                <button type="button" class="swatch" data-color="#00E676" style="background:#00E676" title="Lime"></button>
+                <button type="button" class="swatch" data-color="#FFD700" style="background:#FFD700" title="Gold"></button>
+                <button type="button" class="swatch" data-color="#FF2D55" style="background:#FF2D55" title="Pink"></button>
+                <button type="button" class="swatch" data-color="#FFFFFF" style="background:#FFFFFF" title="White"></button>
+                <input type="color" id="hlCustomColor" value="#00E5FF" style="width:32px;height:32px;border-radius:50%;cursor:pointer;border:none;padding:0" title="Custom color" />
+              </div>
+            </div>
+            <div class="ctl">
+              <label>Thickness <b id="vHlWidth">6</b>px</label>
+              <input type="range" id="rHlWidth" min="1" max="25" step="1" value="6" />
+            </div>
+            <div class="ctl">
+              <label>Glow Blur <b id="vHlBlur">18</b>px</label>
+              <input type="range" id="rHlBlur" min="0" max="40" step="1" value="18" />
+            </div>
+          </div>
+        </div>
+        <div>
           <h3>Export</h3>
           <div class="ctl">
             <label>Format</label>
@@ -1137,6 +1176,73 @@ function fitCanvas() {
   canvas.height = Math.max(1, Math.round(it.h * s));
 }
 
+let cutoutHl = { enabled: false, style: 'glow', color: '#00E5FF', width: 6, blur: 18 };
+let _bgHlCv = null, _bgHlCtx = null;
+
+function drawCutoutGlow(targetCtx, cutSrc, w, h, cfg){
+  if (!cutSrc || !cfg || !cfg.enabled) return;
+  if (!_bgHlCv){
+    _bgHlCv = document.createElement('canvas');
+    _bgHlCtx = _bgHlCv.getContext('2d', { willReadFrequently: true });
+  }
+  if (_bgHlCv.width !== w || _bgHlCv.height !== h){
+    _bgHlCv.width = w; _bgHlCv.height = h;
+  }
+  _bgHlCtx.clearRect(0, 0, w, h);
+  try {
+    _bgHlCtx.drawImage(cutSrc, 0, 0, w, h);
+  } catch(e){ return; }
+
+  const colHex = cfg.color || '#00E5FF';
+  _bgHlCtx.save();
+  _bgHlCtx.globalCompositeOperation = 'source-in';
+  _bgHlCtx.fillStyle = colHex;
+  _bgHlCtx.fillRect(0, 0, w, h);
+  _bgHlCtx.restore();
+
+  const style = cfg.style || 'glow';
+  const strokeW = cfg.width || 6;
+  const blurR = cfg.blur || 18;
+
+  targetCtx.save();
+  if (style === 'solid'){
+    targetCtx.shadowColor = 'rgba(0,0,0,0.4)';
+    targetCtx.shadowBlur = 4;
+    const steps = 16;
+    for (let i = 0; i < steps; i++){
+      const ang = (i / steps) * Math.PI * 2;
+      targetCtx.drawImage(_bgHlCv, Math.cos(ang) * strokeW, Math.sin(ang) * strokeW, w, h);
+    }
+  } else if (style === 'cyber'){
+    targetCtx.shadowColor = '#FF007F';
+    targetCtx.shadowBlur = blurR * 2;
+    targetCtx.drawImage(_bgHlCv, 0, 0, w, h);
+    targetCtx.shadowColor = colHex;
+    targetCtx.shadowBlur = strokeW * 1.5;
+    for (let i = 0; i < 8; i++){
+      const ang = (i / 8) * Math.PI * 2;
+      targetCtx.drawImage(_bgHlCv, Math.cos(ang) * strokeW, Math.sin(ang) * strokeW, w, h);
+    }
+  } else if (style === 'halo'){
+    targetCtx.shadowColor = colHex;
+    targetCtx.shadowBlur = blurR * 2.4;
+    targetCtx.shadowOffsetY = 6;
+    targetCtx.drawImage(_bgHlCv, 0, 0, w, h);
+  } else {
+    // glow
+    targetCtx.shadowColor = colHex;
+    targetCtx.shadowBlur = blurR;
+    const d = Math.max(1, strokeW * 0.5);
+    targetCtx.drawImage(_bgHlCv, -d, 0, w, h);
+    targetCtx.drawImage(_bgHlCv, d, 0, w, h);
+    targetCtx.drawImage(_bgHlCv, 0, -d, w, h);
+    targetCtx.drawImage(_bgHlCv, 0, d, w, h);
+    targetCtx.shadowBlur = blurR * 1.6;
+    targetCtx.drawImage(_bgHlCv, 0, 0, w, h);
+  }
+  targetCtx.restore();
+}
+
 function drawBackground(c, w, h, it) {
   if (bgMode === 'transparent') {
     const s = 24;
@@ -1175,6 +1281,7 @@ async function renderVideoFrame(it) {
 
   drawBackground(ctx, w, h, it);
 
+  let cutCv = null;
   if (it.videoMode === 'ai' && currentSegmentationMask) {
     if (!tempVidCanvas || tempVidCanvas.width !== w || tempVidCanvas.height !== h) {
       tempVidCanvas = document.createElement('canvas');
@@ -1192,13 +1299,17 @@ async function renderVideoFrame(it) {
     tempVidCtx.drawImage(currentSegmentationMask, 0, 0, w, h);
     tempVidCtx.restore();
 
-    ctx.drawImage(tempVidCanvas, 0, 0, w, h);
+    cutCv = tempVidCanvas;
   } else if (it.videoMode === 'chroma') {
-    const keyed = applyVideoChromaKey(v, w, h, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
-    ctx.drawImage(keyed, 0, 0, w, h);
+    cutCv = applyVideoChromaKey(v, w, h, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
   } else {
-    ctx.drawImage(v, 0, 0, w, h);
+    cutCv = v;
   }
+
+  if (cutoutHl.enabled && cutCv) {
+    drawCutoutGlow(ctx, cutCv, w, h, cutoutHl);
+  }
+  if (cutCv) ctx.drawImage(cutCv, 0, 0, w, h);
 
   if (it.beforeVidEl && Math.abs(it.beforeVidEl.currentTime - v.currentTime) > 0.06) {
     it.beforeVidEl.currentTime = v.currentTime;
@@ -1255,6 +1366,9 @@ function renderActive() {
     $('btnCopy').style.display = '';
 
     drawBackground(ctx, canvas.width, canvas.height, it);
+    if (cutoutHl.enabled && it.refCanvas) {
+      drawCutoutGlow(ctx, it.refCanvas, canvas.width, canvas.height, cutoutHl);
+    }
     ctx.drawImage(it.refCanvas, 0, 0, canvas.width, canvas.height);
     beforeImg.src = it.beforeUrl;
     $('metaLine').textContent = `${it.name} — ${it.w}×${it.h}px (Photo)`;
@@ -1580,6 +1694,57 @@ $('btnSendPost').addEventListener('click', () => {
   }
 });
 
+$('chkCutoutHl').addEventListener('change', (e) => {
+  cutoutHl.enabled = e.target.checked;
+  $('cutoutHlOptions').style.display = cutoutHl.enabled ? 'block' : 'none';
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
+});
+
+$('selHlStyle').addEventListener('change', (e) => {
+  cutoutHl.style = e.target.value;
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
+});
+
+$('rHlWidth').addEventListener('input', () => {
+  cutoutHl.width = +$('rHlWidth').value;
+  $('vHlWidth').textContent = $('rHlWidth').value;
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
+});
+
+$('rHlBlur').addEventListener('input', () => {
+  cutoutHl.blur = +$('rHlBlur').value;
+  $('vHlBlur').textContent = $('rHlBlur').value;
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
+});
+
+document.querySelectorAll('#hlSwatches .swatch').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#hlSwatches .swatch').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    cutoutHl.color = btn.dataset.color;
+    $('hlCustomColor').value = cutoutHl.color;
+    const it = active();
+    if (it && it.type === 'video') renderVideoFrame(it);
+    else renderActive();
+  });
+});
+
+$('hlCustomColor').addEventListener('input', (e) => {
+  document.querySelectorAll('#hlSwatches .swatch').forEach(b => b.classList.remove('active'));
+  cutoutHl.color = e.target.value;
+  const it = active();
+  if (it && it.type === 'video') renderVideoFrame(it);
+  else renderActive();
+});
+
 $('btnSendVideo').addEventListener('click', () => {
   const it = active();
   if (!it || it.status !== 'done') { alert('Select a finished item first.'); return; }
@@ -1588,7 +1753,12 @@ $('btnSendVideo').addEventListener('click', () => {
       window.parent.postMessage({
         girika: 'video-cutout',
         blob: it.file,
-        name: it.name
+        name: it.name,
+        cutoutHl: cutoutHl.enabled,
+        hlStyle: cutoutHl.style,
+        hlColor: cutoutHl.color,
+        hlWidth: cutoutHl.width,
+        hlBlur: cutoutHl.blur
       }, '*');
     } else {
       window.open('video.html', '_blank');
@@ -1596,7 +1766,16 @@ $('btnSendVideo').addEventListener('click', () => {
   } else {
     const dataUrl = it.refCanvas.toDataURL('image/png');
     if (window.parent && window.parent !== window){
-      window.parent.postMessage({ girika: 'cutout', target: 'video', dataUrl }, '*');
+      window.parent.postMessage({
+        girika: 'cutout',
+        target: 'video',
+        dataUrl,
+        cutoutHl: cutoutHl.enabled,
+        hlStyle: cutoutHl.style,
+        hlColor: cutoutHl.color,
+        hlWidth: cutoutHl.width,
+        hlBlur: cutoutHl.blur
+      }, '*');
     } else {
       localStorage.setItem('rs-last-cutout', dataUrl);
       window.open('video.html', '_blank');

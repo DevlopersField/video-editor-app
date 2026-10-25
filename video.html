@@ -530,7 +530,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="8.5" cy="9" r="1.6"/><path d="M21 16l-5-5-8 9"/></svg>Photos<input type="file" id="addPhotos" accept="image/*" multiple></label>
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="14" height="14" rx="2"/><path d="M17 10l4-2v8l-4-2"/></svg>Video clips<input type="file" id="addVideos" accept="video/*" multiple></label>
         <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M12 4v16"/></svg>Before / after<input type="file" id="addCompare" accept="image/*" multiple></label>
-        <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1"/></svg>Image on top<input type="file" id="addOverlay" accept="image/*"></label>
+        <label class="btn upload"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><rect x="12" y="12" width="7" height="7" rx="1"/></svg>Cutout / Image<input type="file" id="addOverlay" accept="image/*,video/*,.webm,.mp4,.mov"></label>
       </div>
       <p class="hint">Before / after: select 2 photos together, before first.</p>
       <div class="row" style="margin-top:10px"><button class="btn sm dark" id="openScenes">Motion scenes</button><button class="btn sm" id="openReels">Reel templates</button><button class="btn sm" id="openTexts">Text and titles</button></div>
@@ -1799,6 +1799,126 @@ function smCutout(src, mask, w, h){
   _smCutCtx.restore();
   return _smCutCv;
 }
+/* ---------------- Cutout Highlight Engine: Glowing neon outlines & sticker strokes ---------------- */
+let _hlCv = null, _hlCtx = null;
+const CUTOUT_HL_COLORS = {
+  cyan: "#00E5FF",
+  lime: "#00E676",
+  gold: "#FFD700",
+  pink: "#FF2D55",
+  purple: "#D500F9",
+  red: "#FF3B30",
+  white: "#FFFFFF",
+  clay: "#FF6D00",
+  blue: "#2979FF"
+};
+
+function drawCutoutHighlight(c, src, x, y, w, h, u, t, cfg){
+  if (!src || !cfg) return;
+  w = Math.max(1, Math.round(w));
+  h = Math.max(1, Math.round(h));
+  if (!_hlCv){
+    _hlCv = document.createElement("canvas");
+    _hlCtx = _hlCv.getContext("2d", { willReadFrequently: true });
+  }
+  if (_hlCv.width !== w || _hlCv.height !== h){
+    _hlCv.width = w;
+    _hlCv.height = h;
+  }
+  _hlCtx.clearRect(0, 0, w, h);
+  const sw = src.naturalWidth || src.videoWidth || src.width || w;
+  const sh = src.naturalHeight || src.videoHeight || src.height || h;
+  try {
+    if (src instanceof HTMLCanvasElement){
+      _hlCtx.drawImage(src, 0, 0, w, h);
+    } else {
+      cover(_hlCtx, src, sw, sh, 0, 0, w, h);
+    }
+  } catch(e){
+    return;
+  }
+
+  const colKey = cfg.hlColor || "cyan";
+  const colHex = (colKey === "custom" && cfg.hlHex) ? cfg.hlHex : (CUTOUT_HL_COLORS[colKey] || cfg.hlHex || "#00E5FF");
+
+  // Create solid colored silhouette matching cutout alpha
+  _hlCtx.save();
+  _hlCtx.globalCompositeOperation = "source-in";
+  _hlCtx.fillStyle = colHex;
+  _hlCtx.fillRect(0, 0, w, h);
+  _hlCtx.restore();
+
+  const style = cfg.hlStyle || "glow";
+  const strokeW = Math.max(1, (cfg.hlWidth ?? 6) * u);
+  const blurR = Math.max(0, (cfg.hlBlur ?? 18) * u);
+  const baseAlpha = clamp(cfg.hlOpacity ?? 0.9, 0.1, 1);
+
+  c.save();
+  if (style === "pulse"){
+    const spd = cfg.hlSpeed || 4.5;
+    const pulse = 0.5 + 0.5 * Math.sin((t || 0) * spd);
+    const curBlur = blurR * (0.65 + 0.7 * pulse);
+    const curAlpha = baseAlpha * (0.7 + 0.3 * pulse);
+    const d = Math.max(1, strokeW * (0.4 + 0.4 * pulse));
+    c.globalAlpha = curAlpha;
+    c.shadowColor = colHex;
+    c.shadowBlur = curBlur;
+    c.drawImage(_hlCv, x - d, y, w, h);
+    c.drawImage(_hlCv, x + d, y, w, h);
+    c.drawImage(_hlCv, x, y - d, w, h);
+    c.drawImage(_hlCv, x, y + d, w, h);
+    c.shadowBlur = curBlur * 1.8;
+    c.drawImage(_hlCv, x, y, w, h);
+  } else if (style === "solid"){
+    c.globalAlpha = baseAlpha;
+    c.shadowColor = "rgba(0,0,0,0.4)";
+    c.shadowBlur = 4 * u;
+    const numSteps = 16;
+    for (let i = 0; i < numSteps; i++){
+      const ang = (i / numSteps) * Math.PI * 2;
+      c.drawImage(_hlCv, x + Math.cos(ang) * strokeW, y + Math.sin(ang) * strokeW, w, h);
+    }
+    if (strokeW > 3 * u){
+      for (let i = 0; i < 8; i++){
+        const ang = (i / 8) * Math.PI * 2;
+        c.drawImage(_hlCv, x + Math.cos(ang) * (strokeW * 0.5), y + Math.sin(ang) * (strokeW * 0.5), w, h);
+      }
+    }
+  } else if (style === "cyber"){
+    const secCol = cfg.hlSecColor || (colHex === "#00E5FF" ? "#FF007F" : (colHex === "#00E676" ? "#00E5FF" : "#FF007F"));
+    c.globalAlpha = baseAlpha * 0.85;
+    c.shadowColor = secCol;
+    c.shadowBlur = blurR * 2.2;
+    c.drawImage(_hlCv, x, y, w, h);
+    c.drawImage(_hlCv, x, y, w, h);
+    c.shadowColor = colHex;
+    c.shadowBlur = strokeW * 1.5;
+    for (let i = 0; i < 8; i++){
+      const ang = (i / 8) * Math.PI * 2;
+      c.drawImage(_hlCv, x + Math.cos(ang) * strokeW, y + Math.sin(ang) * strokeW, w, h);
+    }
+  } else if (style === "halo"){
+    c.globalAlpha = baseAlpha * 0.85;
+    c.shadowColor = colHex;
+    c.shadowBlur = blurR * 2.4;
+    c.shadowOffsetY = 8 * u;
+    c.drawImage(_hlCv, x, y, w, h);
+    c.drawImage(_hlCv, x, y + 3 * u, w, h);
+  } else {
+    // "glow" (Neon Glow default)
+    c.globalAlpha = baseAlpha;
+    c.shadowColor = colHex;
+    c.shadowBlur = blurR;
+    const d = Math.max(1, strokeW * 0.5);
+    c.drawImage(_hlCv, x - d, y, w, h);
+    c.drawImage(_hlCv, x + d, y, w, h);
+    c.drawImage(_hlCv, x, y - d, w, h);
+    c.drawImage(_hlCv, x, y + d, w, h);
+    c.shadowBlur = blurR * 1.6;
+    c.drawImage(_hlCv, x, y, w, h);
+  }
+  c.restore();
+}
 function smClipsForRange(start, end){
   return SEQ.filter(c => (c.kind === "video" || c.kind === "image") && c._start < end && c._start + c.dur > start);
 }
@@ -2733,7 +2853,15 @@ function drawOutro(c, t){
 }
 
 /* overlays, watermark, captions */
-function overlayRect(o){ if (o.kind === "text" || o.kind === "gfx") return o._rect || { x:0, y:0, w:0, h:0 }; const { W, H } = geo(); const w = o.w * W, ar = o.el.naturalHeight / o.el.naturalWidth || 1, h = o.shape === "circle" ? w : w * ar; return { x:o.x * W - w / 2, y:o.y * H - h / 2, w, h }; }
+function overlayRect(o){
+  if (o.kind === "text" || o.kind === "gfx") return o._rect || { x:0, y:0, w:0, h:0 };
+  const { W, H } = geo();
+  const nw = o.el.naturalWidth || o.el.videoWidth || 1;
+  const nh = o.el.naturalHeight || o.el.videoHeight || 1;
+  const ar = nh / nw || 1;
+  const w = o.w * W, h = o.shape === "circle" ? w : w * ar;
+  return { x:o.x * W - w / 2, y:o.y * H - h / 2, w, h };
+}
 function drawOverlay(c, o, t){
   if (o.kind === "text"){ drawTextOverlay(c, o, t); return; }
   if (o.kind === "gfx"){ drawGfx(c, o, t); return; }
@@ -2742,15 +2870,38 @@ function drawOverlay(c, o, t){
   const r = overlayRect(o), sc = .96 + .04 * ease(fadeIn), cx = r.x + r.w / 2, cy = r.y + r.h / 2;
   c.save(); c.globalAlpha = a; c.translate(cx, cy); c.scale(sc, sc); c.translate(-cx, -cy);
   if (o.blendMode && o.blendMode !== "source-over") c.globalCompositeOperation = o.blendMode;
+
+  if (o.el && o.el.tagName === "VIDEO"){
+    const relT = clamp(t - o.start, 0, o.el.duration || 4);
+    if (playing){
+      if (o.el.paused) o.el.play().catch(() => {});
+    } else {
+      if (!o.el.paused) o.el.pause();
+      if (Math.abs(o.el.currentTime - relT) > 0.08) o.el.currentTime = relT;
+    }
+  }
+
+  // Cutout Highlight (glowing outline, sticker stroke, neon glow)
+  if (o.cutoutHl){
+    const srcToHl = o.chromaKey ?
+      applyChromaKey(o.el, r.w, r.h, o.keyColor || "#00FF00", o.keyTol ?? 0.36, o.keyFeather ?? 0.14) :
+      o.el;
+    drawCutoutHighlight(c, srcToHl, r.x, r.y, r.w, r.h, u, t, o);
+  }
+
   const rad = o.shape === "circle" ? r.w / 2 : o.shape === "rounded" ? 24 * u : 0;
-  if (o.border){ c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 30 * u; c.shadowOffsetY = 10 * u; c.fillStyle = "#fff";
-    c.beginPath(); c.roundRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u, rad ? rad + 8 * u : 0); c.fill(); c.shadowColor = "transparent"; }
-  c.beginPath(); c.roundRect(r.x, r.y, r.w, r.h, rad); c.clip();
+  if (o.border){
+    c.shadowColor = "rgba(0,0,0,.35)"; c.shadowBlur = 30 * u; c.shadowOffsetY = 10 * u; c.fillStyle = "#fff";
+    c.beginPath(); c.roundRect(r.x - 8 * u, r.y - 8 * u, r.w + 16 * u, r.h + 16 * u, rad ? rad + 8 * u : 0); c.fill(); c.shadowColor = "transparent";
+  }
+  if (rad || o.border){
+    c.beginPath(); c.roundRect(r.x, r.y, r.w, r.h, rad); c.clip();
+  }
   if (o.chromaKey){
     const keyed = applyChromaKey(o.el, r.w, r.h, o.keyColor || "#00FF00", o.keyTol ?? 0.36, o.keyFeather ?? 0.14);
     c.drawImage(keyed, r.x, r.y, r.w, r.h);
   } else {
-    cover(c, o.el, o.el.naturalWidth, o.el.naturalHeight, r.x, r.y, r.w, r.h);
+    cover(c, o.el, o.el.naturalWidth || o.el.videoWidth || r.w, o.el.naturalHeight || o.el.videoHeight || r.h, r.x, r.y, r.w, r.h);
   }
   c.restore();
   if (selected && selected.type === "overlay" && selected.item === o && !exporting){
@@ -4295,6 +4446,27 @@ function renderFrame(t){
       ctx.restore();
     }
   }
+  // Cutout Highlight on Video Subject
+  if (!inTrans && cur.cutoutHl && (cur.kind === "video" || cur.kind === "image")){
+    const local = Math.min(cur.dur, t - cur._start), X = clipXform(cur, local);
+    if (X){
+      const { u } = geo();
+      let cut = null;
+      if (cur.cutoutMode === "chroma"){
+        cut = applyChromaKey(X.src, X.dw, X.dh, cur.hlKeyColor || "#00FF00", cur.hlKeyTol ?? 0.36, cur.hlKeyFeather ?? 0.14);
+      } else if (smIsReady(cur)){
+        const mask = smGetMask(cur, local);
+        cut = mask && smCutout(X.src, mask, X.dw, X.dh);
+      }
+      if (cut){
+        ctx.save();
+        if (X.rot){ ctx.translate(W / 2, H / 2); ctx.rotate(X.rot); ctx.translate(-W / 2, -H / 2); }
+        drawCutoutHighlight(ctx, cut, X.x, X.y, X.dw, X.dh, u, t, cur);
+        ctx.drawImage(cut, X.x, X.y, X.dw, X.dh);
+        ctx.restore();
+      }
+    }
+  }
   drawDrawing(ctx);
   drawAudiogram(ctx, t);
   drawProgressBar(ctx, t);
@@ -4691,10 +4863,39 @@ async function addCompare(files){
 }
 async function addOverlay(file){
   if (!file) return;
-  const el = await loadImage(file);
+  const isVid = file.type?.startsWith("video/") || /\.(webm|mp4|mov)$/i.test(file.name);
+  let el, dur = 4;
+  if (isVid){
+    el = document.createElement("video");
+    el.crossOrigin = "anonymous"; el.playsInline = true; el.muted = true; el.loop = true;
+    el.src = URL.createObjectURL(file);
+    await new Promise(r => { el.onloadedmetadata = r; el.onerror = r; });
+    dur = Math.min(el.duration || 4, 30);
+  } else {
+    el = await loadImage(file);
+  }
   const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
-  const o = { id:uid++, el, name:file.name, start, end:Math.min(TOTAL || 4, start + 4), x:.7, y:.3, w:.42, shape:"rounded", border:true };
+  const isCutout = /cutout/i.test(file.name) || /\.webm$/i.test(file.name);
+  const o = {
+    id: uid++,
+    el,
+    name: file.name,
+    start,
+    end: Math.min(TOTAL || dur, start + dur),
+    x: .5,
+    y: .5,
+    w: isCutout ? .5 : .42,
+    shape: isCutout ? "none" : "rounded",
+    border: !isCutout,
+    cutoutHl: isCutout,
+    hlStyle: "glow",
+    hlColor: "cyan",
+    hlWidth: 6,
+    hlBlur: 18,
+    hlOpacity: 0.9
+  };
   P.overlays.push(o); refresh(); select("overlay", o);
+  toast(isCutout ? "✂️ Cutout added with glowing outline." : "Overlay added.");
 }
 async function decodeAudio(file){ const buf = await file.arrayBuffer(); return await AC.decodeAudioData(buf); }
 function speechSegments(buffer){
@@ -5609,7 +5810,7 @@ function renderInspector(){
         el("p", { class:"hint", text:"Outline a plot with its size and total area. On photos it moves with the camera." }),
         el("div", { class:"row field" }, [btn("Add plot highlight", () => startPlotDraw(it), "btn sm dark")]));
       (it.plots || []).forEach((pl, k) => box.append(el("div", { class:"row field" }, [btn(`Edit ${pl.name || "plot " + (k + 1)}`, () => { select("plot", pl, it); seek(it._start + (pl.at || 0) + 2); })])));
-      box.append(...highlightUI(it), ...keyframeUI(it));
+      box.append(...highlightUI(it), ...cutoutHighlightClipUI(it), ...keyframeUI(it));
     }
     const i = P.clips.indexOf(it);
     box.append(el("h2", { text:"Transition", style:"margin-top:8px" }), fSelect("Transition into next", it.transition, TRANSITIONS, v => { it.transition = v; delete it.tdur; changed(); renderInspector(); }),
@@ -6329,20 +6530,66 @@ function renderInspector(){
   }
   if (type === "overlay"){
     const o = it;
-    box.append(el("p", { class:"insp-title", text:"Image on top" }),
+    const isCutout = /cutout/i.test(o.name || "") || (o.el && o.el.tagName === "VIDEO") || o.cutoutHl;
+    box.append(el("p", { class:"insp-title", text: isCutout ? "✂️ Cutout & Overlay" : "Image on top" }),
       el("div", { class:"grid2" }, [fNum("Show from (s)", o.start, v => { o.start = clamp(v, 0, o.end - .3); changed(); renderInspector(); }), fNum("Until (s)", o.end, v => { o.end = Math.max(o.start + .3, v); changed(); renderInspector(); })]),
       el("div", { class:"row field" }, [btn("Start here", () => { o.start = clamp(now(), 0, o.end - .3); changed(); renderInspector(); }), btn("End here", () => { o.end = Math.max(o.start + .3, now()); changed(); renderInspector(); })]),
       fChips("Position", "", [["tl","Top left"],["tr","Top right"],["c","Centre"],["bl","Bottom left"],["br","Bottom right"]], v => { const { W, H, safe } = geo(), r = overlayRect(o); const hw = r.w / 2 / W, hh = r.h / 2 / H, l = safe.l / W + hw + .02, rr = 1 - safe.r / W - hw - .02, t = safe.t / H + hh + .06, b = 1 - safe.b / H - hh - .02; Object.assign(o, { tl:{ x:l, y:t }, tr:{ x:rr, y:t }, c:{ x:.5, y:.5 }, bl:{ x:l, y:b }, br:{ x:rr, y:b } }[v]); changed(false); }),
       fSlider("Size", o.w, .15, .95, .01, v => { o.w = v; changed(false); }),
-      fChips("Shape", o.shape, [["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }),
+      fChips("Shape", o.shape || "none", [["none","Sticker (No crop)"],["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }),
       el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]),
+
+      /* CUTOUT HIGHLIGHT */
+      el("h2", { text:"✂️ Cutout Highlight", style:"margin-top:12px" }),
+      toggleRow("Enable Cutout Highlight (Glowing Outline)", !!o.cutoutHl, v => {
+        o.cutoutHl = v;
+        if (v && !o.hlColor) o.hlColor = "cyan";
+        if (v && !o.hlStyle) o.hlStyle = "glow";
+        if (v && o.shape !== "none") o.shape = "none";
+        if (v) o.border = false;
+        changed(false);
+        renderInspector();
+      }),
+      o.cutoutHl ? el("div", { class:"field", style:"margin-top:8px;padding:10px;background:var(--soft);border-radius:10px;border:1px solid var(--line)" }, [
+        fChips("Highlight style", o.hlStyle || "glow", [
+          ["glow", "✨ Neon Glow"],
+          ["solid", "🏷️ Solid Stroke"],
+          ["pulse", "⚡ Pulsing Neon"],
+          ["cyber", "🔮 Cyberpunk Dual"],
+          ["halo", "🌌 Drop Halo"]
+        ], v => { o.hlStyle = v; changed(false); renderInspector(); }),
+        fChips("Highlight colour", o.hlColor || "cyan", [
+          ["cyan","Cyan"],
+          ["lime","Lime"],
+          ["gold","Gold"],
+          ["pink","Pink"],
+          ["white","White"],
+          ["purple","Violet"],
+          ["red","Red"],
+          ["custom","Custom"]
+        ], v => { o.hlColor = v; if (v === "custom" && !o.hlHex) o.hlHex = "#00E5FF"; changed(false); renderInspector(); }),
+        o.hlColor === "custom" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-bottom:6px" }, [
+          el("span", { class:"lbl", text:"Custom colour" }),
+          fColorPicker(o.hlHex || "#00E5FF", c => { o.hlHex = c; changed(false); })
+        ]) : "",
+        fSlider("Outline thickness", o.hlWidth ?? 6, 1, 30, 1, v => { o.hlWidth = v; changed(false); }, v => v + "px"),
+        fSlider("Glow blur radius", o.hlBlur ?? 18, 0, 50, 1, v => { o.hlBlur = v; changed(false); }, v => v + "px"),
+        fSlider("Highlight intensity", o.hlOpacity ?? 0.9, 0.2, 1, 0.05, v => { o.hlOpacity = v; changed(false); }, v => Math.round(v * 100) + "%"),
+        o.hlStyle === "pulse" ? fSlider("Pulse speed", o.hlSpeed ?? 4.5, 1, 10, 0.5, v => { o.hlSpeed = v; changed(false); }) : "",
+        o.hlStyle === "cyber" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-top:6px" }, [
+          el("span", { class:"lbl", text:"Outer neon aura colour" }),
+          fColorPicker(o.hlSecColor || "#FF007F", c => { o.hlSecColor = c; changed(false); })
+        ]) : "",
+        el("p", { class:"hint", style:"margin:6px 0 0", text:"Highlight wraps around the transparent silhouette of your cutout." })
+      ]) : "",
+
       el("h2", { text:"Chroma key & blend mode (Adobe style)", style:"margin-top:10px" }),
       el("label", { class:"toggle" }, [
         Object.assign(el("input", { type:"checkbox" }), {
           checked:!!o.chromaKey,
           onchange:e => { o.chromaKey = e.target.checked; changed(false); renderInspector(); }
         }),
-        document.createTextNode("🟢 Chroma key (remove green screen)")
+        document.createTextNode("🟢 Chroma key (remove green screen / manual color cutout)")
       ]),
       o.chromaKey ? el("div", { class:"field", style:"margin-top:6px;padding:8px;background:var(--soft);border-radius:8px" }, [
         el("div", { class:"row", style:"align-items:center;gap:8px" }, [
@@ -6361,8 +6608,25 @@ function renderInspector(){
         ["color-dodge","Color Dodge"],
         ["difference","Difference"]
       ], v => { o.blendMode = v; changed(false); }),
-      el("p", { class:"hint", text:"Drag the image on the preview to place it exactly." }),
-      el("div", { class:"row", style:"margin-top:8px" }, [fileBtn("Replace image", "image/*", async f => { o.el = await loadImage(f); changed(false); }), btn("Delete", () => deleteSelected())]));
+      el("p", { class:"hint", text:"Drag the cutout on the preview to place it exactly." }),
+      el("div", { class:"row", style:"margin-top:8px" }, [
+        fileBtn("Replace file", "image/*,video/*,.webm,.mp4", async f => {
+          if (!f) return;
+          const isV = f.type?.startsWith("video/") || /\.(webm|mp4|mov)$/i.test(f.name);
+          if (isV){
+            const vid = document.createElement("video");
+            vid.crossOrigin = "anonymous"; vid.playsInline = true; vid.muted = true; vid.loop = true;
+            vid.src = URL.createObjectURL(f);
+            await new Promise(r => { vid.onloadedmetadata = r; vid.onerror = r; });
+            o.el = vid; o.name = f.name;
+          } else {
+            o.el = await loadImage(f); o.name = f.name;
+          }
+          changed(false);
+        }),
+        btn("Delete", () => deleteSelected())
+      ])
+    );
     return;
   }
   if (type === "caption"){
@@ -9366,6 +9630,142 @@ function highlightUI(it){
   (it.punches || []).forEach((pz, k) => out.push(el("div", { class:"row field" }, [btn(`Edit zoom ${k + 1} (${pz.z.toFixed(1)}x)`, () => { select("punch", pz, it); seek(it._start + (pz.at || 0) + .6); })])));
   return out;
 }
+function cutoutHighlightClipUI(it){
+  if (!it || (it.kind !== "image" && it.kind !== "video")) return [];
+  const out = [
+    h2("✂️ Cutout Highlight (Subject Outline)"),
+    hint("Highlight the person or subject in this video with a glowing neon outline."),
+    toggleRow("Enable Cutout Highlight on subject", !!it.cutoutHl, async v => {
+      it.cutoutHl = v;
+      if (v && !it.hlColor) it.hlColor = "cyan";
+      if (v && !it.hlStyle) it.hlStyle = "glow";
+      if (v && !it.cutoutMode) it.cutoutMode = "ai";
+      changed(false);
+      renderInspector();
+      if (v && it.cutoutMode === "ai" && !smIsReady(it)){
+        toast("⏳ Analyzing clip frames for subject cutout...");
+        try {
+          await smBuildCache(it);
+          toast("✨ AI Cutout ready! Glowing outline active.");
+          renderFrame(playT);
+        } catch(e){
+          toast("⚠️ " + e.message);
+        }
+      }
+    })
+  ];
+
+  if (it.cutoutHl){
+    const card = el("div", { class:"field", style:"margin-top:8px;padding:10px;background:var(--soft);border-radius:10px;border:1px solid var(--line)" });
+    card.append(
+      fChips("Cutout source", it.cutoutMode || "ai", [
+        ["ai", "✨ Auto AI Subject (On-device)"],
+        ["chroma", "🟢 Chroma / Manual Color Key"]
+      ], async v => {
+        it.cutoutMode = v;
+        changed(false);
+        renderInspector();
+        if (v === "ai" && !smIsReady(it)){
+          toast("⏳ Analyzing clip frames for subject cutout...");
+          await smBuildCache(it);
+          toast("✨ AI Cutout ready!");
+          renderFrame(playT);
+        }
+      }),
+      it.cutoutMode === "chroma" ? el("div", { style:"margin-bottom:8px;padding:6px;background:rgba(0,0,0,0.15);border-radius:6px" }, [
+        el("div", { class:"row", style:"align-items:center;gap:8px" }, [
+          el("span", { class:"lbl", text:"Key color" }),
+          fColorPicker(it.hlKeyColor || "#00FF00", c => { it.hlKeyColor = c; changed(false); })
+        ]),
+        fSlider("Tolerance", it.hlKeyTol ?? 0.36, 0.1, 0.8, 0.02, v => { it.hlKeyTol = v; changed(false); }),
+        fSlider("Feather", it.hlKeyFeather ?? 0.14, 0.02, 0.4, 0.01, v => { it.hlKeyFeather = v; changed(false); })
+      ]) : el("div", { class:"row field", style:"margin-bottom:8px" }, [
+        btn(smIsReady(it) ? "🔄 Re-analyze Subject" : "✨ Analyze Subject with AI", async () => {
+          toast("⏳ Analyzing clip frames for subject cutout...");
+          try {
+            await smBuildCache(it);
+            toast("✨ AI Cutout ready! Glowing outline active.");
+            renderFrame(playT);
+          } catch(e){
+            toast("⚠️ " + e.message);
+          }
+        }, "btn sm dark")
+      ]),
+      fChips("Highlight style", it.hlStyle || "glow", [
+        ["glow", "✨ Neon Glow"],
+        ["solid", "🏷️ Solid Stroke"],
+        ["pulse", "⚡ Pulsing Neon"],
+        ["cyber", "🔮 Cyberpunk Dual"],
+        ["halo", "🌌 Drop Halo"]
+      ], v => { it.hlStyle = v; changed(false); renderInspector(); }),
+      fChips("Highlight colour", it.hlColor || "cyan", [
+        ["cyan","Cyan"],
+        ["lime","Lime"],
+        ["gold","Gold"],
+        ["pink","Pink"],
+        ["white","White"],
+        ["purple","Violet"],
+        ["red","Red"],
+        ["custom","Custom"]
+      ], v => { it.hlColor = v; if (v === "custom" && !it.hlHex) it.hlHex = "#00E5FF"; changed(false); renderInspector(); }),
+      it.hlColor === "custom" ? el("div", { class:"row", style:"align-items:center;gap:8px;margin-bottom:6px" }, [
+        el("span", { class:"lbl", text:"Custom colour" }),
+        fColorPicker(it.hlHex || "#00E5FF", c => { it.hlHex = c; changed(false); })
+      ]) : "",
+      fSlider("Outline thickness", it.hlWidth ?? 6, 1, 30, 1, v => { it.hlWidth = v; changed(false); }, v => v + "px"),
+      fSlider("Glow blur radius", it.hlBlur ?? 18, 0, 50, 1, v => { it.hlBlur = v; changed(false); }, v => v + "px"),
+      fSlider("Highlight intensity", it.hlOpacity ?? 0.9, 0.2, 1, 0.05, v => { it.hlOpacity = v; changed(false); }, v => Math.round(v * 100) + "%"),
+      it.hlStyle === "pulse" ? fSlider("Pulse speed", it.hlSpeed ?? 4.5, 1, 10, 0.5, v => { it.hlSpeed = v; changed(false); }) : "",
+      el("div", { class:"row field", style:"margin-top:8px" }, [
+        btn("✂️ Extract to Floating Cutout Overlay", async () => {
+          const local = clamp(now() - it._start, 0, it.dur);
+          const X = clipXform(it, local);
+          if (!X) return;
+          let cutCv;
+          if (it.cutoutMode === "chroma"){
+            cutCv = applyChromaKey(X.src, X.dw, X.dh, it.hlKeyColor || "#00FF00", it.hlKeyTol ?? 0.36, it.hlKeyFeather ?? 0.14);
+          } else {
+            if (!smIsReady(it)) await smBuildCache(it);
+            const mask = smGetMask(it, local);
+            cutCv = mask && smCutout(X.src, mask, X.dw, X.dh);
+          }
+          if (cutCv){
+            const img = new Image();
+            img.onload = () => {
+              const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
+              const o = {
+                id: uid++,
+                el: img,
+                name: "cutout-subject.png",
+                start,
+                end: Math.min(TOTAL || 4, start + 4),
+                x: .5,
+                y: .5,
+                w: .5,
+                shape: "none",
+                border: false,
+                cutoutHl: true,
+                hlStyle: it.hlStyle || "glow",
+                hlColor: it.hlColor || "cyan",
+                hlHex: it.hlHex,
+                hlWidth: it.hlWidth || 6,
+                hlBlur: it.hlBlur || 18,
+                hlOpacity: it.hlOpacity || 0.9
+              };
+              P.overlays.push(o);
+              refresh();
+              select("overlay", o);
+              toast("✂️ Cutout extracted with glowing outline! Drag to move or scale.");
+            };
+            img.src = cutCv.toDataURL("image/png");
+          }
+        }, "btn sm")
+      ])
+    );
+    out.push(card);
+  }
+  return out;
+}
 function keyframeUI(it){
   const local = clamp(now() - it._start, 0, it.dur), v = kfValues(it, local), has = it.kf && it.kf.length;
   const on = k => val => { setKf(it, k, val); changed(false); kfListRefresh(it); };
@@ -10658,9 +11058,26 @@ if (EMBED){
       const img = new Image();
       img.onload = () => {
         const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
-        const o = { id:uid++, el:img, name:"cutout.png", start, end:Math.min(TOTAL || 4, start + 4), x:.5, y:.5, w:.45, shape:"none", border:false };
+        const o = {
+          id: uid++,
+          el: img,
+          name: "cutout.png",
+          start,
+          end: Math.min(TOTAL || 4, start + 4),
+          x: .5,
+          y: .5,
+          w: .45,
+          shape: "none",
+          border: false,
+          cutoutHl: m.cutoutHl ?? true,
+          hlStyle: m.hlStyle || "glow",
+          hlColor: m.hlColor || "cyan",
+          hlWidth: m.hlWidth || 6,
+          hlBlur: m.hlBlur || 18,
+          hlOpacity: 0.9
+        };
         P.overlays.push(o); refresh(); select("overlay", o);
-        toast("✂️ AI Cutout added as overlay sticker.");
+        toast("✂️ AI Cutout added with Cutout Highlight.");
       };
       img.src = m.dataUrl;
     }
@@ -10671,9 +11088,26 @@ if (EMBED){
       vid.onloadedmetadata = () => {
         const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
         const dur = Math.min(vid.duration || 4, 30);
-        const o = { id:uid++, el:vid, name:m.name || "video-cutout.webm", start, end:Math.min(TOTAL || dur, start + dur), x:.5, y:.5, w:.55, shape:"none", border:false };
+        const o = {
+          id: uid++,
+          el: vid,
+          name: m.name || "video-cutout.webm",
+          start,
+          end: Math.min(TOTAL || dur, start + dur),
+          x: .5,
+          y: .5,
+          w: .55,
+          shape: "none",
+          border: false,
+          cutoutHl: m.cutoutHl ?? true,
+          hlStyle: m.hlStyle || "glow",
+          hlColor: m.hlColor || "cyan",
+          hlWidth: m.hlWidth || 6,
+          hlBlur: m.hlBlur || 18,
+          hlOpacity: 0.9
+        };
         P.overlays.push(o); refresh(); select("overlay", o);
-        toast("🎬 AI Video Cutout added as overlay.");
+        toast("🎬 AI Video Cutout added with Cutout Highlight.");
       };
       vid.src = srcUrl;
     }
