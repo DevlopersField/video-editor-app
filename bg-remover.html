@@ -700,30 +700,92 @@ function progress(key, current, total) {
 /* ================= MediaPipe Video AI Engine ================= */
 async function initVideoAI() {
   if (selfieSegReady && selfieSeg) return selfieSeg;
+  
   if (!window.SelfieSegmentation) {
-    console.warn("SelfieSegmentation not available globally");
+    showOverlay("Loading on-device AI Video Neural Engine…", "MediaPipe SelfieSegmentation");
+    progress("compute:init", 20, 100);
+    try {
+      await new Promise((res, rej) => {
+        const s = document.createElement("script");
+        s.src = "js/mediapipe/selfie_segmentation.js";
+        s.onload = res;
+        s.onerror = () => {
+          const s2 = document.createElement("script");
+          s2.src = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js";
+          s2.onload = res;
+          s2.onerror = rej;
+          document.head.appendChild(s2);
+        };
+        document.head.appendChild(s);
+      });
+    } catch(e) {
+      console.warn("Could not load SelfieSegmentation script globally:", e);
+    }
+  }
+
+  if (!window.SelfieSegmentation) {
+    console.warn("SelfieSegmentation still not available globally");
     return null;
   }
+
   showOverlay("Initializing on-device AI Video Neural Engine…", "MediaPipe SelfieSegmentation");
-  progress("compute:init", 40, 100);
-  try {
-    selfieSeg = new window.SelfieSegmentation({
-      locateFile: (file) => `js/mediapipe/${file}`
-    });
-    selfieSeg.setOptions({
-      modelSelection: 1, // 1 = landscape/fast
-      selfieMode: false
-    });
-    selfieSeg.onResults(results => {
-      currentSegmentationMask = results.segmentationMask;
-    });
-    await selfieSeg.initialize();
-    progress("compute:ready", 100, 100);
-    selfieSegReady = true;
-  } catch(e) {
-    console.warn("MediaPipe init fallback:", e);
-    selfieSegReady = true;
+  progress("compute:init", 50, 100);
+
+  const isFile = window.location.protocol === 'file:';
+  const localLocate = (file) => `js/mediapipe/${file}`;
+  const cdnLocate = (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
+
+  let segInstance = null;
+  let ready = false;
+
+  // Try local first if on HTTP/HTTPS
+  if (!isFile) {
+    try {
+      segInstance = new window.SelfieSegmentation({ locateFile: localLocate });
+      segInstance.setOptions({
+        modelSelection: 1, // 1 = landscape/fast
+        selfieMode: false
+      });
+      segInstance.onResults(results => {
+        currentSegmentationMask = results.segmentationMask;
+      });
+      await segInstance.initialize();
+      ready = true;
+    } catch(err) {
+      console.warn("Local MediaPipe init failed, trying CDN fallback:", err);
+      segInstance = null;
+    }
   }
+
+  // Fallback to CDN if local failed or if on file:// protocol
+  if (!ready) {
+    try {
+      showOverlay("Loading on-device AI model from CDN…", "MediaPipe SelfieSegmentation");
+      progress("compute:cdn", 75, 100);
+      segInstance = new window.SelfieSegmentation({ locateFile: cdnLocate });
+      segInstance.setOptions({
+        modelSelection: 1,
+        selfieMode: false
+      });
+      segInstance.onResults(results => {
+        currentSegmentationMask = results.segmentationMask;
+      });
+      await segInstance.initialize();
+      ready = true;
+    } catch(err) {
+      console.error("MediaPipe CDN init also failed:", err);
+      segInstance = null;
+    }
+  }
+
+  if (ready && segInstance) {
+    selfieSeg = segInstance;
+    selfieSegReady = true;
+    progress("compute:ready", 100, 100);
+  } else {
+    selfieSegReady = false;
+  }
+
   hideOverlay();
   return selfieSeg;
 }
@@ -969,40 +1031,58 @@ async function processQueue() {
         const vUrl = URL.createObjectURL(it.file);
         it.videoUrl = vUrl;
         const v = document.createElement('video');
-        v.crossOrigin = 'anonymous';
         v.playsInline = true;
         v.muted = true;
         v.loop = true;
         v.src = vUrl;
+
+        showOverlay("Loading video metadata…", it.name);
+        progress("compute:video", 20, 100);
+
         await new Promise((resolve) => {
+          if (v.readyState >= 2) return resolve();
+          v.onloadeddata = resolve;
           v.onloadedmetadata = resolve;
-          v.onerror = resolve;
-          setTimeout(resolve, 3000);
+          v.onerror = () => { console.warn("Video metadata error", v.error); resolve(); };
+          setTimeout(resolve, 3500);
         });
+
         it.w = v.videoWidth || 640;
         it.h = v.videoHeight || 360;
         it.dur = v.duration || 5;
         it.videoEl = v;
 
         const bv = document.createElement('video');
-        bv.crossOrigin = 'anonymous';
         bv.playsInline = true;
         bv.muted = true;
         bv.loop = true;
         bv.src = vUrl;
         it.beforeVidEl = bv;
 
-        v.currentTime = Math.min(0.5, it.dur / 2);
-        await new Promise(r => { v.onseeked = r; setTimeout(r, 600); });
+        v.currentTime = Math.min(0.2, it.dur / 2);
+        await new Promise(r => {
+          let done = false;
+          const to = setTimeout(() => { if (!done) { done = true; r(); } }, 800);
+          v.onseeked = () => { if (!done) { done = true; clearTimeout(to); r(); } };
+        });
+
         const tc = document.createElement('canvas');
         tc.width = 120; tc.height = Math.round(120 * (it.h / it.w));
         tc.getContext('2d').drawImage(v, 0, 0, tc.width, tc.height);
         it.thumbUrl = tc.toDataURL('image/jpeg', 0.85);
 
+        // Warm up and isolate subject on initial frame
         if (selfieSegReady && selfieSeg) {
+          showOverlay("AI Isolating Subject from Video…", it.name);
+          progress("compute:seg", 80, 100);
           try {
-            await selfieSeg.send({ image: v });
-          } catch(e) {}
+            await Promise.race([
+              selfieSeg.send({ image: v }),
+              new Promise(res => setTimeout(res, 4000))
+            ]);
+          } catch(e) {
+            console.warn("Initial video frame segmentation warning:", e);
+          }
         }
         it.status = 'done';
       } catch (err) {
@@ -1302,14 +1382,19 @@ async function renderVideoFrame(it) {
       tempVidCtx = tempVidCanvas.getContext('2d');
     }
     tempVidCtx.clearRect(0, 0, w, h);
-    tempVidCtx.drawImage(v, 0, 0, w, h);
 
+    // Draw mask first
     tempVidCtx.save();
-    tempVidCtx.globalCompositeOperation = 'destination-in';
     if (refine.feather > 0) {
       tempVidCtx.filter = `blur(${refine.feather}px)`;
     }
     tempVidCtx.drawImage(currentSegmentationMask, 0, 0, w, h);
+    tempVidCtx.restore();
+
+    // Composite video using source-in (keeps video only where subject was segmented)
+    tempVidCtx.save();
+    tempVidCtx.globalCompositeOperation = 'source-in';
+    tempVidCtx.drawImage(v, 0, 0, w, h);
     tempVidCtx.restore();
 
     cutCv = tempVidCanvas;
@@ -1620,11 +1705,13 @@ async function exportVideoItem(it, fmt) {
 
     if (it.videoMode === 'ai' && currentSegmentationMask) {
       cCtx.clearRect(0, 0, ew, eh);
-      cCtx.drawImage(v, 0, 0, ew, eh);
       cCtx.save();
-      cCtx.globalCompositeOperation = 'destination-in';
       if (refine.feather > 0) cCtx.filter = `blur(${refine.feather}px)`;
       cCtx.drawImage(currentSegmentationMask, 0, 0, ew, eh);
+      cCtx.restore();
+      cCtx.save();
+      cCtx.globalCompositeOperation = 'source-in';
+      cCtx.drawImage(v, 0, 0, ew, eh);
       cCtx.restore();
       eCtx.drawImage(cCv, 0, 0, ew, eh);
     } else if (it.videoMode === 'chroma') {
@@ -1767,6 +1854,10 @@ $('btnSendVideo').addEventListener('click', () => {
         girika: 'video-cutout',
         blob: it.file,
         name: it.name,
+        videoMode: it.videoMode,
+        keyColor: it.keyColor,
+        keyTol: it.keyTol,
+        keyFeather: it.keyFeather,
         cutoutHl: cutoutHl.enabled,
         hlStyle: cutoutHl.style,
         hlColor: cutoutHl.color,

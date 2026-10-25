@@ -1935,29 +1935,87 @@ function applyChromaKey(src, w, h, keyHex = "#00FF00", tol = 0.36, feather = 0.1
 const SM_SAMPLE_FPS = 6;
 const SM = { seg:null, ready:false, loading:null, cache:new Map(), resolveMask:null, queue:Promise.resolve() };
 function smEnsure(){
-  if (SM.ready) return Promise.resolve(true);
+  if (SM.ready && SM.seg) return Promise.resolve(true);
   if (SM.loading) return SM.loading;
   SM.loading = (async () => {
     if (!window.SelfieSegmentation){
       await new Promise((res, rej) => {
         const s = document.createElement("script");
-        s.src = "js/mediapipe/selfie_segmentation.js"; s.onload = res; s.onerror = () => rej(new Error("Could not load the on-device AI model."));
+        s.src = "js/mediapipe/selfie_segmentation.js";
+        s.onload = res;
+        s.onerror = () => {
+          const s2 = document.createElement("script");
+          s2.src = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js";
+          s2.onload = res;
+          s2.onerror = rej;
+          document.head.appendChild(s2);
+        };
         document.head.appendChild(s);
       });
     }
-    SM.seg = new window.SelfieSegmentation({ locateFile:f => "js/mediapipe/" + f });
-    SM.seg.setOptions({ modelSelection:1, selfieMode:false });
-    SM.seg.onResults(r => { if (SM.resolveMask) SM.resolveMask(r.segmentationMask); });
-    await SM.seg.initialize();
+
+    const isFile = window.location.protocol === "file:";
+    const localLocate = f => "js/mediapipe/" + f;
+    const cdnLocate = f => "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/" + f;
+
+    let seg = null;
+    if (!isFile){
+      try {
+        seg = new window.SelfieSegmentation({ locateFile: localLocate });
+        seg.setOptions({ modelSelection: 1, selfieMode: false });
+        seg.onResults(r => { if (SM.resolveMask) SM.resolveMask(r.segmentationMask); });
+        await seg.initialize();
+      } catch(e){
+        console.warn("Local MediaPipe init failed, trying CDN fallback...", e);
+        seg = null;
+      }
+    }
+    if (!seg){
+      seg = new window.SelfieSegmentation({ locateFile: cdnLocate });
+      seg.setOptions({ modelSelection: 1, selfieMode: false });
+      seg.onResults(r => { if (SM.resolveMask) SM.resolveMask(r.segmentationMask); });
+      await seg.initialize();
+    }
+    SM.seg = seg;
     SM.ready = true;
     return true;
-  })();
+  })().catch(err => {
+    console.error("smEnsure error:", err);
+    SM.loading = null;
+    throw err;
+  });
   return SM.loading;
 }
 function smSegmentOnce(src){
-  const run = () => new Promise((resolve, reject) => {
-    SM.resolveMask = mask => resolve(mask);
-    SM.seg.send({ image:src }).catch(reject);
+  const run = () => new Promise((resolve) => {
+    let done = false;
+    const to = setTimeout(() => {
+      if (!done){
+        done = true;
+        console.warn("smSegmentOnce timeout (4000ms)");
+        resolve(null);
+      }
+    }, 4000);
+    SM.resolveMask = mask => {
+      if (!done){
+        done = true;
+        clearTimeout(to);
+        resolve(mask);
+      }
+    };
+    if (!SM.seg){
+      clearTimeout(to);
+      resolve(null);
+      return;
+    }
+    SM.seg.send({ image:src }).catch(err => {
+      if (!done){
+        done = true;
+        clearTimeout(to);
+        console.warn("SM.seg.send error:", err);
+        resolve(null);
+      }
+    });
   });
   const p = SM.queue.then(run, run);
   SM.queue = p.catch(() => {});
@@ -1965,10 +2023,21 @@ function smSegmentOnce(src){
 }
 function smSeekVideo(v, t){
   return new Promise(resolve => {
-    if (Math.abs(v.currentTime - t) < .004){ resolve(); return; }
-    const done = () => { v.removeEventListener("seeked", done); resolve(); };
-    v.addEventListener("seeked", done);
-    v.currentTime = t;
+    if (Math.abs(v.currentTime - t) < .008){ resolve(); return; }
+    let done = false;
+    const to = setTimeout(() => {
+      if (!done){ done = true; v.removeEventListener("seeked", onSeek); resolve(); }
+    }, 1200);
+    const onSeek = () => {
+      if (!done){ done = true; clearTimeout(to); v.removeEventListener("seeked", onSeek); resolve(); }
+    };
+    v.addEventListener("seeked", onSeek);
+    try {
+      v.currentTime = t;
+    } catch(e){
+      clearTimeout(to);
+      resolve();
+    }
   });
 }
 async function smBuildCache(clip, onProgress){
@@ -1976,8 +2045,14 @@ async function smBuildCache(clip, onProgress){
   const srcKey = clip.el && (clip.el.currentSrc || clip.el.src) || "";
   if (clip.kind === "image"){
     const mask = await smSegmentOnce(clip.el);
-    const cv = document.createElement("canvas"); cv.width = mask.width; cv.height = mask.height;
-    cv.getContext("2d").drawImage(mask, 0, 0);
+    const cv = document.createElement("canvas");
+    cv.width = mask && mask.width ? mask.width : (clip.el.naturalWidth || 640);
+    cv.height = mask && mask.height ? mask.height : (clip.el.naturalHeight || 360);
+    if (mask){
+      cv.getContext("2d").drawImage(mask, 0, 0);
+    } else {
+      cv.getContext("2d").fillStyle = "#FFFFFF"; cv.getContext("2d").fillRect(0, 0, cv.width, cv.height);
+    }
     SM.cache.set(clip.id, { kind:"static", mask:cv, src:srcKey });
     onProgress && onProgress(1);
     return;
@@ -1993,9 +2068,13 @@ async function smBuildCache(clip, onProgress){
     const local = Math.min(dur - .001, i / SM_SAMPLE_FPS);
     await smSeekVideo(v, srcTime(clip, local));
     const mask = await smSegmentOnce(v);
-    const cv = document.createElement("canvas"); cv.width = mask.width; cv.height = mask.height;
-    cv.getContext("2d").drawImage(mask, 0, 0);
-    frames.push({ local, mask:cv });
+    if (mask && mask.width){
+      const cv = document.createElement("canvas"); cv.width = mask.width; cv.height = mask.height;
+      cv.getContext("2d").drawImage(mask, 0, 0);
+      frames.push({ local, mask:cv });
+    } else if (frames.length){
+      frames.push({ local, mask: frames[frames.length - 1].mask });
+    }
     onProgress && onProgress((i + 1) / n);
   }
   SM.cache.set(clip.id, { kind:"video", frames, builtForDur:dur, src:srcKey });
@@ -2024,9 +2103,18 @@ function smCutout(src, mask, w, h){
   if (!_smCutCv){ _smCutCv = document.createElement("canvas"); _smCutCtx = _smCutCv.getContext("2d"); }
   if (_smCutCv.width !== w || _smCutCv.height !== h){ _smCutCv.width = w; _smCutCv.height = h; }
   _smCutCtx.clearRect(0, 0, w, h);
-  try { _smCutCtx.drawImage(src, 0, 0, w, h); } catch(e){ return null; }
-  _smCutCtx.save(); _smCutCtx.globalCompositeOperation = "destination-in";
+  if (!mask){
+    try { _smCutCtx.drawImage(src, 0, 0, w, h); } catch(e){}
+    return _smCutCv;
+  }
+  // Draw mask first
+  _smCutCtx.save();
   try { _smCutCtx.drawImage(mask, 0, 0, w, h); } catch(e){}
+  _smCutCtx.restore();
+  // Composite src using source-in
+  _smCutCtx.save();
+  _smCutCtx.globalCompositeOperation = "source-in";
+  try { _smCutCtx.drawImage(src, 0, 0, w, h); } catch(e){ return null; }
   _smCutCtx.restore();
   return _smCutCv;
 }
@@ -10313,12 +10401,21 @@ function initIgCutoutUI(){
       const file = e.target.files && e.target.files[0];
       e.target.value = "";
       if (!file) return;
-      if (file.type && file.type.startsWith("video/")){
+      const isVid = (file.type && file.type.startsWith("video/")) || /\.(mp4|webm|mov|m4v|avi|mkv)$/i.test(file.name);
+      if (isVid){
         const vid = document.createElement("video");
-        vid.crossOrigin = "anonymous"; vid.playsInline = true; vid.muted = true; vid.src = URL.createObjectURL(file);
-        await new Promise(r => { vid.onloadeddata = r; vid.onerror = r; });
-        vid.currentTime = 0.1;
-        await new Promise(r => { vid.onseeked = r; vid.onerror = r; });
+        vid.playsInline = true; vid.muted = true; vid.src = URL.createObjectURL(file);
+        await new Promise(r => {
+          if (vid.readyState >= 2) return r();
+          vid.onloadeddata = r; vid.onloadedmetadata = r; vid.onerror = r;
+          setTimeout(r, 3000);
+        });
+        vid.currentTime = Math.min(0.2, (vid.duration || 1) / 2);
+        await new Promise(r => {
+          let done = false;
+          const to = setTimeout(() => { if (!done) { done = true; r(); } }, 800);
+          vid.onseeked = () => { if (!done) { done = true; clearTimeout(to); r(); } };
+        });
         loadIgSource(vid, file.name);
       } else {
         const img = await loadImage(file);
@@ -12664,7 +12761,7 @@ if (EMBED){
     if (m.girika === "video-cutout" && (m.dataUrl || m.blob)){
       const srcUrl = m.dataUrl || URL.createObjectURL(m.blob);
       const vid = document.createElement("video");
-      vid.crossOrigin = "anonymous"; vid.playsInline = true; vid.muted = true; vid.loop = true;
+      vid.playsInline = true; vid.muted = true; vid.loop = true;
       vid.onloadedmetadata = () => {
         const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
         const dur = Math.min(vid.duration || 4, 30);
@@ -12680,6 +12777,10 @@ if (EMBED){
           rot: m.rot || 0,
           shape: "none",
           border: false,
+          chromaKey: m.videoMode === "chroma" || !!m.chromaKey,
+          keyColor: m.keyColor || "#00FF00",
+          keyTol: m.keyTol ?? 0.36,
+          keyFeather: m.keyFeather ?? 0.14,
           cutoutHl: m.cutoutHl ?? true,
           hlStyle: m.hlStyle || "sticker",
           hlColor: m.hlColor || "white",

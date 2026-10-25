@@ -448,10 +448,10 @@ QUICK.forEach(q => {
 window.addEventListener("message", e => {
   const m = e.data; if (!m || !m.girika) return;
   if (m.girika === "cutout"){
-    if (m.target === "post"){ show("post"); send("post", { girika:"cutout", dataUrl:m.dataUrl }); }
-    else if (m.target === "video"){ show("video"); send("video", { girika:"cutout", dataUrl:m.dataUrl }); }
+    if (m.target === "post"){ show("post"); send("post", { ...m, girika:"cutout" }); }
+    else if (m.target === "video"){ show("video"); send("video", { ...m, girika:"cutout" }); }
   } else if (m.girika === "video-cutout"){
-    show("video"); send("video", { girika:"video-cutout", dataUrl:m.dataUrl, blob:m.blob, name:m.name });
+    show("video"); send("video", { ...m, girika:"video-cutout" });
   }
 });
 
