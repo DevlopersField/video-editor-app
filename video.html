@@ -2286,6 +2286,7 @@ function drawClip(c, clip, local){
         lookAfter(cc, clip.look);
         gradeAfter(cc, clip);
         if (!framed) (clip.plots || []).forEach(pl => drawPlot(cc, X, pl, local, clip));
+        if (!framed) (clip.regions || []).forEach(rg => drawRegion(cc, X, rg, local, clip));
         if (!framed) (clip.spots || []).forEach(sp => drawSpot(cc, X, sp, local, clip));
         if (!framed && selected && selected.type === "punch" && selected.clip === clip && !exporting && !playing) drawPunchMarker(cc, X, selected.item);
       }
@@ -2607,6 +2608,84 @@ function plotPtsAt(pl, local){
   });
 }
 
+function pointInPoly(x, y, poly){
+  let inside = false;
+  for (let i = 0, j = poly.length - 1; i < poly.length; j = i++){
+    const [xi, yi] = poly[i], [xj, yj] = poly[j];
+    if (((yi > y) !== (yj > y)) && (x < (xj - xi) * (y - yi) / (yj - yi) + xi)) inside = !inside;
+  }
+  return inside;
+}
+/* ---------- region highlight: trace any shape (road, path, building, view) and glow/dim it.
+   Lighter-weight sibling of Plot — no land dimensions, no 3D pin, no camera tracking — just
+   "highlight this part of the frame", which is what a road, a façade, a garden strip or any
+   other arbitrary feature actually needs. Reuses Plot's color palette and drawing workflow. ---------- */
+function drawRegion(c, X, rg, local, clip){
+  const { u, W, H } = geo(), t = local - (rg.at || 0);
+  const isEditing = !exporting && !playing;
+  const isSelected = selected && selected.type === "region" && selected.item === rg && isEditing;
+  if (t < 0 && !isSelected) return;
+  const pts2d = (rg.pts || []).map(([a, b]) => mapPt(X, a, b));
+  if (pts2d.length < 2) return;
+  const closed = pts2d.length >= 3;
+  const life = rg.dur > 0 ? rg.dur : Infinity;
+  if (!isSelected && t > life) return;
+  const out = isSelected ? 1 : clamp((life - t) / .35);
+  const T = isEditing ? Math.max(t, 1.6) : t;
+  const [col, rgb] = (rg.color === "custom" && rg.lineHex) ? [rg.lineHex, hexToRgb(rg.lineHex)] : (PLOT_COLORS[rg.color] || PLOT_COLORS.clay);
+  const path = () => { c.beginPath(); pts2d.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y)); if (closed) c.closePath(); };
+
+  // Spotlight: dim everything outside the traced shape
+  if (closed && rg.dimRest){
+    const dimAlpha = typeof rg.dimAlpha === "number" ? rg.dimAlpha : 0.6;
+    c.save();
+    c.globalAlpha = out * clamp(T / .2) * dimAlpha;
+    c.fillStyle = "#000000";
+    c.beginPath(); c.rect(0, 0, W, H);
+    pts2d.forEach(([x, y], i) => i ? c.lineTo(x, y) : c.moveTo(x, y));
+    c.closePath();
+    c.fill("evenodd");
+    c.restore();
+  }
+
+  c.save(); c.globalAlpha = out;
+
+  if (closed && rg.fillOn !== false){
+    const fa = clamp(T / .2) * (rg.fillAlpha ?? .22);
+    if (fa > 0){ c.fillStyle = `rgba(${rgb},${clamp(fa, 0, .9).toFixed(3)})`; path(); c.fill(); }
+  }
+
+  if (rg.outline !== false){
+    c.save();
+    c.strokeStyle = col; c.lineWidth = (rg.strokeWidth || 7) * u; c.lineJoin = "round"; c.lineCap = "round";
+    c.shadowColor = `rgba(${rgb},.9)`; c.shadowBlur = 14 * u;
+    path(); c.stroke();
+    c.restore();
+  }
+
+  if (isEditing){
+    const da = ease(T / .35);
+    pts2d.forEach(([x, y]) => { c.fillStyle = "#fff"; c.globalAlpha = da * out; c.beginPath(); c.arc(x, y, (isSelected ? 10 : 7) * u, 0, Math.PI * 2); c.fill(); });
+    c.globalAlpha = out;
+  }
+
+  if (closed && rg.name && rg.name.trim()){
+    const topPt = pts2d.reduce((a, b) => b[1] < a[1] ? b : a, pts2d[0]);
+    c.save();
+    c.font = `700 ${15 * u}px ${SANS}`;
+    c.textAlign = "center"; c.textBaseline = "bottom";
+    const label = rg.name.trim().toUpperCase();
+    const tw = c.measureText(label).width;
+    const bx = topPt[0], by = topPt[1] - 14 * u;
+    c.fillStyle = `rgba(${rgb},.92)`;
+    c.beginPath(); c.roundRect(bx - tw / 2 - 10 * u, by - 22 * u, tw + 20 * u, 26 * u, 8 * u); c.fill();
+    c.fillStyle = "#fff";
+    c.fillText(label, bx, by - 5 * u);
+    c.restore();
+  }
+
+  c.restore();
+}
 function drawPlot(c, X, pl, local, clip){
   const { u, W, H } = geo(), t = local - (pl.at || 0);
   const isEditing = !exporting && !playing;
@@ -3189,6 +3268,12 @@ function drawOutro(c, t){
 function overlayRect(o){
   if (o.kind === "text" || o.kind === "gfx") return o._rect || { x:0, y:0, w:0, h:0 };
   const { W, H } = geo();
+  // Full-frame cutout: covers the entire canvas (like a background clip) instead
+  // of sitting as a small, width-fraction sticker. drawOverlay()'s non-chromaKey
+  // draw path already uses cover() for the element fill, so handing it the full
+  // canvas rect here makes the transparent video fill (and crop to cover) the
+  // whole frame — exactly "use the whole cutout video on the video", not a sticker.
+  if (o.fullFrame) return { x:0, y:0, w:W, h:H };
   const nw = o.el.naturalWidth || o.el.videoWidth || 1;
   const nh = o.el.naturalHeight || o.el.videoHeight || 1;
   const ar = nh / nw || 1;
@@ -5903,6 +5988,14 @@ function renderTimeline(){
       addHandles(b, relSpec(pl, c, true));
       tp.appendChild(b);
     }));
+    SEQ.forEach(c => (c.regions || []).forEach(rg => {
+      const st = c._start + (rg.at || 0);
+      const effDur = rg.dur > 0 ? Math.min(rg.dur, c.dur - (rg.at || 0)) : (c.dur - (rg.at || 0));
+      const b = blk("ovl plotb regionb", st * pps, effDur * pps, `✨ ${rg.name || "Region"} (${effDur.toFixed(1)}s)`, () => { select("region", rg, c); seek(st + 0.05); }, sel(rg));
+      b.title = `Region Highlight: ${rg.name || "Region"} (${effDur.toFixed(1)}s) - Drag to move, drag edges to adjust start & duration`;
+      addHandles(b, relSpec(rg, c, true));
+      tp.appendChild(b);
+    }));
     SEQ.forEach(c => (c.spots || []).forEach(sp => {
       const st = c._start + (sp.at || 0), effDur = Math.min(sp.dur, c.dur - (sp.at || 0));
       const b = blk("ovl spotb", st * pps, effDur * pps, `🎯 Spotlight ${sp.label || ""} (${effDur.toFixed(1)}s)`.trim(), () => { select("spot", sp, c); seek(st + 0.05); }, sel(sp));
@@ -6884,20 +6977,26 @@ function renderInspector(){
     const o = it;
     const isCutout = /cutout/i.test(o.name || "") || (o.el && o.el.tagName === "VIDEO") || o.cutoutHl || o.isIgSticker;
     box.append(el("p", { class:"insp-title", text: isCutout ? "✂️ Instagram Cutout Sticker" : "Image on top" }),
+      (o.el && o.el.tagName === "VIDEO") ? toggleRow("Full video (fills the whole frame — use it as a cutout over another clip, not a small sticker)", !!o.fullFrame, v => {
+        o.fullFrame = v;
+        if (v){ o.w = 1; o.x = .5; o.y = .5; o.rot = 0; o.shape = "none"; o.border = false; o.isIgSticker = false; }
+        else { o.w = .55; o.isIgSticker = true; }
+        changed(false); renderInspector();
+      }) : "",
       el("div", { class:"grid2" }, [fNum("Show from (s)", o.start, v => { o.start = clamp(v, 0, o.end - .3); changed(); renderInspector(); }), fNum("Until (s)", o.end, v => { o.end = Math.max(o.start + .3, v); changed(); renderInspector(); })]),
       el("div", { class:"row field" }, [btn("Start here", () => { o.start = clamp(now(), 0, o.end - .3); changed(); renderInspector(); }), btn("End here", () => { o.end = Math.max(o.start + .3, now()); changed(); renderInspector(); })]),
-      fChips("Position", "", [["tl","Top left"],["tr","Top right"],["c","Centre"],["bl","Bottom left"],["br","Bottom right"]], v => { const { W, H, safe } = geo(), r = overlayRect(o); const hw = r.w / 2 / W, hh = r.h / 2 / H, l = safe.l / W + hw + .02, rr = 1 - safe.r / W - hw - .02, t = safe.t / H + hh + .06, b = 1 - safe.b / H - hh - .02; Object.assign(o, { tl:{ x:l, y:t }, tr:{ x:rr, y:t }, c:{ x:.5, y:.5 }, bl:{ x:l, y:b }, br:{ x:rr, y:b } }[v]); changed(false); }),
-      fSlider("Size", o.w, .1, 1.4, .01, v => { o.w = v; changed(false); }),
+      !o.fullFrame ? fChips("Position", "", [["tl","Top left"],["tr","Top right"],["c","Centre"],["bl","Bottom left"],["br","Bottom right"]], v => { const { W, H, safe } = geo(), r = overlayRect(o); const hw = r.w / 2 / W, hh = r.h / 2 / H, l = safe.l / W + hw + .02, rr = 1 - safe.r / W - hw - .02, t = safe.t / H + hh + .06, b = 1 - safe.b / H - hh - .02; Object.assign(o, { tl:{ x:l, y:t }, tr:{ x:rr, y:t }, c:{ x:.5, y:.5 }, bl:{ x:l, y:b }, br:{ x:rr, y:b } }[v]); changed(false); }) : "",
+      !o.fullFrame ? fSlider("Size", o.w, .1, 1.4, .01, v => { o.w = v; changed(false); }) : "",
       (o.el && o.el.tagName === "VIDEO") ? fSlider("Video sound volume", o.volume ?? 1, 0, 1.5, 0.05, v => {
         o.volume = v;
         if (o.el) o.el.volume = clamp(v, 0, 1);
         changed(false);
       }, v => Math.round(v * 100) + "%") : "",
-      fSlider("Sticker angle / Tilt", o.rot || 0, -180, 180, 1, v => { o.rot = v; changed(false); }, v => v + "°"),
+      !o.fullFrame ? fSlider("Sticker angle / Tilt", o.rot || 0, -180, 180, 1, v => { o.rot = v; changed(false); }, v => v + "°") : "",
       el("div", { class:"row field", style:"gap:6px;margin-bottom:8px" }, [
-        btn("-15° Tilt", () => { o.rot = (o.rot || 0) - 15; changed(false); renderInspector(); }),
-        btn("0° Straight", () => { o.rot = 0; changed(false); renderInspector(); }),
-        btn("+15° Tilt", () => { o.rot = (o.rot || 0) + 15; changed(false); renderInspector(); }),
+        !o.fullFrame ? btn("-15° Tilt", () => { o.rot = (o.rot || 0) - 15; changed(false); renderInspector(); }) : null,
+        !o.fullFrame ? btn("0° Straight", () => { o.rot = 0; changed(false); renderInspector(); }) : null,
+        !o.fullFrame ? btn("+15° Tilt", () => { o.rot = (o.rot || 0) + 15; changed(false); renderInspector(); }) : null,
         btn("🔄 Cycle Style", () => {
           o.cutoutHl = true;
           const seq = ["sticker", "glow", "pulse", "cyber", "halo", "none"];
@@ -6907,8 +7006,8 @@ function renderInspector(){
           renderInspector();
         })
       ]),
-      fChips("Shape", o.shape || "none", [["none","Sticker (No crop)"],["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }),
-      !o.cutoutHl ? el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]) : "",
+      !o.fullFrame ? fChips("Shape", o.shape || "none", [["none","Sticker (No crop)"],["rounded","Rounded"],["square","Square"],["circle","Circle"]], v => { o.shape = v; changed(false); }) : "",
+      (!o.fullFrame && !o.cutoutHl) ? el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:o.border, onchange:e => { o.border = e.target.checked; changed(false); } }), document.createTextNode("White frame and shadow")]) : "",
 
       /* CUTOUT HIGHLIGHT & INSTAGRAM STICKER */
       el("h2", { text:"✂️ Cutout & Sticker Styling (Instagram)", style:"margin-top:12px" }),
@@ -7253,6 +7352,7 @@ function deleteSelected(){
   if (!selected) return;
   const { type, item } = selected;
   if (type === "plot"){ const cl = selected.clip; cl.plots.splice(cl.plots.indexOf(item), 1); selected = null; refresh(); return; }
+  if (type === "region"){ const cl = selected.clip; cl.regions.splice(cl.regions.indexOf(item), 1); selected = null; refresh(); return; }
   if (type === "spot" || type === "punch"){ const cl = selected.clip, arr = type === "spot" ? cl.spots : cl.punches; arr.splice(arr.indexOf(item), 1); selected = null; refresh(); return; }
   if (type === "clip"){
     if (item.kind === "intro"){ P.intro.on = false; $("introOn").checked = false; persist(); }
@@ -7491,14 +7591,49 @@ function startPlotDraw(clip, existing){
     }
   }
   seek(clamp(t0, clip._start, clip._start + clip.dur));
-  drawing = { clip, pts:[], existing, drawAt: clamp(t0 - clip._start, 0, clip.dur) };
+  drawing = { clip, pts:[], existing, drawAt: clamp(t0 - clip._start, 0, clip.dur), kind:"plot" };
   $("drawBar").hidden = false; updateDrawBar(); renderFrame(playT);
 }
-function updateDrawBar(){ if (!drawing) return; $("drawMsg").textContent = drawing.pts.length < 3 ? `Click each corner of the plot on the preview (${drawing.pts.length} placed). 4 corners gives width and length.` : `${drawing.pts.length} corners placed. Click Finish, or keep adding corners.`; $("drawDone").disabled = drawing.pts.length < 3; }
+// "Highlight a region" — same click-to-trace workflow as a Plot outline, but for
+// any arbitrary shape (a road, a path, a façade, a garden) with no land-dimension
+// fields and no camera tracking. Shares drawBar/Undo/Cancel/Finish with Plot.
+function startRegionDraw(clip, existing){
+  pause();
+  let t0;
+  if (existing){
+    t0 = clip._start + Math.min(clip.dur - .1, (existing.at || 0) + 0.1);
+  } else {
+    t0 = (playT >= clip._start && playT <= clip._start + clip.dur) ? playT : clip._start + Math.min(clip.dur - .3, 0.4);
+  }
+  seek(clamp(t0, clip._start, clip._start + clip.dur));
+  drawing = { clip, pts: existing ? existing.pts.map(q => [...q]) : [], existing, drawAt: clamp(t0 - clip._start, 0, clip.dur), kind:"region" };
+  $("drawBar").hidden = false; updateDrawBar(); renderFrame(playT);
+}
+function updateDrawBar(){
+  if (!drawing) return;
+  const thing = drawing.kind === "region" ? "shape" : "plot";
+  $("drawMsg").textContent = drawing.pts.length < 3 ?
+    `Click each point of the ${thing} on the preview (${drawing.pts.length} placed). ${drawing.kind === "region" ? "Trace as many points as you need to follow the road or shape." : "4 corners gives width and length."}` :
+    `${drawing.pts.length} points placed. Click Finish, or keep adding points.`;
+  $("drawDone").disabled = drawing.pts.length < 3;
+}
 function cancelDraw(){ drawing = null; $("drawBar").hidden = true; if (!playing) renderFrame(playT); }
 function finishDraw(){
   if (!drawing || drawing.pts.length < 3) return;
-  const { clip, pts, existing, drawAt } = drawing;
+  const { clip, pts, existing, drawAt, kind } = drawing;
+  if (kind === "region"){
+    let rg = existing;
+    if (rg) rg.pts = pts;
+    else {
+      const curLocal = typeof drawAt === "number" ? drawAt : clamp(now() - clip._start, 0, Math.max(0, clip.dur - 0.5));
+      rg = { id: uid++, pts, name:"", color:"clay", at:+Math.max(0, curLocal).toFixed(2), dur:0, outline:true, fillOn:true, fillAlpha:.22, dimRest:false, dimAlpha:.6, strokeWidth:7 };
+      (clip.regions = clip.regions || []).push(rg);
+    }
+    drawing = null; $("drawBar").hidden = true;
+    changed(); select("region", rg, clip);
+    toast("✨ Region highlighted! Edit its color, fill, or turn on Spotlight (dim the rest) in the panel.");
+    return;
+  }
   let pl = existing;
   if (pl) pl.pts = pts;
   else {
@@ -7958,6 +8093,17 @@ function stagePointerDown(e, px, py){
   /* a plot's size label: click it to open the plot settings */
   const pc = activeClipAt(t);
   if (pc && pc.plots){ for (const pl of pc.plots){ const r = [pl._lrect, ...(pl._srects || [])].find(q => q && px >= q.x - pad && px <= q.x + q.w + pad && py >= q.y - pad && py <= q.y + q.h + pad); if (r && px >= r.x - pad && px <= r.x + r.w + pad && py >= r.y - pad && py <= r.y + r.h + pad && t >= pc._start + (pl.at || 0) && (!(pl.dur > 0) || t <= pc._start + (pl.at || 0) + pl.dur)){ select("plot", pl, pc); if (!playing) renderFrame(playT); return; } } }
+  /* click inside a traced region highlight to select it */
+  if (pc && pc.regions && pc.regions.length){
+    const localR = t - pc._start, XR = clipXform(pc, localR);
+    if (XR){
+      for (const rg of pc.regions){
+        if ((rg.at || 0) > localR || (rg.dur > 0 && localR > (rg.at || 0) + rg.dur)) continue;
+        const poly = (rg.pts || []).map(([a, b]) => mapPt(XR, a, b));
+        if (poly.length >= 3 && pointInPoly(px, py, poly)){ select("region", rg, pc); if (!playing) renderFrame(playT); return; }
+      }
+    }
+  }
   /* the photo or clip under the pointer: pan its framing */
   const c = activeClipAt(t);
   if (frameClip(c)){
@@ -9288,11 +9434,12 @@ function cloneClipData(c){
       kf: p.kf ? p.kf.map(k => ({ t:k.t, pts:k.pts.map(q => [...q]) })) : undefined
     })),
     kf:c.kf ? c.kf.map(k => ({ ...k })) : c.kf,
+    regions:(c.regions || []).map(r => ({ ...r, pts:(r.pts || []).map(q => [...q]) })),
     spots:c.spots ? c.spots.map(x => ({ ...x })) : c.spots,
     punches:c.punches ? c.punches.map(x => ({ ...x })) : c.punches,
     adj:c.adj ? { ...c.adj } : c.adj, textWs:wsCopy(c.textWs) };
 }
-function deepClip(c){ const d = cloneClipData(c); ["plots","spots","punches"].forEach(k => (d[k] || []).forEach(x => { x.id = uid++; })); return d; }
+function deepClip(c){ const d = cloneClipData(c); ["plots","regions","spots","punches"].forEach(k => (d[k] || []).forEach(x => { x.id = uid++; })); return d; }
 function shiftItems(list, dt){
   return (list || []).map(x => { const at = (x.at || 0) + dt; return at < 0 ? { ...x, at:0, dur:x.dur + at } : { ...x, at }; }).filter(x => x.dur > .25);
 }
@@ -9301,6 +9448,10 @@ function shiftClipItems(c, dt){
     p.at = Math.max(0, (p.at || 0) + dt);
     if (p.kf) p.kf.forEach(k => { k.t += dt; });
   });
+  // Regions use the same "dur:0 means runs to the end of the clip" convention as
+  // plots, so they shift like plots (shiftItems would wrongly drop them — it treats
+  // dur<=.25 as "expired", which is true of a fresh default region).
+  (c.regions || []).forEach(r => { r.at = Math.max(0, (r.at || 0) + dt); });
   c.spots = shiftItems(c.spots, dt); c.punches = shiftItems(c.punches, dt);
   (c.kf || []).forEach(k => { k.t += dt; });
 }
@@ -9318,20 +9469,31 @@ const RAMPS = {
   slowend: { name:"Slow down at the end", pts:[[0,1.6],[.55,1.6],[.75,.35],[1,.35]] },
   fastend: { name:"Speed up at the end", pts:[[0,.6],[.55,.6],[.8,2.5],[1,2.5]] },
   bullet:  { name:"Bullet time (freeze-like slow-mo)", pts:[[0,1.2],[.35,1.2],[.42,.15],[.68,.15],[.76,1.2],[1,1.2]] },
-  ease:    { name:"Smooth start and stop (drone)", pts:[[0,.45],[.18,1.1],[.82,1.1],[1,.45]] }
+  ease:    { name:"Smooth start and stop (drone)", pts:[[0,.45],[.18,1.1],[.82,1.1],[1,.45]] },
+  jumpcut: { name:"Jump cut: snaps to a faster speed mid-clip", pts:[[0,1],[.46,1],[.5,2.3],[.54,2.3],[1,2.3]] }
 };
 const smooth01 = p => p * p * (3 - 2 * p);
-function rampAt(name, u){
-  const pts = (RAMPS[name] || RAMPS.none).pts;
+// Keyframe points for a clip's speed curve — the fixed RAMPS presets above, OR
+// (when ramp === "custom") the clip's own user-placed speed keyframes. Both are
+// just [u, speedMultiplier] arrays over normalized clip progress u∈[0,1], so one
+// continuous clip can speed up/slow down anywhere in its middle without ever
+// being cut into pieces — this is the array that both playback and the VN-style
+// keyframe editor UI read and write.
+function rampPts(c){
+  if (c.ramp === "custom" && Array.isArray(c.customPts) && c.customPts.length >= 2) return c.customPts;
+  return (RAMPS[c.ramp] || RAMPS.none).pts;
+}
+function rampAt(pts, u){
   if (u <= pts[0][0]) return pts[0][1];
   for (let i = 0; i < pts.length - 1; i++){ const [a, va] = pts[i], [b, vb] = pts[i + 1]; if (u <= b) return va + (vb - va) * smooth01((u - a) / (b - a || 1)); }
   return pts[pts.length - 1][1];
 }
 function speedMap(c){
-  const key = c.ramp || "none";
+  const pts = rampPts(c);
+  const key = c.ramp === "custom" ? `custom:${c._rampRev || 0}` : (c.ramp || "none");
   if (c._map && c._map.key === key) return c._map;
   const N = 256, cum = new Float32Array(N + 1);
-  for (let i = 0; i < N; i++) cum[i + 1] = cum[i] + (rampAt(key, i / N) + rampAt(key, (i + 1) / N)) / 2 / N;
+  for (let i = 0; i < N; i++) cum[i + 1] = cum[i] + (rampAt(pts, i / N) + rampAt(pts, (i + 1) / N)) / 2 / N;
   Object.defineProperty(c, "_map", { value:{ key, cum, mean:cum[N], N }, writable:true, configurable:true, enumerable:false });
   return c._map;
 }
@@ -9353,7 +9515,7 @@ function rateAt(c, local){
   if (!c || c.kind !== "video") return 1;
   const freezePl = isPlotFrozen(c, local);
   if (freezePl) return 0;
-  return (c.speed || 1) * rampAt(c.ramp || "none", clamp(local / (c.dur || 1))) * (c.reverse ? -1 : 1);
+  return (c.speed || 1) * rampAt(rampPts(c), clamp(local / (c.dur || 1))) * (c.reverse ? -1 : 1);
 }
 function speedTag(c){
   if (c.kind !== "video") return "";
@@ -11229,12 +11391,103 @@ const hint = text => el("p", { class:"hint", text });
 const proOnly = (...kids) => el("div", { class:"pro-only" }, kids.filter(Boolean));
 const h2 = text => el("h2", { text, style:"margin-top:10px" });
 function toggleRow(label, checked, on){ return el("label", { class:"toggle" }, [Object.assign(el("input", { type:"checkbox" }), { checked:!!checked, onchange:e => on(e.target.checked) }), document.createTextNode(label)]); }
+// VN-style speed-ramp keyframe editor: drag points on one continuous clip to
+// make it fast/slow/fast anywhere in the middle — no splitting the clip into
+// pieces. Reads/writes it.customPts ([u, speedMultiplier] pairs, u in 0..1)
+// which rampPts()/rampAt() (defined above, near RAMPS) turn into the actual
+// variable-speed playback curve.
+function speedKeyframeEditor(it){
+  if (!Array.isArray(it.customPts) || it.customPts.length < 2){
+    const seed = (RAMPS[it._lastRamp] || RAMPS.none).pts;
+    it.customPts = seed.map(p => [p[0], p[1]]);
+  }
+  const W = 300, H = 110, PAD = 10, YMIN = .1, YMAX = 4;
+  const toX = u => PAD + u * (W - PAD * 2);
+  const toY = s => PAD + (1 - (clamp(s, YMIN, YMAX) - YMIN) / (YMAX - YMIN)) * (H - PAD * 2);
+  const fromX = x => clamp((x - PAD) / (W - PAD * 2), 0, 1);
+  const fromY = y => clamp(YMIN + (1 - (y - PAD) / (H - PAD * 2)) * (YMAX - YMIN), YMIN, YMAX);
+  const bump = () => { it._rampRev = (it._rampRev || 0) + 1; recalcDur(it); };
+
+  const svg = el("svg", { viewBox:`0 0 ${W} ${H}`, class:"speed-kf-editor",
+    style:"width:100%;height:120px;background:var(--soft);border-radius:10px;touch-action:none;cursor:crosshair;display:block" });
+  svg.appendChild(el("line", { x1:PAD, x2:W - PAD, y1:toY(1), y2:toY(1), stroke:"rgba(255,255,255,.22)", "stroke-dasharray":"3,3" }));
+  const path = el("path", { fill:"none", stroke:"var(--accent,#7c5cff)", "stroke-width":"2.5" });
+  svg.appendChild(path);
+  const pointEls = [];
+
+  function redrawPath(){
+    const pts = it.customPts;
+    const STEPS = 48;
+    let d = `M ${toX(0)} ${toY(rampAt(pts, 0))}`;
+    for (let i = 1; i <= STEPS; i++){ const u = i / STEPS; d += ` L ${toX(u)} ${toY(rampAt(pts, u))}`; }
+    path.setAttribute("d", d);
+  }
+  function redrawPoints(){
+    pointEls.forEach(p => p.remove()); pointEls.length = 0;
+    it.customPts.forEach((p, idx) => {
+      const isEdge = idx === 0 || idx === it.customPts.length - 1;
+      const c = el("circle", { cx:toX(p[0]), cy:toY(p[1]), r:isEdge ? 6 : 7,
+        fill:isEdge ? "rgba(255,255,255,.55)" : "var(--accent,#7c5cff)", stroke:"#fff", "stroke-width":"1.5", style:"cursor:grab" });
+      c.dataset.idx = idx;
+      pointEls.push(c); svg.appendChild(c);
+    });
+  }
+  redrawPath(); redrawPoints();
+
+  function svgPt(ev){ const r = svg.getBoundingClientRect(); return { x:(ev.clientX - r.left) / r.width * W, y:(ev.clientY - r.top) / r.height * H }; }
+
+  let dragIdx = null;
+  svg.addEventListener("pointerdown", ev => {
+    if (ev.target.tagName === "circle"){ dragIdx = +ev.target.dataset.idx; svg.setPointerCapture(ev.pointerId); return; }
+    const { x, y } = svgPt(ev), u = fromX(x), s = +fromY(y).toFixed(2);
+    const pts = it.customPts;
+    let at = pts.findIndex(p => p[0] > u);
+    if (at === -1) at = pts.length - 1;
+    if (at === 0) at = 1;
+    pts.splice(at, 0, [u, s]);
+    bump(); changed(); renderInspector();
+  });
+  svg.addEventListener("pointermove", ev => {
+    if (dragIdx == null) return;
+    const { x, y } = svgPt(ev), pts = it.customPts;
+    const isEdge = dragIdx === 0 || dragIdx === pts.length - 1;
+    let u = pts[dragIdx][0];
+    if (!isEdge) u = clamp(fromX(x), pts[dragIdx - 1][0] + .015, pts[dragIdx + 1][0] - .015);
+    pts[dragIdx] = [u, +fromY(y).toFixed(2)];
+    redrawPath(); redrawPoints();
+  });
+  const finishDrag = () => { if (dragIdx == null) return; dragIdx = null; bump(); changed(); };
+  svg.addEventListener("pointerup", finishDrag);
+  svg.addEventListener("pointercancel", finishDrag);
+  svg.addEventListener("dblclick", ev => {
+    if (ev.target.tagName !== "circle") return;
+    const idx = +ev.target.dataset.idx;
+    if (idx === 0 || idx === it.customPts.length - 1 || it.customPts.length <= 2) return;
+    it.customPts.splice(idx, 1);
+    bump(); changed(); renderInspector();
+  });
+
+  const presetRow = el("div", { class:"row field", style:"flex-wrap:wrap;gap:6px" },
+    Object.entries(RAMPS).filter(([k]) => k !== "none").map(([k, r]) =>
+      btn(r.name.split(":")[0], () => {
+        it.customPts = r.pts.map(p => [p[0], p[1]]);
+        it._lastRamp = k;
+        bump(); changed(); renderInspector();
+      })));
+
+  return el("div", { class:"field" }, [
+    el("label", { text:"Speed keyframes" }),
+    svg,
+    hint("Click empty space to add a keyframe, drag a dot to reshape the curve, double-click a dot to remove it. The clip is never cut — speed changes smoothly between points."),
+    presetRow]);
+}
 function videoToolsUI(it){
   const sp = it.speed || 1;
   return [h2("Speed and drone tools"),
     fChips("Speed", SPEEDS.some(([v]) => v === sp) ? sp : -1, SPEEDS, v => { it.speed = v; changed(); renderInspector(); if (v < .5 || v > 2.5) toast("At this speed the clip's own sound is muted. Music and voiceover still play."); }),
     proOnly(fSlider("Custom speed", sp, .1, 8, .05, v => { it.speed = v; changed(); }, v => (+v).toFixed(2) + "x"),
-      fSelect("Speed ramp", it.ramp || "none", Object.entries(RAMPS).map(([k, r]) => [k, r.name]), v => { it.ramp = v; changed(); renderInspector(); }),
+      fSelect("Speed ramp", it.ramp || "none", [...Object.entries(RAMPS).map(([k, r]) => [k, r.name]), ["custom", "Custom (drag your own keyframes)"]], v => { it.ramp = v; changed(); renderInspector(); }),
+      it.ramp === "custom" ? speedKeyframeEditor(it) : null,
       toggleRow("Play in reverse (great for drone pull-backs)", it.reverse, v => { it.reverse = v; changed(); }),
       hint(`Plays ${it.dur.toFixed(1)} s on the timeline from ${(it.trimOut - it.trimIn).toFixed(1)} s of footage. Clip sound is muted when slowed or sped up a lot, or reversed. Reverse preview can stutter; the export is smooth.`),
       fSlider("Horizon fix", it.tilt || 0, -12, 12, .1, v => { it.tilt = v; changed(false); }, v => (+v).toFixed(1) + "°")),
@@ -11275,6 +11528,10 @@ function highlightUI(it){
     el("div", { class:"row field" }, [btn("Spotlight a spot", () => startPlace("spot", it), "btn sm dark"), btn("Zoom punch-in", () => startPlace("punch", it), "btn sm dark")])];
   (it.spots || []).forEach((sp, k) => out.push(el("div", { class:"row field" }, [btn(`Edit spotlight ${sp.label ? `"${sp.label}"` : k + 1}`, () => { select("spot", sp, it); seek(it._start + (sp.at || 0) + .8); })])));
   (it.punches || []).forEach((pz, k) => out.push(el("div", { class:"row field" }, [btn(`Edit zoom ${k + 1} (${pz.z.toFixed(1)}x)`, () => { select("punch", pz, it); seek(it._start + (pz.at || 0) + .6); })])));
+  out.push(h2("Highlight a region (road, path, any shape)"),
+    hint("Trace an outline around any part of the frame — a road, a boundary, a building, a view — and glow it, fill it, or dim everything else. Not tied to plot dimensions."),
+    el("div", { class:"row field" }, [btn("Trace a region", () => startRegionDraw(it), "btn sm dark")]));
+  (it.regions || []).forEach((rg, k) => out.push(el("div", { class:"row field" }, [btn(`Edit region ${rg.name ? `"${rg.name}"` : k + 1}`, () => { select("region", rg, it); seek(it._start + (rg.at || 0) + .8); })])));
   return out;
 }
 function cutoutHighlightClipUI(it){
@@ -11443,6 +11700,23 @@ const _seekBase = seek;
 seek = function(t){ _seekBase(t); if (selected && selected.type === "clip" && selected.item.kf && selected.item.kf.length && !playing){ clearTimeout(kfRefreshT); kfRefreshT = setTimeout(renderInspector, 150); } };
 
 function proInspector(type, it, box){
+  if (type === "region"){
+    const rg = it, clip = selected.clip;
+    box.append(el("p", { class:"insp-title", text:"Region highlight" + (rg.name ? ` — ${rg.name}` : "") }),
+      hint("Traces any part of the frame — a road, a path, a façade, a garden strip. Redraw to change its shape."),
+      fText("Label (optional, e.g. \"Access Road\")", rg.name, v => { rg.name = v; changed(false); }),
+      fChips("Colour", rg.color, [["red","Red"],["yellow","Yellow"],["green","Green"],["clay","Clay"],["lime","White"],["blue","Blue"],["sage","Sage"],["custom","Custom"]], v => { rg.color = v; if (v === "custom" && !rg.lineHex) rg.lineHex = "#FF6D00"; changed(false); renderInspector(); }),
+      rg.color === "custom" ? plotColorField("Highlight colour", rg.lineHex || "#FF6D00", v => { rg.lineHex = v || "#FF6D00"; changed(false); }) : "",
+      toggleRow("Glowing outline", rg.outline !== false, v => { rg.outline = v; changed(false); }),
+      toggleRow("Light fill inside the shape", rg.fillOn !== false, v => { rg.fillOn = v; changed(false); }),
+      rg.fillOn !== false ? fSlider("Fill strength", rg.fillAlpha ?? .22, .05, .6, .01, v => { rg.fillAlpha = v; changed(false); }) : "",
+      toggleRow("Spotlight: dim everything outside this shape", !!rg.dimRest, v => { rg.dimRest = v; changed(false); renderInspector(); }),
+      rg.dimRest ? fSlider("Darken the rest", rg.dimAlpha ?? .6, .2, .9, .01, v => { rg.dimAlpha = v; changed(false); }) : "",
+      fSlider("Outline thickness", rg.strokeWidth || 7, 2, 16, .5, v => { rg.strokeWidth = v; changed(false); }),
+      el("div", { class:"grid2" }, [fNum("Appears at (s into clip)", rg.at, v => { rg.at = clamp(v, 0, Math.max(0, clip.dur - .1)); changed(); }, .1, 0, 600), fNum("Shows for (s, 0 = until clip ends)", rg.dur, v => { rg.dur = clamp(v, 0, 600); changed(); }, .1, 0, 600)]),
+      el("div", { class:"row" }, [btn("Redraw shape", () => startRegionDraw(clip, rg)), btn("Back to clip", () => select("clip", clip)), btn("Delete", () => deleteSelected())]));
+    return true;
+  }
   if (type === "spot"){
     const sp = it, clip = selected.clip;
     box.append(el("p", { class:"insp-title", text:"Spotlight" }), hint("Drag the circle on the preview to move it."),
@@ -12759,12 +13033,23 @@ if (EMBED){
       img.src = m.dataUrl;
     }
     if (m.girika === "video-cutout" && (m.dataUrl || m.blob)){
+      // bg-remover.html now bakes the keying (AI/chroma/diff, whichever the
+      // user picked) into a real alpha-channel WebM before sending it over —
+      // so this is already a transparent clip. No re-keying here: it just
+      // plays natively, same as dropping a transparent .webm into the
+      // Cutouts tray directly (addOverlay()'s isCutout path above).
       const srcUrl = m.dataUrl || URL.createObjectURL(m.blob);
       const vid = document.createElement("video");
       vid.playsInline = true; vid.muted = true; vid.loop = true;
       vid.onloadedmetadata = () => {
         const start = clamp(now(), 0, Math.max(0, TOTAL - .5));
         const dur = Math.min(vid.duration || 4, 30);
+        // Defaults to a full-frame cutout (covers the whole video, like a background
+        // layer) rather than a small floating sticker — that's the normal reason to
+        // send a cutout from the bg remover. Pass fullFrame:false from the sender to
+        // get the old small-sticker behaviour instead; either way it's a toggle in
+        // the overlay inspector afterwards too.
+        const fullFrame = m.fullFrame !== false;
         const o = {
           id: uid++,
           el: vid,
@@ -12773,15 +13058,13 @@ if (EMBED){
           end: Math.min(TOTAL || dur, start + dur),
           x: .5,
           y: .5,
-          w: .55,
+          w: fullFrame ? 1 : .55,
+          fullFrame,
           rot: m.rot || 0,
           shape: "none",
           border: false,
-          chromaKey: m.videoMode === "chroma" || !!m.chromaKey,
-          keyColor: m.keyColor || "#00FF00",
-          keyTol: m.keyTol ?? 0.36,
-          keyFeather: m.keyFeather ?? 0.14,
-          cutoutHl: m.cutoutHl ?? true,
+          chromaKey: false,
+          cutoutHl: m.cutoutHl ?? !fullFrame,
           hlStyle: m.hlStyle || "sticker",
           hlColor: m.hlColor || "white",
           hlHex: m.hlHex || "#FFFFFF",
@@ -12789,11 +13072,11 @@ if (EMBED){
           hlBlur: 14,
           hlOpacity: 0.95,
           isCutout: true,
-          isIgSticker: true
+          isIgSticker: !fullFrame
         };
         P.overlays.push(o); refresh(); select("overlay", o);
         if (typeof saveCutoutToTray === "function") saveCutoutToTray(o);
-        toast("🎬 Instagram Video Cutout Sticker added to reel!");
+        toast(fullFrame ? "🎬 Full-video cutout added to reel!" : "🎬 Video Cutout Sticker added to reel!");
       };
       vid.src = srcUrl;
     }
@@ -12819,6 +13102,8 @@ requestAnimationFrame(loop);
 .blk.plotb.roadb{background:linear-gradient(135deg,#1e293b,#334155);border:1.5px solid #FFD700;box-shadow:inset 0 1px 0 rgba(255,215,0,.35),0 2px 5px rgba(0,0,0,.35)}
 .blk.plotb.sel{border-color:#5eead4 !important;box-shadow:0 0 0 2px rgba(45,212,191,.5),0 0 12px rgba(45,212,191,.4) !important}
 .blk.plotb.roadb.sel{border-color:#FDE047 !important;box-shadow:0 0 0 2px rgba(255,215,0,.6),0 0 14px rgba(255,215,0,.5) !important}
+.blk.plotb.regionb{background:linear-gradient(135deg,#7c3aed,#9333ea);border:1px solid rgba(216,180,254,.5)}
+.blk.plotb.regionb.sel{border-color:#e9d5ff !important;box-shadow:0 0 0 2px rgba(192,132,252,.6),0 0 14px rgba(192,132,252,.5) !important}
 .blk.spotb{background:linear-gradient(135deg,#4338ca,#6366f1);border:1px solid rgba(165,180,252,.5)}
 .blk.punchb{background:linear-gradient(135deg,#9a3412,#c2410c);border:1px solid rgba(253,186,116,.5)}
 .blk.textb{background:linear-gradient(135deg,#6b21a8,#7e22ce);border:1px solid rgba(216,180,254,.5)}

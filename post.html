@@ -204,6 +204,21 @@ body.recording .recnote{display:block}
   .stage-top,.canvas-area,.vbar{padding-left:16px;padding-right:16px}
   .stage{min-height:0}
 }
+/* phones: tighter chrome, bigger tap targets than a mouse UI needs */
+@media (max-width:640px){
+  .panel{padding:14px}
+  .slider{grid-template-columns:1fr 46px;grid-template-rows:auto auto;row-gap:4px}
+  .slider>span{grid-column:1/-1}
+  .btn{min-height:44px;padding:10px 14px}
+  .btn.sm{min-height:40px;padding:9px 12px}
+  .st-btn{min-height:38px}
+  .stage-tools{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:calc(100% - 16px)}
+  .stage-tools::-webkit-scrollbar{display:none}
+}
+@media (max-width:900px) and (orientation:landscape) and (max-height:520px){
+  .stage{min-height:0}
+  .panel{max-height:46vh}
+}
 body.simple .pro-only{display:none!important}
 .mode-sw{display:flex;background:rgba(255,255,255,.08);border-radius:9px;padding:3px;gap:2px;margin-left:auto}
 .mode-sw button{border:0;background:none;color:var(--sage);font:700 12px var(--sans);padding:6px 12px;border-radius:7px;cursor:pointer}
@@ -2644,14 +2659,22 @@ function buildGuides(){
 function fitCanvas(){
   const f = fmt(), area = $("canvasArea"), holder = $("holder");
   const narrow = window.innerWidth <= 1180;
+  // visualViewport tracks what's actually visible on mobile (shrinks when the
+  // on-screen keyboard or Safari's dynamic toolbar appears), so the canvas
+  // doesn't get sized against a taller viewport than what's really shown.
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
   const availW = Math.max(200, area.clientWidth - (narrow ? 32 : 40));
-  const availH = narrow ? Math.min(window.innerHeight * .72, 900) : Math.max(260, area.clientHeight - 28);
+  let availH = narrow ? Math.min(vh * .62, 900) : Math.max(260, area.clientHeight - 28);
+  if (narrow && area.clientHeight > 80) availH = Math.min(availH, area.clientHeight - 10);
+  availH = Math.max(160, availH);
   let w = availW, h = w * f.h / f.w;
   if (h > availH){ h = availH; w = h * f.w / f.h; }
   holder.style.width = Math.floor(w) + "px"; holder.style.height = Math.floor(h) + "px";
 }
 new ResizeObserver(fitCanvas).observe($("canvasArea"));
 window.addEventListener("resize", fitCanvas);
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitCanvas);
+window.addEventListener("orientationchange", () => setTimeout(fitCanvas, 60));
 
 /* =========================================================
    Media upload, positioning, video controls

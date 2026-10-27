@@ -3,8 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>BG Remover — AI Photo &amp; Video Background Remover</title>
-<script src="js/mediapipe/selfie_segmentation.js"></script>
+<title>BG Remover — AI Photo &amp; No-AI Video Background Remover</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
   :root {
@@ -327,14 +326,14 @@
 <div id="appView">
 <header>
   <h1>BG <span>Remover</span></h1>
-  <p><b>100% free, private &amp; offline-capable.</b> Remove backgrounds from photos &amp; videos — single or in batch. Everything runs locally on your device.</p>
+  <p><b>100% free, private &amp; offline-capable.</b> Remove backgrounds from photos &amp; videos — single or in batch. AI Subject mode handles any video with no green screen; Chroma/Difference Key cover green-screen or locked-camera shots. Everything runs locally on your device, self-hosted, no cloud, no credits.</p>
 </header>
 
 <main>
   <div id="dropzone">
     <div class="big">🖼️ 🎬</div>
     <h2>Drop photos or videos here, paste, or click to browse</h2>
-    <p>JPG, PNG, WEBP · MP4, WEBM, MOV — single or <b>batch</b>. On-device AI segmentation with instant offline processing.</p>
+    <p>JPG, PNG, WEBP · MP4, WEBM, MOV — single or <b>batch</b>. On-device AI subject detection for any footage, plus chroma/difference keying for green-screen or static shots.</p>
     <div class="row">
       <button class="btn" id="btnBrowse">Choose photos / videos</button>
       <button class="btn ghost" id="btnSample">Sample photo</button>
@@ -366,24 +365,50 @@
     <div class="editor">
       <aside id="panel">
         <div id="videoEngineGroup" style="display:none">
-          <h3>Video Engine</h3>
+          <h3>Video Engine <span style="text-transform:none;letter-spacing:0;font-weight:600;color:var(--muted)">· self-hosted AI · no cloud · forever free</span></h3>
           <div class="ctl">
             <select id="videoModeSelect">
-              <option value="ai">⚡ AI Subject (Person / Portrait / Action)</option>
+              <option value="ai">⚡ AI Subject (any video, no screen needed)</option>
               <option value="chroma">🟢 Chroma Key (Green / Color Screen)</option>
+              <option value="diff">🎯 Difference Key (Static Background, any color)</option>
             </select>
+          </div>
+          <div id="aiSettings" style="margin-top:4px">
+            <div class="ctl"><span class="note" id="aiStatus">Loading AI engine…</span></div>
+            <div class="ctl">
+              <label>AI Sensitivity <b id="vThreshold">50%</b></label>
+              <input type="range" id="rThreshold" min="0.1" max="0.9" step="0.02" value="0.5" />
+              <span class="note">Lower keeps more of the subject (risks background bleeding in); higher cuts tighter (risks eating into the subject).</span>
+            </div>
           </div>
           <div id="chromaSettings" style="display:none;margin-top:4px">
             <div class="ctl">
               <label>Key color</label>
               <div style="display:flex;gap:8px;align-items:center">
                 <input type="color" id="keyColorPicker" value="#00FF00" style="width:36px;height:28px;border-radius:6px;border:1px solid var(--line);cursor:pointer;padding:0" />
-                <span style="font-size:11.5px;color:var(--muted)">Green screen default</span>
+                <button type="button" class="btn ghost sm" id="btnEyedrop" style="padding:6px 10px" title="Click, then tap the background in the preview to sample its exact color">💧 Pick from frame</button>
               </div>
+              <span class="note" id="eyedropHint" style="display:none;color:var(--acc)">Tap the background in the preview below to sample it…</span>
             </div>
             <div class="ctl">
               <label>Tolerance <b id="vTol">36%</b></label>
               <input type="range" id="rTol" min="0.05" max="0.8" step="0.01" value="0.36" />
+            </div>
+            <div class="ctl">
+              <label>Spill suppression <b id="vSpill">100%</b></label>
+              <input type="range" id="rSpill" min="0" max="1" step="0.05" value="1" />
+              <span class="note">Strips the green/blue color cast that bleeds onto hair and skin edges.</span>
+            </div>
+          </div>
+          <div id="diffSettings" style="display:none;margin-top:4px">
+            <div class="ctl">
+              <button type="button" class="btn ghost sm" id="btnCapturePlate" style="width:100%">📸 Capture clean background frame</button>
+              <span class="note">Scrub to a moment with <b>no subject</b> in frame, then capture it. Works on any background — no green screen needed.</span>
+            </div>
+            <div class="ctl" id="plateStatus"><span class="note">No background captured yet.</span></div>
+            <div class="ctl">
+              <label>Sensitivity <b id="vDiffTol">12%</b></label>
+              <input type="range" id="rDiffTol" min="0.02" max="0.5" step="0.01" value="0.12" />
             </div>
           </div>
         </div>
@@ -398,12 +423,8 @@
             <label>Expand / shrink <b id="vExpand">0</b>px</label>
             <input type="range" id="rExpand" min="-6" max="6" step="0.5" value="0" />
           </div>
-          <div class="ctl" id="ctlThreshold" style="display:none">
-            <label>AI Sensitivity <b id="vThreshold">50%</b></label>
-            <input type="range" id="rThreshold" min="0.1" max="0.9" step="0.02" value="0.5" />
-          </div>
           <div class="ctl">
-            <span class="note">Feather softens the cutout edge. Expand (+) / shrink (−) fixes halos or eaten edges.</span>
+            <span class="note">Feather softens the cutout edge. Expand (+) / shrink (−) fixes halos or eaten edges. Applies to photos and video alike.</span>
           </div>
         </div>
         <div>
@@ -461,6 +482,12 @@
           <div class="ctl" style="flex-direction:row;gap:8px">
             <button class="btn sm" id="btnDownload" style="flex:1">⬇ Download</button>
             <button class="btn ghost sm" id="btnCopy" style="flex:1" title="Copy transparent PNG to clipboard">📋 Copy</button>
+          </div>
+          <div class="ctl" style="margin-top:2px">
+            <label class="toggle-lbl" style="display:flex;align-items:center;gap:8px;cursor:pointer">
+              <input type="checkbox" id="chkFullFrame" checked />
+              <span>Send video as full-frame cutout (fills the whole clip, not a small sticker)</span>
+            </label>
           </div>
           <div class="ctl" style="flex-direction:row;gap:8px;margin-top:2px">
             <button class="btn ghost sm" id="btnSendPost" style="flex:1" title="Send cutout to Post Editor">📲 To Post</button>
@@ -581,8 +608,8 @@
         <td>Open-source library (MIT license) for high-accuracy neural image segmentation in the browser.</td>
       </tr>
       <tr>
-        <td>MediaPipe SelfieSegmentation</td>
-        <td>On-device real-time AI neural network for video subject segmentation running at 30–60+ FPS via WebAssembly SIMD and WebGL. Self-hosted locally in <code>js/mediapipe/</code>.</td>
+        <td>Chroma &amp; Difference Key engine</td>
+        <td>Zero-AI video background removal: pure canvas pixel math (color-distance keying, or per-pixel diff against a captured clean background plate). No model, no download, no CDN, no credits, runs forever — the same technique Adobe Premiere/After Effects use for Keylight and Difference Matte.</td>
       </tr>
       <tr>
         <td>ISNet model</td>
@@ -654,9 +681,13 @@ const videoControls = $('videoControls');
 const btnPlayPause = $('btnPlayPause'), vSeek = $('vSeek'), vTime = $('vTime'),
       btnLoop = $('btnLoop'), btnMute = $('btnMute');
 const videoEngineGroup = $('videoEngineGroup'), videoModeSelect = $('videoModeSelect'),
-      chromaSettings = $('chromaSettings');
+      chromaSettings = $('chromaSettings'), diffSettings = $('diffSettings'), aiSettings = $('aiSettings');
 const keyColorPicker = $('keyColorPicker'), rTol = $('rTol'), vTol = $('vTol');
-const ctlThreshold = $('ctlThreshold'), rThreshold = $('rThreshold'), vThreshold = $('vThreshold');
+const rSpill = $('rSpill'), vSpill = $('vSpill');
+const btnEyedrop = $('btnEyedrop'), eyedropHint = $('eyedropHint');
+const btnCapturePlate = $('btnCapturePlate'), plateStatus = $('plateStatus');
+const rDiffTol = $('rDiffTol'), vDiffTol = $('vDiffTol');
+const rThreshold = $('rThreshold'), vThreshold = $('vThreshold'), aiStatus = $('aiStatus');
 
 /* ================= state ================= */
 let items = [];            // {id, type:'image'|'video', file, name, thumbUrl, status, ...}
@@ -670,13 +701,19 @@ let refine = { feather: 0, expand: 0, threshold: 0.5 };
 let refineTimer = null;
 let animFrameId = null;
 
-// MediaPipe Video AI Engine state
-let selfieSeg = null;
-let selfieSegReady = false;
-let currentSegmentationMask = null;
-let isProcessingVideoFrame = false;
-let tempVidCanvas = null, tempVidCtx = null;
-let _vckCv = null, _vckCtx = null;
+// Video keying engine state (chroma / difference — no AI, no cloud)
+let _vckCv = null, _vckCtx = null;             // chroma key scratch canvas
+let _vdkCv = null, _vdkCtx = null;             // difference key scratch canvas
+let _vdkPlateRs = null, _vdkPlateRsCtx = null; // resized background-plate cache
+let _vdkPlateData = null, _vdkCacheKey = '';
+let _vraAlphaCv = null, _vraAlphaCtx = null;   // alpha choke/feather scratch canvas
+let _eyedropCv = null, _eyedropCtx = null;
+let eyedropActive = false;
+
+// AI Subject engine state (self-hosted MediaPipe, local files only — never a CDN)
+let selfieSeg = null, selfieSegReady = false, aiLoadError = null, aiLoadPromise = null;
+let currentSegmentationMask = null, isProcessingVideoFrame = false;
+let _aiMaskCv = null, _aiMaskCtx = null, _aiOutCv = null, _aiOutCtx = null;
 
 const active = () => items.find(i => i.id === activeId);
 
@@ -697,101 +734,95 @@ function progress(key, current, total) {
   else ovStatus.textContent = `${key} — ${pct}%`;
 }
 
-/* ================= MediaPipe Video AI Engine ================= */
-async function initVideoAI() {
-  if (selfieSegReady && selfieSeg) return selfieSeg;
-  
-  if (!window.SelfieSegmentation) {
-    showOverlay("Loading on-device AI Video Neural Engine…", "MediaPipe SelfieSegmentation");
-    progress("compute:init", 20, 100);
-    try {
-      await new Promise((res, rej) => {
-        const s = document.createElement("script");
-        s.src = "js/mediapipe/selfie_segmentation.js";
-        s.onload = res;
-        s.onerror = () => {
-          const s2 = document.createElement("script");
-          s2.src = "https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js";
-          s2.onload = res;
-          s2.onerror = rej;
-          document.head.appendChild(s2);
-        };
-        document.head.appendChild(s);
-      });
-    } catch(e) {
-      console.warn("Could not load SelfieSegmentation script globally:", e);
+/* ================= AI Subject Engine (self-hosted, local files only — no CDN) ================= */
+// Loads once per session, lazily, and never blocks the UI. If it fails (model
+// files missing, WASM unsupported) it degrades gracefully: video still shows
+// unmodified and the status line tells the user to switch to Chroma/Difference Key.
+function setAiStatus(text) { if (aiStatus) aiStatus.textContent = text; }
+
+function ensureVideoAI() {
+  if (aiLoadPromise) return aiLoadPromise;
+  aiLoadPromise = (async () => {
+    setAiStatus('⏳ Loading AI engine (local files, one-time per session)…');
+    if (!window.SelfieSegmentation) {
+      try {
+        await new Promise((res, rej) => {
+          const s = document.createElement('script');
+          s.src = 'js/mediapipe/selfie_segmentation.js';
+          s.onload = res;
+          s.onerror = () => rej(new Error('js/mediapipe/selfie_segmentation.js failed to load'));
+          document.head.appendChild(s);
+        });
+      } catch (err) {
+        aiLoadError = err;
+      }
     }
-  }
-
-  if (!window.SelfieSegmentation) {
-    console.warn("SelfieSegmentation still not available globally");
-    return null;
-  }
-
-  showOverlay("Initializing on-device AI Video Neural Engine…", "MediaPipe SelfieSegmentation");
-  progress("compute:init", 50, 100);
-
-  const isFile = window.location.protocol === 'file:';
-  const localLocate = (file) => `js/mediapipe/${file}`;
-  const cdnLocate = (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/${file}`;
-
-  let segInstance = null;
-  let ready = false;
-
-  // Try local first if on HTTP/HTTPS
-  if (!isFile) {
-    try {
-      segInstance = new window.SelfieSegmentation({ locateFile: localLocate });
-      segInstance.setOptions({
-        modelSelection: 1, // 1 = landscape/fast
-        selfieMode: false
-      });
-      segInstance.onResults(results => {
-        currentSegmentationMask = results.segmentationMask;
-      });
-      await segInstance.initialize();
-      ready = true;
-    } catch(err) {
-      console.warn("Local MediaPipe init failed, trying CDN fallback:", err);
-      segInstance = null;
+    if (!window.SelfieSegmentation) {
+      aiLoadError = aiLoadError || new Error('SelfieSegmentation not available');
+      setAiStatus('⚠ AI engine unavailable on this page — use Chroma Key or Difference Key instead.');
+      return null;
     }
-  }
-
-  // Fallback to CDN if local failed or if on file:// protocol
-  if (!ready) {
     try {
-      showOverlay("Loading on-device AI model from CDN…", "MediaPipe SelfieSegmentation");
-      progress("compute:cdn", 75, 100);
-      segInstance = new window.SelfieSegmentation({ locateFile: cdnLocate });
-      segInstance.setOptions({
-        modelSelection: 1,
-        selfieMode: false
+      const seg = new window.SelfieSegmentation({ locateFile: (f) => `js/mediapipe/${f}` });
+      seg.setOptions({ modelSelection: 1, selfieMode: false });
+      seg.onResults((res) => {
+        currentSegmentationMask = res.segmentationMask;
+        isProcessingVideoFrame = false;
+        const it = active();
+        if (it && it.type === 'video' && it.videoMode === 'ai') renderVideoFrame(it);
       });
-      segInstance.onResults(results => {
-        currentSegmentationMask = results.segmentationMask;
-      });
-      await segInstance.initialize();
-      ready = true;
-    } catch(err) {
-      console.error("MediaPipe CDN init also failed:", err);
-      segInstance = null;
+      await seg.initialize();
+      selfieSeg = seg;
+      selfieSegReady = true;
+      setAiStatus('✓ AI engine ready');
+      const it = active();
+      if (it && it.type === 'video' && it.videoMode === 'ai') renderVideoFrame(it);
+      return seg;
+    } catch (err) {
+      aiLoadError = err;
+      setAiStatus('⚠ AI engine failed to initialize — use Chroma Key or Difference Key instead.');
+      return null;
     }
-  }
-
-  if (ready && segInstance) {
-    selfieSeg = segInstance;
-    selfieSegReady = true;
-    progress("compute:ready", 100, 100);
-  } else {
-    selfieSegReady = false;
-  }
-
-  hideOverlay();
-  return selfieSeg;
+  })();
+  return aiLoadPromise;
 }
 
-/* ================= Chroma Key Engine ================= */
-function applyVideoChromaKey(src, w, h, keyHex = '#00FF00', tol = 0.36, feather = 0.14) {
+// Composites video over its AI segmentation mask. Reads the mask's own luminance
+// as the subject-confidence value (robust regardless of how the bitmap encodes it,
+// rather than assuming alpha-encoding), then applies the sensitivity threshold.
+function compositeAiMask(video, mask, w, h, threshold = 0.5) {
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_aiMaskCv) { _aiMaskCv = document.createElement('canvas'); _aiMaskCtx = _aiMaskCv.getContext('2d', { willReadFrequently: true }); }
+  if (_aiMaskCv.width !== w || _aiMaskCv.height !== h) { _aiMaskCv.width = w; _aiMaskCv.height = h; }
+  _aiMaskCtx.clearRect(0, 0, w, h);
+  let maskData;
+  try { _aiMaskCtx.drawImage(mask, 0, 0, w, h); maskData = _aiMaskCtx.getImageData(0, 0, w, h); } catch(e) { return video; }
+
+  if (!_aiOutCv) { _aiOutCv = document.createElement('canvas'); _aiOutCtx = _aiOutCv.getContext('2d', { willReadFrequently: true }); }
+  if (_aiOutCv.width !== w || _aiOutCv.height !== h) { _aiOutCv.width = w; _aiOutCv.height = h; }
+  _aiOutCtx.clearRect(0, 0, w, h);
+  let outData;
+  try { _aiOutCtx.drawImage(video, 0, 0, w, h); outData = _aiOutCtx.getImageData(0, 0, w, h); } catch(e) { return video; }
+
+  const md = maskData.data, od = outData.data;
+  const knee = 0.12;
+  const thr = Math.min(0.95, Math.max(0.05, threshold));
+  for (let i = 0; i < od.length; i += 4) {
+    const conf = md[i] / 255; // mask luminance = subject confidence, 0..1
+    let a;
+    if (conf >= thr + knee) a = 255;
+    else if (conf <= thr - knee) a = 0;
+    else a = Math.round(((conf - (thr - knee)) / (2 * knee)) * 255);
+    od[i + 3] = a;
+  }
+  _aiOutCtx.putImageData(outData, 0, 0);
+  return _aiOutCv;
+}
+
+/* ================= Chroma Key Engine (no AI, no cloud) ================= */
+// Classic color-distance keying, same family of math as Adobe Keylight.
+// `spill` (0-1) scales despill strength on semi-transparent edge pixels.
+function applyVideoChromaKey(src, w, h, keyHex = '#00FF00', tol = 0.36, spill = 1) {
   w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
   if (!_vckCv) { _vckCv = document.createElement('canvas'); _vckCtx = _vckCv.getContext('2d', { willReadFrequently: true }); }
   if (_vckCv.width !== w || _vckCv.height !== h) { _vckCv.width = w; _vckCv.height = h; }
@@ -806,7 +837,7 @@ function applyVideoChromaKey(src, w, h, keyHex = '#00FF00', tol = 0.36, feather 
   const kb = parseInt(hex.slice(4, 6), 16) || 0;
   const isGreen = kg > kr + 35 && kg > kb + 35;
   const isBlue = kb > kr + 35 && kb > kg + 35;
-  const fthr = Math.max(0.02, feather || 0.14);
+  const knee = 0.12; // soft transition width at the tolerance boundary (antialiased edge, not spatial feather)
 
   for (let i = 0; i < d.length; i += 4) {
     const r = d[i], g = d[i + 1], b = d[i + 2], a = d[i + 3];
@@ -816,14 +847,102 @@ function applyVideoChromaKey(src, w, h, keyHex = '#00FF00', tol = 0.36, feather 
     else if (isBlue) diff = (b - Math.max(r, g)) / 255;
     else { const dr = (r - kr) / 255, dg = (g - kg) / 255, db = (b - kb) / 255; diff = 1 - Math.sqrt(dr * dr + dg * dg + db * db) / 1.732; }
     if (diff > tol) {
-      const k = Math.min(1, Math.max(0, (diff - tol) / fthr));
+      const k = Math.min(1, Math.max(0, (diff - tol) / knee));
       d[i + 3] = Math.round(a * (1 - k));
-      if (isGreen) d[i + 1] = Math.min(g, Math.round((r + b) / 2));
-      else if (isBlue) d[i + 2] = Math.min(b, Math.round((r + g) / 2));
+      if (spill > 0 && (isGreen || isBlue)) {
+        const despill = k * spill;
+        if (isGreen) d[i + 1] = Math.round(g * (1 - despill) + Math.min(g, (r + b) / 2) * despill);
+        else d[i + 2] = Math.round(b * (1 - despill) + Math.min(b, (r + g) / 2) * despill);
+      }
     }
   }
   _vckCtx.putImageData(imgData, 0, 0);
   return _vckCv;
+}
+
+/* ================= Difference Key Engine (no AI, no cloud) ================= */
+// Compares each frame to a captured clean background plate (same technique as
+// Adobe's Difference Matte). Works on any static background, no green screen needed.
+function applyVideoDifferenceKey(src, w, h, item, tol = 0.12) {
+  w = Math.max(1, Math.round(w)); h = Math.max(1, Math.round(h));
+  if (!_vdkCv) { _vdkCv = document.createElement('canvas'); _vdkCtx = _vdkCv.getContext('2d', { willReadFrequently: true }); }
+  if (_vdkCv.width !== w || _vdkCv.height !== h) { _vdkCv.width = w; _vdkCv.height = h; }
+  _vdkCtx.clearRect(0, 0, w, h);
+  try { _vdkCtx.drawImage(src, 0, 0, w, h); } catch(e) { return src; }
+
+  const plate = item && item.bgPlate;
+  if (!plate) return _vdkCv; // no clean plate captured yet — pass through so the user sees why nothing is removed
+
+  const cacheKey = plate._id + 'x' + w + 'x' + h;
+  if (_vdkCacheKey !== cacheKey) {
+    if (!_vdkPlateRs) { _vdkPlateRs = document.createElement('canvas'); _vdkPlateRsCtx = _vdkPlateRs.getContext('2d', { willReadFrequently: true }); }
+    _vdkPlateRs.width = w; _vdkPlateRs.height = h;
+    _vdkPlateRsCtx.clearRect(0, 0, w, h);
+    _vdkPlateRsCtx.drawImage(plate, 0, 0, w, h);
+    _vdkPlateData = _vdkPlateRsCtx.getImageData(0, 0, w, h).data;
+    _vdkCacheKey = cacheKey;
+  }
+
+  let imgData;
+  try { imgData = _vdkCtx.getImageData(0, 0, w, h); } catch(e) { return _vdkCv; }
+  const d = imgData.data, p = _vdkPlateData;
+  const knee = 0.08;
+  for (let i = 0; i < d.length; i += 4) {
+    const a = d[i + 3];
+    if (a === 0) continue;
+    const dr = (d[i] - p[i]) / 255, dg = (d[i + 1] - p[i + 1]) / 255, db = (d[i + 2] - p[i + 2]) / 255;
+    const diff = Math.sqrt(dr * dr + dg * dg + db * db) / 1.732; // 0 = matches plate (background), 1 = fully different
+    if (diff < tol) {
+      const k = Math.min(1, Math.max(0, (tol - diff) / knee));
+      d[i + 3] = Math.round(a * (1 - k));
+    }
+  }
+  _vdkCtx.putImageData(imgData, 0, 0);
+  return _vdkCv;
+}
+
+/* ================= Edge refine for video (choke/feather the alpha matte) ================= */
+// Reuses the same dilate/erode + blur math as the photo path's applyRefine(),
+// but works directly on a keyed canvas's alpha channel so it applies to video too.
+function refineVideoAlpha(cv, w, h, expand, feather) {
+  if (!expand && !feather) return cv;
+  if (!_vraAlphaCv) { _vraAlphaCv = document.createElement('canvas'); _vraAlphaCtx = _vraAlphaCv.getContext('2d', { willReadFrequently: true }); }
+  if (_vraAlphaCv.width !== w || _vraAlphaCv.height !== h) { _vraAlphaCv.width = w; _vraAlphaCv.height = h; }
+
+  const sctx = cv.getContext('2d', { willReadFrequently: true });
+  let imgData;
+  try { imgData = sctx.getImageData(0, 0, w, h); } catch(e) { return cv; }
+  const d = imgData.data;
+
+  _vraAlphaCtx.clearRect(0, 0, w, h);
+  const aImg = _vraAlphaCtx.createImageData(w, h);
+  for (let p = 0; p < w * h; p++) {
+    const a = d[p * 4 + 3];
+    aImg.data[p * 4] = aImg.data[p * 4 + 1] = aImg.data[p * 4 + 2] = a;
+    aImg.data[p * 4 + 3] = 255;
+  }
+  _vraAlphaCtx.putImageData(aImg, 0, 0);
+
+  if (expand) {
+    const r = Math.abs(expand);
+    if (expand < 0) { _vraAlphaCtx.filter = 'invert(1)'; _vraAlphaCtx.drawImage(_vraAlphaCv, 0, 0); _vraAlphaCtx.filter = 'none'; }
+    _vraAlphaCtx.globalCompositeOperation = 'lighten';
+    const offs = [[r, 0], [-r, 0], [0, r], [0, -r], [r * .7, r * .7], [-r * .7, r * .7], [r * .7, -r * .7], [-r * .7, -r * .7]];
+    for (const [dx, dy] of offs) _vraAlphaCtx.drawImage(_vraAlphaCv, dx, dy);
+    _vraAlphaCtx.globalCompositeOperation = 'source-over';
+    if (expand < 0) { _vraAlphaCtx.filter = 'invert(1)'; _vraAlphaCtx.drawImage(_vraAlphaCv, 0, 0); _vraAlphaCtx.filter = 'none'; }
+  }
+
+  if (feather > 0) {
+    _vraAlphaCtx.filter = `blur(${feather}px)`;
+    _vraAlphaCtx.drawImage(_vraAlphaCv, 0, 0);
+    _vraAlphaCtx.filter = 'none';
+  }
+
+  const aData = _vraAlphaCtx.getImageData(0, 0, w, h).data;
+  for (let p = 0; p < w * h; p++) d[p * 4 + 3] = aData[p * 4];
+  sctx.putImageData(imgData, 0, 0);
+  return cv;
 }
 
 /* ================= input ================= */
@@ -927,9 +1046,11 @@ $('btnSampleVideo').addEventListener('click', async (e) => {
 /* ================= queue ================= */
 function addFiles(files) {
   if (!files.length) return;
+  let addedVideo = false;
   for (const f of files) {
     const id = ++seq;
     const isVid = isMediaVideo(f);
+    if (isVid) addedVideo = true;
     items.push({
       id,
       type: isVid ? 'video' : 'image',
@@ -941,10 +1062,14 @@ function addFiles(files) {
       beforeUrl: null,
       videoEl: null, beforeVidEl: null, videoUrl: null, dur: 0,
       videoMode: 'ai',
-      keyColor: '#00FF00', keyTol: 0.36, keyFeather: 0.14,
+      keyColor: '#00FF00', keyTol: 0.36, spill: 1,
+      diffTol: 0.12, bgPlate: null,
       error: null, w: 0, h: 0
     });
   }
+  // Start loading the local AI engine in the background the moment a video shows up —
+  // fire-and-forget, never blocks the queue or the preview.
+  if (addedVideo) ensureVideoAI();
   if (!activeId) activeId = items[0].id;
   dropzone.style.display = 'none';
   workspace.classList.add('on');
@@ -1027,7 +1152,6 @@ async function processQueue() {
 
     if (it.type === 'video') {
       try {
-        await initVideoAI();
         const vUrl = URL.createObjectURL(it.file);
         it.videoUrl = vUrl;
         const v = document.createElement('video');
@@ -1070,20 +1194,6 @@ async function processQueue() {
         tc.width = 120; tc.height = Math.round(120 * (it.h / it.w));
         tc.getContext('2d').drawImage(v, 0, 0, tc.width, tc.height);
         it.thumbUrl = tc.toDataURL('image/jpeg', 0.85);
-
-        // Warm up and isolate subject on initial frame
-        if (selfieSegReady && selfieSeg) {
-          showOverlay("AI Isolating Subject from Video…", it.name);
-          progress("compute:seg", 80, 100);
-          try {
-            await Promise.race([
-              selfieSeg.send({ image: v }),
-              new Promise(res => setTimeout(res, 4000))
-            ]);
-          } catch(e) {
-            console.warn("Initial video frame segmentation warning:", e);
-          }
-        }
         it.status = 'done';
       } catch (err) {
         console.error(err);
@@ -1215,20 +1325,22 @@ $('rExpand').addEventListener('input', () => {
   $('vExpand').textContent = $('rExpand').value;
   scheduleRefine();
 });
+videoModeSelect.addEventListener('change', () => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.videoMode = videoModeSelect.value;
+  aiSettings.style.display = it.videoMode === 'ai' ? 'block' : 'none';
+  chromaSettings.style.display = it.videoMode === 'chroma' ? 'block' : 'none';
+  diffSettings.style.display = it.videoMode === 'diff' ? 'block' : 'none';
+  if (it.videoMode === 'ai') ensureVideoAI();
+  renderVideoFrame(it);
+});
+
 rThreshold.addEventListener('input', () => {
   refine.threshold = +rThreshold.value;
   vThreshold.textContent = Math.round(refine.threshold * 100) + '%';
   const it = active();
   if (it && it.type === 'video') renderVideoFrame(it);
-});
-
-videoModeSelect.addEventListener('change', () => {
-  const it = active();
-  if (!it || it.type !== 'video') return;
-  it.videoMode = videoModeSelect.value;
-  chromaSettings.style.display = it.videoMode === 'chroma' ? 'block' : 'none';
-  ctlThreshold.style.display = it.videoMode === 'ai' ? 'flex' : 'none';
-  renderVideoFrame(it);
 });
 
 keyColorPicker.addEventListener('input', (e) => {
@@ -1243,6 +1355,65 @@ rTol.addEventListener('input', () => {
   if (!it || it.type !== 'video') return;
   it.keyTol = +rTol.value;
   vTol.textContent = Math.round(it.keyTol * 100) + '%';
+  renderVideoFrame(it);
+});
+
+rSpill.addEventListener('input', () => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.spill = +rSpill.value;
+  vSpill.textContent = Math.round(it.spill * 100) + '%';
+  renderVideoFrame(it);
+});
+
+rDiffTol.addEventListener('input', () => {
+  const it = active();
+  if (!it || it.type !== 'video') return;
+  it.diffTol = +rDiffTol.value;
+  vDiffTol.textContent = Math.round(it.diffTol * 100) + '%';
+  renderVideoFrame(it);
+});
+
+btnCapturePlate.addEventListener('click', () => {
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const v = it.videoEl;
+  const plate = document.createElement('canvas');
+  plate.width = it.w; plate.height = it.h;
+  plate.getContext('2d').drawImage(v, 0, 0, it.w, it.h);
+  plate._id = Date.now() + '_' + Math.random().toString(36).slice(2);
+  it.bgPlate = plate;
+  plateStatus.innerHTML = `<span class="note" style="color:#6ce28c">✓ Background captured at ${formatTime(v.currentTime)} — play the clip, the subject will cut out against it.</span>`;
+  renderVideoFrame(it);
+});
+
+btnEyedrop.addEventListener('click', () => {
+  eyedropActive = !eyedropActive;
+  btnEyedrop.style.outline = eyedropActive ? '2px solid #fff' : 'none';
+  eyedropHint.style.display = eyedropActive ? 'block' : 'none';
+  canvas.style.cursor = eyedropActive ? 'crosshair' : '';
+});
+
+canvas.addEventListener('click', (e) => {
+  if (!eyedropActive) return;
+  const it = active();
+  if (!it || it.type !== 'video' || !it.videoEl) return;
+  const rect = canvas.getBoundingClientRect();
+  const nx = (e.clientX - rect.left) / rect.width;
+  const ny = (e.clientY - rect.top) / rect.height;
+  const sx = Math.min(it.w - 1, Math.max(0, Math.round(nx * it.w)));
+  const sy = Math.min(it.h - 1, Math.max(0, Math.round(ny * it.h)));
+  if (!_eyedropCv) { _eyedropCv = document.createElement('canvas'); _eyedropCtx = _eyedropCv.getContext('2d', { willReadFrequently: true }); }
+  _eyedropCv.width = it.w; _eyedropCv.height = it.h;
+  _eyedropCtx.drawImage(it.videoEl, 0, 0, it.w, it.h);
+  const px = _eyedropCtx.getImageData(sx, sy, 1, 1).data;
+  const hex = '#' + [px[0], px[1], px[2]].map(c => c.toString(16).padStart(2, '0')).join('');
+  it.keyColor = hex;
+  keyColorPicker.value = hex;
+  eyedropActive = false;
+  btnEyedrop.style.outline = 'none';
+  eyedropHint.style.display = 'none';
+  canvas.style.cursor = '';
   renderVideoFrame(it);
 });
 
@@ -1358,51 +1529,30 @@ function drawBackground(c, w, h, it) {
   }
 }
 
-async function renderVideoFrame(it) {
+function renderVideoFrame(it) {
   if (!it || it.type !== 'video' || !it.videoEl) return;
   const v = it.videoEl;
   const w = canvas.width, h = canvas.height;
   if (w <= 2 || h <= 2) return;
 
-  if (it.videoMode === 'ai' && selfieSegReady && selfieSeg && !isProcessingVideoFrame) {
-    isProcessingVideoFrame = true;
-    try {
-      await selfieSeg.send({ image: v });
-    } catch(e) {}
-    isProcessingVideoFrame = false;
-  }
-
   drawBackground(ctx, w, h, it);
 
-  let cutCv = null;
-  if (it.videoMode === 'ai' && currentSegmentationMask) {
-    if (!tempVidCanvas || tempVidCanvas.width !== w || tempVidCanvas.height !== h) {
-      tempVidCanvas = document.createElement('canvas');
-      tempVidCanvas.width = w; tempVidCanvas.height = h;
-      tempVidCtx = tempVidCanvas.getContext('2d');
+  let cutCv;
+  if (it.videoMode === 'ai') {
+    if (!selfieSegReady && !aiLoadError) ensureVideoAI(); // fire-and-forget, singleton — never blocks
+    if (selfieSegReady && selfieSeg && !isProcessingVideoFrame) {
+      isProcessingVideoFrame = true;
+      selfieSeg.send({ image: v }).catch(() => { isProcessingVideoFrame = false; });
     }
-    tempVidCtx.clearRect(0, 0, w, h);
-
-    // Draw mask first
-    tempVidCtx.save();
-    if (refine.feather > 0) {
-      tempVidCtx.filter = `blur(${refine.feather}px)`;
-    }
-    tempVidCtx.drawImage(currentSegmentationMask, 0, 0, w, h);
-    tempVidCtx.restore();
-
-    // Composite video using source-in (keeps video only where subject was segmented)
-    tempVidCtx.save();
-    tempVidCtx.globalCompositeOperation = 'source-in';
-    tempVidCtx.drawImage(v, 0, 0, w, h);
-    tempVidCtx.restore();
-
-    cutCv = tempVidCanvas;
-  } else if (it.videoMode === 'chroma') {
-    cutCv = applyVideoChromaKey(v, w, h, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
+    // While the mask isn't ready yet (first load, or engine unavailable), show the
+    // raw frame rather than nothing — so it never looks silently broken.
+    cutCv = currentSegmentationMask ? compositeAiMask(v, currentSegmentationMask, w, h, refine.threshold ?? 0.5) : v;
+  } else if (it.videoMode === 'diff') {
+    cutCv = applyVideoDifferenceKey(v, w, h, it, it.diffTol ?? 0.12);
   } else {
-    cutCv = v;
+    cutCv = applyVideoChromaKey(v, w, h, it.keyColor || '#00FF00', it.keyTol ?? 0.36, it.spill ?? 1);
   }
+  cutCv = refineVideoAlpha(cutCv, w, h, refine.expand, refine.feather);
 
   if (cutoutHl.enabled && cutCv) {
     drawCutoutGlow(ctx, cutCv, w, h, cutoutHl);
@@ -1433,9 +1583,19 @@ function renderActive() {
 
     videoControls.style.display = 'flex';
     videoEngineGroup.style.display = 'block';
-    ctlThreshold.style.display = it.videoMode === 'ai' ? 'flex' : 'none';
     videoModeSelect.value = it.videoMode || 'ai';
+    aiSettings.style.display = it.videoMode === 'ai' ? 'block' : 'none';
     chromaSettings.style.display = it.videoMode === 'chroma' ? 'block' : 'none';
+    diffSettings.style.display = it.videoMode === 'diff' ? 'block' : 'none';
+    rThreshold.value = refine.threshold ?? 0.5; vThreshold.textContent = Math.round((refine.threshold ?? 0.5) * 100) + '%';
+    keyColorPicker.value = it.keyColor || '#00FF00';
+    rTol.value = it.keyTol ?? 0.36; vTol.textContent = Math.round((it.keyTol ?? 0.36) * 100) + '%';
+    rSpill.value = it.spill ?? 1; vSpill.textContent = Math.round((it.spill ?? 1) * 100) + '%';
+    rDiffTol.value = it.diffTol ?? 0.12; vDiffTol.textContent = Math.round((it.diffTol ?? 0.12) * 100) + '%';
+    plateStatus.innerHTML = it.bgPlate
+      ? '<span class="note" style="color:#6ce28c">✓ Background captured — ready.</span>'
+      : '<span class="note">No background captured yet.</span>';
+    if (it.videoMode === 'ai') ensureVideoAI();
 
     $('fmtSelect').innerHTML = `
       <option value="webm">WebM Video — transparent alpha channel</option>
@@ -1453,7 +1613,6 @@ function renderActive() {
 
     videoControls.style.display = 'none';
     videoEngineGroup.style.display = 'none';
-    ctlThreshold.style.display = 'none';
 
     $('fmtSelect').innerHTML = `
       <option value="png">PNG — transparent / best quality</option>
@@ -1631,16 +1790,23 @@ async function exportVideoItem(it, fmt) {
   if (!v) return;
 
   pauseAnyVideo();
+
+  if (it.videoMode === 'ai' && !selfieSegReady) {
+    showOverlay('Loading AI engine…', it.name);
+    await ensureVideoAI();
+    if (!selfieSegReady) {
+      hideOverlay();
+      alert('AI engine could not load, so there is nothing to export in AI Subject mode. Switch to Chroma Key or Difference Key and try again.');
+      return;
+    }
+  }
+
   showOverlay(`Exporting video (${fmt.toUpperCase()})…`, it.name);
 
   const ew = it.w, eh = it.h;
   const eCv = document.createElement('canvas');
   eCv.width = ew; eCv.height = eh;
   const eCtx = eCv.getContext('2d');
-
-  const cCv = document.createElement('canvas');
-  cCv.width = ew; cCv.height = eh;
-  const cCtx = cCv.getContext('2d');
 
   let mimeType = 'video/webm; codecs=vp9';
   if (fmt === 'mp4') {
@@ -1691,35 +1857,23 @@ async function exportVideoItem(it, fmt) {
     v.currentTime = t;
     await new Promise(r => { v.onseeked = r; setTimeout(r, 160); });
 
-    if (it.videoMode === 'ai' && selfieSegReady && selfieSeg) {
-      try {
-        await selfieSeg.send({ image: v });
-      } catch(e) {}
-    }
-
     const flatBg = (fmt === 'mp4' && bgMode === 'transparent') ? 'green' : bgMode;
     const oldBg = bgMode;
     bgMode = flatBg;
     drawBackground(eCtx, ew, eh, it);
     bgMode = oldBg;
 
-    if (it.videoMode === 'ai' && currentSegmentationMask) {
-      cCtx.clearRect(0, 0, ew, eh);
-      cCtx.save();
-      if (refine.feather > 0) cCtx.filter = `blur(${refine.feather}px)`;
-      cCtx.drawImage(currentSegmentationMask, 0, 0, ew, eh);
-      cCtx.restore();
-      cCtx.save();
-      cCtx.globalCompositeOperation = 'source-in';
-      cCtx.drawImage(v, 0, 0, ew, eh);
-      cCtx.restore();
-      eCtx.drawImage(cCv, 0, 0, ew, eh);
-    } else if (it.videoMode === 'chroma') {
-      const keyed = applyVideoChromaKey(v, ew, eh, it.keyColor || '#00FF00', it.keyTol || 0.36, it.keyFeather || 0.14);
-      eCtx.drawImage(keyed, 0, 0, ew, eh);
+    let keyed;
+    if (it.videoMode === 'ai') {
+      try { await selfieSeg.send({ image: v }); } catch(e) {}
+      keyed = currentSegmentationMask ? compositeAiMask(v, currentSegmentationMask, ew, eh, refine.threshold ?? 0.5) : v;
+    } else if (it.videoMode === 'diff') {
+      keyed = applyVideoDifferenceKey(v, ew, eh, it, it.diffTol ?? 0.12);
     } else {
-      eCtx.drawImage(v, 0, 0, ew, eh);
+      keyed = applyVideoChromaKey(v, ew, eh, it.keyColor || '#00FF00', it.keyTol ?? 0.36, it.spill ?? 1);
     }
+    keyed = refineVideoAlpha(keyed, ew, eh, refine.expand, refine.feather);
+    eCtx.drawImage(keyed, 0, 0, ew, eh);
 
     progress(`Rendering frame ${f + 1}/${totalFrames}`, f + 1, totalFrames);
     await new Promise(r => setTimeout(r, 8));
@@ -1740,6 +1894,91 @@ async function exportVideoItem(it, fmt) {
   hideOverlay();
   v.currentTime = 0;
   renderActive();
+}
+
+// Renders the current keying mode (AI / chroma / diff) + refine settings into a
+// real alpha-channel WebM blob — this is what makes a cutout sent to the Video
+// Editor transparent no matter which engine produced it, instead of relying on
+// the receiving app to re-implement all three keying algorithms itself.
+async function renderCutoutBlob(it) {
+  const v = it.videoEl;
+  if (!v) return null;
+
+  if (it.videoMode === 'ai' && !selfieSegReady) {
+    showOverlay('Loading AI engine…', it.name);
+    await ensureVideoAI();
+    if (!selfieSegReady) {
+      hideOverlay();
+      alert('AI engine could not load, so there is nothing to send. Switch to Chroma Key or Difference Key and try again.');
+      return null;
+    }
+  }
+
+  showOverlay('Preparing cutout for Video Editor…', it.name);
+
+  const ew = it.w, eh = it.h;
+  const eCv = document.createElement('canvas');
+  eCv.width = ew; eCv.height = eh;
+  const eCtx = eCv.getContext('2d');
+
+  let mimeType = MediaRecorder.isTypeSupported('video/webm; codecs=vp9') ? 'video/webm; codecs=vp9' : 'video/webm';
+  const stream = eCv.captureStream(30);
+  try {
+    const vStream = v.captureStream ? v.captureStream() : (v.mozCaptureStream ? v.mozCaptureStream() : null);
+    if (vStream && vStream.getAudioTracks().length) {
+      stream.addTrack(vStream.getAudioTracks()[0]);
+    }
+  } catch(e) {}
+
+  const chunks = [];
+  let recorder = null;
+  try {
+    recorder = new MediaRecorder(stream, { mimeType, videoBitsPerSecond: 8000000 });
+  } catch(e) {
+    recorder = new MediaRecorder(stream);
+  }
+  recorder.ondataavailable = ev => { if (ev.data && ev.data.size > 0) chunks.push(ev.data); };
+  const recFinished = new Promise(resolve => { recorder.onstop = resolve; });
+  recorder.start(100);
+
+  v.currentTime = 0;
+  await new Promise(r => { v.onseeked = r; setTimeout(r, 400); });
+
+  const fps = 30;
+  const totalFrames = Math.max(1, Math.round(it.dur * fps));
+  const dt = 1 / fps;
+
+  for (let f = 0; f < totalFrames; f++) {
+    const t = f * dt;
+    v.currentTime = t;
+    await new Promise(r => { v.onseeked = r; setTimeout(r, 160); });
+
+    eCtx.clearRect(0, 0, ew, eh); // always transparent — this is a cutout, never flattened onto a background
+
+    let keyed;
+    if (it.videoMode === 'ai') {
+      try { await selfieSeg.send({ image: v }); } catch(e) {}
+      keyed = currentSegmentationMask ? compositeAiMask(v, currentSegmentationMask, ew, eh, refine.threshold ?? 0.5) : v;
+    } else if (it.videoMode === 'diff') {
+      keyed = applyVideoDifferenceKey(v, ew, eh, it, it.diffTol ?? 0.12);
+    } else {
+      keyed = applyVideoChromaKey(v, ew, eh, it.keyColor || '#00FF00', it.keyTol ?? 0.36, it.spill ?? 1);
+    }
+    keyed = refineVideoAlpha(keyed, ew, eh, refine.expand, refine.feather);
+    eCtx.drawImage(keyed, 0, 0, ew, eh);
+
+    progress(`Preparing cutout ${f + 1}/${totalFrames}`, f + 1, totalFrames);
+    await new Promise(r => setTimeout(r, 8));
+  }
+
+  recorder.stop();
+  await recFinished;
+
+  hideOverlay();
+  v.currentTime = 0;
+  renderActive();
+
+  return new Blob(chunks, { type: recorder.mimeType });
 }
 
 $('btnDownload').addEventListener('click', async () => {
@@ -1845,19 +2084,23 @@ $('hlCustomColor').addEventListener('input', (e) => {
   else renderActive();
 });
 
-$('btnSendVideo').addEventListener('click', () => {
+$('btnSendVideo').addEventListener('click', async () => {
   const it = active();
   if (!it || it.status !== 'done') { alert('Select a finished item first.'); return; }
   if (it.type === 'video') {
+    pauseAnyVideo();
+    // Bake the current keying mode (AI/chroma/diff) + refine settings into a real
+    // alpha-channel WebM before handing off, so the Video Editor just plays a
+    // transparent clip — it never has to know which engine made the cutout.
+    const blob = await renderCutoutBlob(it);
+    if (!blob) return;
+    const outName = `${baseName(it.name)}-cutout.webm`;
     if (window.parent && window.parent !== window){
       window.parent.postMessage({
         girika: 'video-cutout',
-        blob: it.file,
-        name: it.name,
-        videoMode: it.videoMode,
-        keyColor: it.keyColor,
-        keyTol: it.keyTol,
-        keyFeather: it.keyFeather,
+        blob,
+        name: outName,
+        fullFrame: $('chkFullFrame') ? $('chkFullFrame').checked : true,
         cutoutHl: cutoutHl.enabled,
         hlStyle: cutoutHl.style,
         hlColor: cutoutHl.color,
@@ -1865,7 +2108,15 @@ $('btnSendVideo').addEventListener('click', () => {
         hlBlur: cutoutHl.blur
       }, '*');
     } else {
-      window.open('video.html', '_blank');
+      // Standalone (no parent editor to receive it) — hand over the baked
+      // transparent cutout as a download instead of silently doing nothing.
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = outName;
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+      alert('Cutout saved as a transparent WebM. Open Video Editor and add it from the Cutouts tray.');
     }
   } else {
     const dataUrl = it.refCanvas.toDataURL('image/png');
@@ -1919,7 +2170,7 @@ async function refreshStorageInfo() {
   let n = 0;
   try { if ('caches' in window) n = (await caches.keys()).length; } catch { /* ignore */ }
   el.innerHTML =
-    `AI engines: Photo ISNet ONNX model &amp; Video MediaPipe Neural Engine run 100% on your device with <b>zero cloud processing</b>. App storage entries: <b>${n}</b>. ` +
+    `Photo removal: on-device AI (ISNet ONNX model). Video removal: zero-AI chroma/difference keying — pure canvas math, no model, no download, <b>zero cloud processing</b>. App storage entries: <b>${n}</b>. ` +
     `For a complete wipe use your browser's <b>Settings → Delete browsing data → Cached images and files</b>.`;
 }
 
