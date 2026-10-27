@@ -285,7 +285,8 @@ body.busy #projectGroup{pointer-events:none;opacity:.55}
 .heard b{color:var(--clay-lt);font-weight:700;margin-right:6px}
 /* timeline */
 .timeline{grid-column:1 / -1;display:grid;grid-template-columns:96px minmax(0,1fr);grid-template-rows:38px minmax(0,1fr);background:var(--tl);border-top:1px solid var(--line);min-height:0}
-.tl-tools{grid-column:1 / -1;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--surface)}
+.tl-tools{grid-column:1 / -1;display:flex;align-items:center;gap:12px;padding:0 14px;border-bottom:1px solid var(--line);background:var(--surface);overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.tl-tools::-webkit-scrollbar{display:none}
 .tl-tools .lbl{margin:0}
 .tl-tools input[type=range]{width:140px;accent-color:var(--deodar)}
 .tl-labels{display:flex;flex-direction:column;padding-top:22px;border-right:1px solid var(--line);background:var(--surface)}
@@ -379,13 +380,40 @@ body.busy #exportGroup{pointer-events:auto;opacity:1}
 @media (max-width:1100px){
   .app{grid-template-columns:1fr;grid-template-rows:auto;height:auto}
   .panel.left,.panel.right,.app > .stage{grid-column:1;grid-row:auto}
-  .stage{min-height:70vh}
+  .stage{min-height:56vh}
   .panel.left,.panel.right{border:0;border-top:1px solid var(--line)}
   .rs-handle{display:none}
-  .timeline{grid-column:1;height:280px}
+  .timeline{grid-column:1;height:clamp(220px,34vh,320px)}
   .choices,.choices.four{grid-template-columns:1fr}
   .nav a{padding:6px 8px}
   .bar .status{display:none}
+}
+@media (pointer:coarse){
+  .btn{min-height:44px;padding:10px 14px}
+  .btn.sm{min-height:40px;padding:9px 12px}
+  .btn.icon{min-width:40px;min-height:40px}
+  .tbtn{min-height:40px;padding:9px 10px}
+  .tbtn.icon{min-width:40px;justify-content:center}
+  .st-btn{min-height:38px}
+  .ws-emo{width:38px;height:38px}
+}
+@media (max-width:640px){
+  .stage{min-height:40vh}
+  .timeline{height:clamp(190px,30vh,280px)}
+  .panel{padding:14px}
+  .canvas-area{padding:4px 8px 10px}
+  .grid2,.grid3{grid-template-columns:1fr}
+  .slider{grid-template-columns:1fr 46px;grid-template-rows:auto auto;row-gap:4px}
+  .slider>span{grid-column:1/-1}
+  .stage-tools{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:calc(100% - 16px)}
+  .stage-tools::-webkit-scrollbar{display:none}
+  .tl-zoom input{width:80px!important}
+  .start-card{padding:20px}
+}
+@media (max-width:900px) and (orientation:landscape) and (max-height:520px){
+  .stage{min-height:0;flex:1 1 auto}
+  .timeline{height:150px}
+  .panel{max-height:46vh}
 }
 /* reel-skin: neutral editing-desk chrome; brand colours live only in the preview */
 :root{--slate:#1B1D21;--deodar:#1B1D21;--sage:#A3A8AF;--clay:#F2C230;--clay-lt:#F2C230;--lime:#F4F4F2;--mist:#EAEBE8;--ink:#1B1D21;--fog:#666B72;--line:#DEDFDC;--accent:#F2C230;--on-accent:#1B1D21;
@@ -628,6 +656,10 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
             <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#ccc;">
               <input type="checkbox" id="chkIgCamMic" checked>
               <span>Record mic</span>
+            </label>
+            <label style="display:flex; align-items:center; gap:6px; cursor:pointer; color:#ccc;">
+              <input type="checkbox" id="chkIgCamCaptions" checked>
+              <span>Auto captions from my voice</span>
             </label>
             <button type="button" class="btn sm" id="btnIgCamClose" style="padding:4px 8px; font-size:11px;">✕ Exit Cam</button>
           </div>
@@ -1557,6 +1589,8 @@ const KIT = GIRIKA.KIT, PACK = (window.REEL_PACKS || {})[GIRIKA.industry] || nul
 const FILE_PREFIX = (KIT.name || "reel-studio").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "reel-studio";
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const ease = p => .5 - .5 * Math.cos(Math.PI * clamp(p));
+const COARSE = (() => { try { return matchMedia("(pointer:coarse)").matches; } catch(e) { return false; } })();
+const TOUCH_HIT = k => k * (COARSE ? 1.4 : 1);
 const fmtT = s => { s = Math.max(0, s || 0); const m = Math.floor(s / 60); return `${m}:${(s - m * 60).toFixed(1).padStart(4, "0")}`; };
 let uid = 1;
 
@@ -7699,7 +7733,7 @@ cv.addEventListener("pointerdown", e => {
     const X = useFixedX ? (clipXform(clip, selected.item.at || 0) || clipXform(clip, local)) : clipXform(clip, local);
     const { u } = geo();
     const curPts = plotPtsAt(selected.item, local);
-    if (X){ const idx = curPts.findIndex(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
+    if (X){ const idx = curPts.findIndex(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < TOUCH_HIT(34 * u); });
       if (idx >= 0){ dragV = { pl:selected.item, idx, clip }; cv.setPointerCapture(e.pointerId); return; } }
   }
   if (stageHandleDown(e, px, py)) return;
@@ -8556,11 +8590,17 @@ function setFormat(k){
 function fitCanvas(){
   const f = F(), area = $("canvasArea"), holder = $("holder");
   const narrow = window.innerWidth <= 1100;
-  const aw = Math.max(200, area.clientWidth - 36), ah = narrow ? window.innerHeight * .65 : Math.max(220, area.clientHeight - 14);
+  const vh = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const aw = Math.max(200, area.clientWidth - 36);
+  let ah = narrow ? vh * .6 : Math.max(220, area.clientHeight - 14);
+  if (narrow && area.clientHeight > 80) ah = Math.min(ah, area.clientHeight - 10);
+  ah = Math.max(160, ah);
   let w = aw, h = w * f.h / f.w; if (h > ah){ h = ah; w = h * f.w / f.h; }
   holder.style.width = Math.floor(w) + "px"; holder.style.height = Math.floor(h) + "px";
 }
 new ResizeObserver(fitCanvas).observe($("canvasArea"));
+if (window.visualViewport) window.visualViewport.addEventListener("resize", fitCanvas);
+window.addEventListener("orientationchange", () => setTimeout(fitCanvas, 60));
 
 /* left panel controls */
 const onFiles = (id, fn) => $(id).addEventListener("change", e => { const fs = [...(e.target.files || [])]; e.target.value = ""; if (fs.length) fn(fs); });
@@ -10743,6 +10783,8 @@ let igCamRecStart = 0;
 let igCamPlayheadStart = 0;
 let igCamTimerInterval = 0;
 let igCamShape = "ai"; // "ai" | "circle" | "chroma" | "full"
+let igCamReco = null;      // active SpeechRecognition instance for cam-cutout recording
+let igCamRecoOn = false;   // true while the cam recording wants live captions (controls auto-restart)
 
 async function startFrontCamStudio(){
   const modal = $("igCutoutModal");
@@ -10945,6 +10987,7 @@ function startFrontCamRecording(){
   const timer = $("igCamTimer");
   const syncTimeline = $("chkIgCamSyncTimeline") ? $("chkIgCamSyncTimeline").checked : true;
   const useMic = $("chkIgCamMic") ? $("chkIgCamMic").checked : true;
+  const wantCaptions = useMic && ($("chkIgCamCaptions") ? $("chkIgCamCaptions").checked : true);
 
   igCamChunks = [];
   const recStream = igCamRecCv.captureStream(30);
@@ -10993,13 +11036,45 @@ function startFrontCamRecording(){
   if (syncTimeline && SEQ.length){
     play(igCamPlayheadStart);
   }
+  if (wantCaptions && SR) startCamRecognition(igCamPlayheadStart);
+  else if (wantCaptions && !SR) toast("Auto captions need Chrome. You can type captions in afterwards.");
   toast("🔴 Recording Front Camera Cutout Video… Talk or react!");
+}
+
+/* Live captions while recording the front-camera cutout — same caption pipeline as the
+   voiceover recorder (addAutoCaptions/P.captions), just keyed off the cam stream instead
+   of recState so it can run independently of (or alongside) a voiceover take. */
+function startCamRecognition(fromTime){
+  P.captions = P.captions.filter(c => !(c.auto && c.start >= fromTime));
+  igCamRecoOn = true;
+  const r = new SR(); r.lang = P.lang === "hinglish" ? "hi-IN" : P.lang; r.continuous = true; r.interimResults = true;
+  const segStart = {}, done = {};
+  r.onresult = e => {
+    const t = now();
+    for (let i = e.resultIndex; i < e.results.length; i++){
+      if (segStart[i] === undefined) segStart[i] = Math.max(fromTime, t - .7);
+      const txt = e.results[i][0].transcript, shown = P.lang === "hinglish" ? toHinglish(txt) : txt;
+      if (e.results[i].isFinal && !done[i]){ done[i] = true; addAutoCaptions(segStart[i], t, txt); showHeard(shown, true); }
+      else if (!e.results[i].isFinal) showHeard(shown, false);
+    }
+  };
+  r.onerror = ev => { if (ev.error === "not-allowed" || ev.error === "service-not-allowed") toast("Auto captions are blocked here. Captions can still be typed."); if (ev.error === "network") toast("Auto captions need internet."); };
+  r.onend = () => { if (igCamRecoOn && igCamReco === r) { try { startCamRecognition(fromTime); } catch(e) {} } };
+  igCamReco = r;
+  const track = igCamStream && igCamStream.getAudioTracks()[0];
+  try { track ? r.start(track) : r.start(); } catch(e) { try { r.start(); } catch(e2) {} }
+}
+function stopCamRecognition(){
+  igCamRecoOn = false;
+  if (igCamReco){ try { igCamReco.stop(); } catch(e) {} igCamReco = null; }
+  showHeard("");
 }
 
 function stopFrontCamRecording(){
   if (igMediaRecorder && igMediaRecorder.state === "recording"){
     igMediaRecorder.stop();
   }
+  stopCamRecognition();
   pause();
   clearInterval(igCamTimerInterval);
   const btnStart = $("btnIgCamStartRec");
@@ -11211,8 +11286,8 @@ function drawGfx(c, o, t){
 function gfxArrowHit(px, py){
   if (!selected || selected.type !== "overlay" || selected.item.kind !== "gfx" || selected.item.g !== "arrow" || playing) return null;
   const o = selected.item, { W, H, u } = geo(), p = gfxArrowPts(o, W, H), X = o.x * W, Y = o.y * H;
-  if (Math.hypot(X + p.x1 - px, Y + p.y1 - py) < 34 * u) return { o, end:"tip" };
-  if (Math.hypot(X + p.x0 - px, Y + p.y0 - py) < 34 * u) return { o, end:"tail" };
+  if (Math.hypot(X + p.x1 - px, Y + p.y1 - py) < TOUCH_HIT(34 * u)) return { o, end:"tip" };
+  if (Math.hypot(X + p.x0 - px, Y + p.y0 - py) < TOUCH_HIT(34 * u)) return { o, end:"tail" };
   return null;
 }
 function gfxArrowMove(d, px, py){
@@ -11316,7 +11391,7 @@ function proPointerDown(e, px, py){
     const X = useFixedX ? (clipXform(clip, pl.at || 0) || clipXform(clip, local)) : clipXform(clip, local);
     const { u } = geo(), r = pl._lrect || { x:-1e9, y:-1e9, w:0, h:0 };
     const curPts = plotPtsAt(pl, local);
-    const nearCorner = X && curPts.some(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < 34 * u; });
+    const nearCorner = X && curPts.some(([a, b]) => { const [qx, qy] = mapPt(X, a, b); return Math.hypot(qx - px, qy - py) < TOUCH_HIT(34 * u); });
     const sk = X && !nearCorner && pl._srects ? pl._srects.findIndex(q => q && px >= q.x - 8 * u && px <= q.x + q.w + 8 * u && py >= q.y - 8 * u && py <= q.y + q.h + 8 * u) : -1;
     if (sk >= 0){ const q = pl._srects[sk]; dragL = { pl, clip, k:sk, dx:px - q.cx, dy:py - q.cy }; cv.setPointerCapture(e.pointerId); return true; }
     if (X && !nearCorner && pl._roadRect && px >= pl._roadRect.x - 8 * u && px <= pl._roadRect.x + pl._roadRect.w + 8 * u && py >= pl._roadRect.y - 8 * u && py <= pl._roadRect.y + pl._roadRect.h + 8 * u){
@@ -11352,7 +11427,7 @@ function proPointerDown(e, px, py){
   if (selected && (selected.type === "spot" || selected.type === "punch")){
     const clip = selected.clip, X = clipXform(clip, now() - clip._start);
     if (X){ const it = selected.item, [qx, qy] = mapPt(X, it.u, it.v), { u, W, H } = geo();
-      const R = selected.type === "spot" ? Math.max(60 * u, it.r * Math.min(W, H) * (X.cw ? X.dw / X.cw : 1)) : 70 * u;
+      const R = TOUCH_HIT(selected.type === "spot" ? Math.max(60 * u, it.r * Math.min(W, H) * (X.cw ? X.dw / X.cw : 1)) : 70 * u);
       if (Math.hypot(qx - px, qy - py) < R){ dragP = { item:it, clip }; cv.setPointerCapture(e.pointerId); return true; } }
   }
   { const ah = gfxArrowHit(px, py); if (ah){ dragA = ah; cv.setPointerCapture(e.pointerId); return true; } }

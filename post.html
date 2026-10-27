@@ -204,14 +204,21 @@ body.recording .recnote{display:block}
   .stage-top,.canvas-area,.vbar{padding-left:16px;padding-right:16px}
   .stage{min-height:0}
 }
-/* phones: tighter chrome, bigger tap targets than a mouse UI needs */
+/* touch devices: bigger tap targets than a mouse UI needs, independent of screen width
+   (a landscape phone or tablet is still a touch device even past the 640px phone breakpoint) */
+@media (pointer:coarse){
+  .btn{min-height:44px;padding:10px 14px}
+  .btn.sm{min-height:40px;padding:9px 12px}
+  .st-btn{min-height:38px}
+}
+@media (max-width:900px){
+  .bar{gap:10px;padding:0 14px}
+}
+/* phones: tighter chrome layout */
 @media (max-width:640px){
   .panel{padding:14px}
   .slider{grid-template-columns:1fr 46px;grid-template-rows:auto auto;row-gap:4px}
   .slider>span{grid-column:1/-1}
-  .btn{min-height:44px;padding:10px 14px}
-  .btn.sm{min-height:40px;padding:9px 12px}
-  .st-btn{min-height:38px}
   .stage-tools{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;-webkit-overflow-scrolling:touch;scrollbar-width:none;max-width:calc(100% - 16px)}
   .stage-tools::-webkit-scrollbar{display:none}
 }
