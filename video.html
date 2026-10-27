@@ -563,7 +563,7 @@ body{font-feature-settings:"ss01","tnum" 0;letter-spacing:-.003em}
       <div id="projDlgFolder"></div>
       <div class="pj-warn" id="projDlgWarn" hidden></div>
       <div id="projDlgList"></div>
-      <div class="pj-foot"><label class="btn sm upload">Open a .girika file<input type="file" id="projOpen" accept=".girika,application/octet-stream"></label></div>
+      <div class="pj-foot"><label class="btn sm upload"><span id="projOpenLabel">Open a project file</span><input type="file" id="projOpen" accept=".girika,application/octet-stream"></label></div>
     </div>
   </div>
 </div>
@@ -1587,6 +1587,14 @@ const C = { ...GIRIKA.C }, LOGO = GIRIKA.LOGO, TONES = GIRIKA.TONES;
 const SERIF = GIRIKA.FONTS.SERIF, SANS = GIRIKA.FONTS.SANS;
 const KIT = GIRIKA.KIT, PACK = (window.REEL_PACKS || {})[GIRIKA.industry] || null;
 const FILE_PREFIX = (KIT.name || "reel-studio").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "reel-studio";
+/* project-file extension: stays ".girika" for the built-in Girika Homes brand (so existing saved
+   files keep opening), becomes the active brand's own slug (e.g. ".xyz") for any other brand. */
+const PROJ_EXT = KIT.id === "girika" ? "girika" : (FILE_PREFIX || "girika");
+(function syncProjExtUI(){
+  const inp = $("projOpen"), lbl = $("projOpenLabel");
+  if (inp) inp.setAttribute("accept", PROJ_EXT === "girika" ? ".girika,application/octet-stream" : `.${PROJ_EXT},.girika,application/octet-stream`);
+  if (lbl) lbl.textContent = `Open a .${PROJ_EXT} file`;
+})();
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const ease = p => .5 - .5 * Math.cos(Math.PI * clamp(p));
 const COARSE = (() => { try { return matchMedia("(pointer:coarse)").matches; } catch(e) { return false; } })();
@@ -5929,7 +5937,7 @@ async function exportRealtime(){
   if (exportJob || !SEQ.length) return;
   const mime = pickMime(); if (!mime){ toast("Video export needs Chrome."); return; }
   pause(); await AC.resume().catch(() => {});
-  exporting = true; selected = selected; document.body.classList.add("busy");
+  const _prevSel = selected; exporting = true; selected = null; document.body.classList.add("busy");
   const btn = $("exportBtn"); btn.disabled = true; $("cancelBtn").hidden = false; RES = 1;
   syncVideos(0, true); await new Promise(r => setTimeout(r, 400)); renderFrame(0);
   const vt = cv.captureStream(30).getVideoTracks()[0];
@@ -5942,7 +5950,7 @@ async function exportRealtime(){
   await new Promise(res => play(0, { onEnd:res }).then(() => { exportJob.resolve = res; }));
   clearInterval(prog); vt.stop();
   if (rec.state !== "inactive") rec.stop(); await done;
-  const cancelled = exportJob.cancelled; exportJob = null; exporting = false;
+  const cancelled = exportJob.cancelled; exportJob = null; exporting = false; selected = _prevSel;
   document.body.classList.remove("busy"); btn.disabled = false; btn.textContent = "Export MP4"; $("cancelBtn").hidden = true;
   if (!cancelled && chunks.length){
     const ext = mime.startsWith("video/mp4") ? "mp4" : "webm", d = new Date(), p = n => String(n).padStart(2, "0");
@@ -12275,7 +12283,7 @@ async function exportFast(){
   if (proJob || exportJob || !SEQ.length) return;
   pause(); layoutSeq(); await AC.resume().catch(() => {});
   const fps = +P.exp.fps; RES = resScale(P.exp.res); const { W, H } = geo();
-  proJob = { cancelled:false }; exporting = true; expUI(true, "Preparing...", 0);
+  const _prevSel = selected; selected = null; proJob = { cancelled:false }; exporting = true; expUI(true, "Preparing...", 0);
   let venc = null, aenc = null, err = null;
   try {
     const vpick = await pickVideoConfig(W, H, fps); if (!vpick) throw new Error("this browser has no video encoder for this size");
@@ -12320,7 +12328,7 @@ async function exportFast(){
   } finally {
     try { if (venc && venc.state !== "closed") venc.close(); } catch(e) {}
     try { if (aenc && aenc.state !== "closed") aenc.close(); } catch(e) {}
-    releaseDecoders(); RES = 1; exporting = false; proJob = null; expUI(false);
+    releaseDecoders(); RES = 1; exporting = false; proJob = null; selected = _prevSel; expUI(false);
     renderFrame(playT); syncVideos(playT, true); updateLen();
   }
 }
@@ -12451,7 +12459,7 @@ async function downloadProject(){
     const { doc, media } = await serializeProject();
     const json = new TextEncoder().encode(JSON.stringify({ doc, media:media.map(m => ({ kind:m.kind, name:m.name, type:m.type, size:m.blob.size })) }));
     const head = new Uint8Array(12); head.set(new TextEncoder().encode(PROJ_MAGIC)); new DataView(head.buffer).setUint32(8, json.length, true);
-    downloadBlob(new Blob([head, json, ...media.map(m => m.blob)], { type:"application/octet-stream" }), `${RS.slug(PROJ.name || FILE_PREFIX)}-${stamp(new Date())}.girika`);
+    downloadBlob(new Blob([head, json, ...media.map(m => m.blob)], { type:"application/octet-stream" }), `${RS.slug(PROJ.name || FILE_PREFIX)}-${stamp(new Date())}.${PROJ_EXT}`);
     if (RS.fs.state !== "ready"){ PROJ.dirty = false; PROJ.savedAt = Date.now(); idbClearRecovery(); }
     toast("Project file downloaded. Open it later with Open project.");
   } catch(e){ console.error(e); toast("Could not pack the project."); }
@@ -12464,7 +12472,7 @@ async function openProject(file){
     const len = new DataView(head.buffer).getUint32(8, true), meta = JSON.parse(new TextDecoder().decode(await file.slice(12, 12 + len).arrayBuffer()));
     let off = 12 + len; const files = meta.media.map(m => { const b = file.slice(off, off + m.size, m.type); off += m.size; return new File([b], m.name, { type:m.type }); });
     meta.media.forEach(m => { delete m.file; });
-    if (!meta.doc.name) meta.doc.name = file.name.replace(/\.girika$/i, "").replace(/-\d{8}-\d{4,6}$/, "");
+    if (!meta.doc.name) meta.doc.name = file.name.replace(new RegExp(`\\.(${PROJ_EXT}|girika)$`, "i"), "").replace(/-\d{8}-\d{4,6}$/, "");
     PROJ.slug = ""; PROJ.written = new Set();
     await loadProjectData(meta, files, file.name);
     PROJ.dirty = false; PROJ.savedAt = Date.now(); projState();
@@ -12581,15 +12589,15 @@ async function openProjDlg(){
     const p = el("p", { class:"hint" });
     if (RS.fs.state === "unsupported"){
       p.textContent = isSub
-        ? "This editor is currently running in an embedded frame. Projects and media are autosaved safely in this browser, and you can download or open .girika project files anytime."
-        : "Projects are autosaved safely in this browser. You can also download or open .girika project files below.";
+        ? `This editor is currently running in an embedded frame. Projects and media are autosaved safely in this browser, and you can download or open .${PROJ_EXT} project files anytime.`
+        : `Projects are autosaved safely in this browser. You can also download or open .${PROJ_EXT} project files below.`;
     } else {
-      p.textContent = "Connect your save folder to see your saved folder projects, or download / open a .girika file.";
+      p.textContent = `Connect your save folder to see your saved folder projects, or download / open a .${PROJ_EXT} file.`;
     }
     box.appendChild(p);
     if (projHasContent()){
       const actions = el("div", { class:"row", style:"margin-top:12px;gap:8px" }, [
-        btn("Download this project (.girika)", () => downloadProject(), "btn sm dark"),
+        btn(`Download this project (.${PROJ_EXT})`, () => downloadProject(), "btn sm dark"),
         btn("Autosave now to browser", async () => { await autosaveToBrowser(); toast("Autosaved to browser storage."); }, "btn sm")
       ]);
       box.appendChild(actions);
@@ -13025,12 +13033,12 @@ async function saveFramePNG(){
   if (!SEQ.length){ toast("Add something to the timeline first."); return; }
   pause(); const t = playT, btn0 = $("frameBtn"); btn0.disabled = true;
   try {
-    exporting = true; RES = resScale(P.exp.res); await prepareFrame(t, 30); renderFrame(t);
+    const _prevSel = selected; selected = null; exporting = true; RES = resScale(P.exp.res); await prepareFrame(t, 30); renderFrame(t);
     const blob = await new Promise(r => cv.toBlob(r, "image/png")), { W, H } = geo();
     const d = new Date(), p2 = x => String(x).padStart(2, "0");
     saveOutput(blob, outName("frame", "png"));
     toast(`Saved the frame at ${fmtT(t)} as a ${W} x ${H} PNG.`);
-  } finally { RES = 1; exporting = false; btn0.disabled = false; renderFrame(playT); syncVideos(playT, true); }
+  } finally { RES = 1; exporting = false; selected = _prevSel; btn0.disabled = false; renderFrame(playT); syncVideos(playT, true); }
 }
 $("frameBtn").addEventListener("click", saveFramePNG);
 
